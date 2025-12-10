@@ -1,0 +1,880 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "watch-gateway",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/gateway/ApiGateway",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "watch-user-management",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/user-management/UserManagement",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "watch-inventory",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/inventory/InventoryManagement",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "watch-sales",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/sales/SalesManagement",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "watch-financial",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/financial/FinancialManagement",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "watch-dashboard",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "watch",
+        "run",
+        "--project",
+        "${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/dashboard/DashboardAnalytics",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "watch-all-services",
+      "dependsOn": [
+        "watch-gateway",
+        "watch-user-management",
+        "watch-inventory",
+        "watch-sales",
+        "watch-financial",
+        "watch-dashboard"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": false
+      }
+    },
+    {
+      "label": "run-gateway",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/gateway/ApiGateway",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "run-user-management",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/user-management/UserManagement",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "run-inventory",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/inventory/InventoryManagement",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "run-sales",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/sales/SalesManagement",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "run-financial",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/financial/FinancialManagement",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "run-dashboard",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "run",
+        "--project",
+        "${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj"
+      ],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "backend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/services/dashboard/DashboardAnalytics",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development"
+        }
+      }
+    },
+    {
+      "label": "run-all-services",
+      "dependsOn": [
+        "run-gateway",
+        "run-user-management",
+        "run-inventory",
+        "run-sales",
+        "run-financial",
+        "run-dashboard"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      }
+    },
+    {
+      "label": "build-gateway",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-user-management",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-inventory",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-sales",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-financial",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-dashboard",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "build",
+        "${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj",
+        "/property:GenerateFullPaths=true",
+        "/consoleloggerparameters:NoSummary"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "build"
+    },
+    {
+      "label": "build-all-services",
+      "dependsOn": [
+        "build-gateway",
+        "build-user-management",
+        "build-inventory",
+        "build-sales",
+        "build-financial",
+        "build-dashboard"
+      ],
+      "problemMatcher": [],
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "dev-frontend",
+      "command": "npm",
+      "type": "shell",
+      "args": ["run", "dev"],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "frontend"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "build-frontend",
+      "command": "npm",
+      "type": "shell",
+      "args": ["run", "build"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "dev-infrastructure",
+      "command": "docker-compose",
+      "type": "shell",
+      "args": ["-f", "docker-compose.dev.yml", "up", "-d"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infrastructure"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/infrastructure"
+      }
+    },
+    {
+      "label": "stop-dev-infrastructure",
+      "command": "docker-compose",
+      "type": "shell",
+      "args": ["-f", "docker-compose.dev.yml", "down"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "infrastructure"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/infrastructure"
+      }
+    },
+    {
+      "label": "docker-compose-up",
+      "command": "docker-compose",
+      "type": "shell",
+      "args": ["up", "-d"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "docker-compose-down",
+      "command": "docker-compose",
+      "type": "shell",
+      "args": ["down"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "dev-setup",
+      "dependsOn": [
+        "dev-infrastructure",
+        "watch-all-services",
+        "dev-frontend"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always"
+      }
+    },
+    {
+      "label": "test-user-management",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "test",
+        "${workspaceFolder}/services/user-management/UserManagement.Tests/UserManagement.Tests.csproj",
+        "--verbosity",
+        "minimal"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "test"
+    },
+    {
+      "label": "test-inventory",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "test",
+        "${workspaceFolder}/services/inventory/InventoryManagement.Tests/InventoryManagement.Tests.csproj",
+        "--verbosity",
+        "minimal"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": "test"
+    },
+    {
+      "label": "test-all",
+      "command": "dotnet",
+      "type": "process",
+      "args": [
+        "test",
+        "${workspaceFolder}",
+        "--verbosity",
+        "minimal"
+      ],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "infrastructure-up",
+      "command": "docker-compose",
+      "type": "shell",
+      "args": ["up", "-d"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infrastructure"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/infrastructure"
+      }
+    },
+    {
+      "label": "infrastructure-down",
+      "command": "docker-compose",
+      "type": "shell",
+      "args": ["down"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "infrastructure"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/infrastructure"
+      }
+    },
+    {
+      "label": "infrastructure-logs",
+      "command": "docker-compose",
+      "type": "shell",
+      "args": ["logs", "-f"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infrastructure"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/infrastructure"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "mongodb-shell",
+      "command": "docker",
+      "type": "shell",
+      "args": [
+        "exec",
+        "-it",
+        "erp-mongodb",
+        "mongosh",
+        "-u",
+        "admin",
+        "-p",
+        "admin123"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infrastructure"
+      }
+    },
+    {
+      "label": "kafka-topics-list",
+      "command": "docker",
+      "type": "shell",
+      "args": [
+        "exec",
+        "erp-kafka",
+        "kafka-topics",
+        "--bootstrap-server",
+        "localhost:9092",
+        "--list"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "k8s-deploy-local",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "apply",
+        "-k",
+        "${workspaceFolder}/infrastructure/k8s/local/"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "k8s-delete-local",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "delete",
+        "namespace",
+        "erp-local"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "k8s-logs-all",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "logs",
+        "-f",
+        "-n",
+        "erp-local",
+        "--all-containers=true",
+        "--prefix=true"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "k8s-get-pods",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "get",
+        "pods",
+        "-n",
+        "erp-local",
+        "-o",
+        "wide"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "k8s-get-services",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "get",
+        "services",
+        "-n",
+        "erp-local"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "generate-api-clients",
+      "command": "npm",
+      "type": "shell",
+      "args": [
+        "run",
+        "generate:api"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "generate-api-client-dashboard",
+      "command": "npm",
+      "type": "shell",
+      "args": [
+        "run",
+        "generate:api:service",
+        "dashboard"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "generate-api-client-user-management",
+      "command": "npm",
+      "type": "shell",
+      "args": [
+        "run",
+        "generate:api:service",
+        "user-management"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "generate-api-client-inventory",
+      "command": "npm",
+      "type": "shell",
+      "args": [
+        "run",
+        "generate:api:service",
+        "inventory"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "generate-api-client-sales",
+      "command": "npm",
+      "type": "shell",
+      "args": [
+        "run",
+        "generate:api:service",
+        "sales"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "generate-api-client-financial",
+      "command": "npm",
+      "type": "shell",
+      "args": [
+        "run",
+        "generate:api:service",
+        "financial"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "check-services",
+      "command": "npm",
+      "type": "shell",
+      "args": [
+        "run",
+        "check:services"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/frontend"
+      }
+    },
+    {
+      "label": "skaffold-dev",
+      "command": "skaffold",
+      "type": "shell",
+      "args": ["dev", "--profile=local"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
+      "isBackground": true
+    },
+    {
+      "label": "skaffold-stop",
+      "command": "skaffold",
+      "type": "shell",
+      "args": ["delete"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    }
+  ]
+}

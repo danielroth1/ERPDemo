@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: financial
+  namespace: erp-local
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: financial
+  template:
+    metadata:
+      labels:
+        app: financial
+    spec:
+      containers:
+      - name: financial
+        image: erp/financial
+        ports:
+        - containerPort: 8080
+          name: http
+        env:
+        - name: ASPNETCORE_URLS
+          value: "http://+:8080"
+        - name: ASPNETCORE_ENVIRONMENT
+          value: "Development"
+        - name: MongoDb__ConnectionString
+          valueFrom:
+            secretKeyRef:
+              name: mongodb-secret
+              key: connection-string
+        - name: MongoDb__DatabaseName
+          value: "erp_financial"
+        - name: Kafka__BootstrapServers
+          value: "kafka-service:9092"
+        - name: Jwt__Secret
+          value: "your-secret-key-change-in-production-min-32-chars"
+        - name: Jwt__Issuer
+          value: "erp-system"
+        - name: Jwt__Audience
+          value: "erp-client"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 5
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: financial-service
+  namespace: erp-local
+spec:
+  selector:
+    app: financial
+  ports:
+  - port: 8080
+    targetPort: 8080
+    protocol: TCP
+    name: http

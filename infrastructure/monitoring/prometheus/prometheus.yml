@@ -1,0 +1,101 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'erp-local'
+    environment: 'development'
+
+scrape_configs:
+  # User Management Service
+  - job_name: 'user-management'
+    static_configs:
+      - targets: ['user-management-service:8080']
+    metrics_path: '/metrics'
+
+  # Inventory Service
+  - job_name: 'inventory'
+    static_configs:
+      - targets: ['inventory-service:8080']
+    metrics_path: '/metrics'
+
+  # Sales Service
+  - job_name: 'sales'
+    static_configs:
+      - targets: ['sales-service:8080']
+    metrics_path: '/metrics'
+
+  # Financial Service
+  - job_name: 'financial'
+    static_configs:
+      - targets: ['financial-service:8080']
+    metrics_path: '/metrics'
+
+  # Dashboard Service
+  - job_name: 'dashboard'
+    static_configs:
+      - targets: ['dashboard-service:8080']
+    metrics_path: '/metrics'
+
+  # API Gateway
+  - job_name: 'gateway'
+    static_configs:
+      - targets: ['gateway-service:8080']
+    metrics_path: '/metrics'
+
+  # MongoDB Exporter
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+
+  # Linkerd Proxies
+  - job_name: 'linkerd-proxy'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - erp-local
+            - erp-prod
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        action: keep
+        regex: linkerd-admin
+      - source_labels: [__meta_kubernetes_namespace]
+        action: replace
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        action: replace
+        target_label: pod
+      - source_labels: [__meta_kubernetes_pod_label_linkerd_io_proxy_job]
+        action: replace
+        target_label: k8s_job
+
+  # Linkerd Control Plane
+  - job_name: 'linkerd-controller'
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - linkerd
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_label_linkerd_io_control_plane_component]
+        action: keep
+        regex: .+
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        action: keep
+        regex: admin-http
+      - source_labels: [__meta_kubernetes_pod_label_linkerd_io_control_plane_component]
+        action: replace
+        target_label: component
+
+  # Kafka JMX Exporter
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-jmx-exporter:7071']
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+rule_files:
+  # - "alert_rules.yml"

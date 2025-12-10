@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: erp-local
+  labels:
+    name: erp-local
+    environment: development
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: erp-prod
+  labels:
+    name: erp-prod
+    environment: production

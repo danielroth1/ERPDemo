@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: erp-local
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      containers:
+      - name: prometheus
+        image: prom/prometheus:latest
+        ports:
+        - containerPort: 9090
+          name: http
+        volumeMounts:
+        - name: config
+          mountPath: /etc/prometheus
+        args:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+      volumes:
+      - name: config
+        configMap:
+          name: prometheus-config
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: erp-local
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    scrape_configs:
+      - job_name: 'gateway'
+        static_configs:
+          - targets: ['gateway-service:8080']
+      
+      - job_name: 'user-management'
+        static_configs:
+          - targets: ['user-management-service:8080']
+      
+      - job_name: 'inventory'
+        static_configs:
+          - targets: ['inventory-service:8080']
+      
+      - job_name: 'sales'
+        static_configs:
+          - targets: ['sales-service:8080']
+      
+      - job_name: 'financial'
+        static_configs:
+          - targets: ['financial-service:8080']
+      
+      - job_name: 'dashboard'
+        static_configs:
+          - targets: ['dashboard-service:8080']
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-service
+  namespace: erp-local
+spec:
+  type: LoadBalancer
+  selector:
+    app: prometheus
+  ports:
+  - port: 9090
+    targetPort: 9090
+    protocol: TCP
+    name: http

@@ -1,0 +1,60 @@
+{
+  "version": "1.0.0",
+  "clients": {
+    "dashboard": {
+      "descriptionLocation": "http://localhost:5005/swagger/v1/swagger.json",
+      "includePatterns": ["**/v1/**"],
+      "excludePatterns": [],
+      "language": "typescript",
+      "outputPath": "./frontend/src/generated/clients/dashboard",
+      "clientClassName": "DashboardClient",
+      "structuredMimeTypes": [
+        "application/json"
+      ]
+    },
+    "userManagement": {
+      "descriptionLocation": "http://localhost:5001/swagger/v1/swagger.json",
+      "includePatterns": ["**/v1/**"],
+      "excludePatterns": [],
+      "language": "typescript",
+      "outputPath": "./frontend/src/generated/clients/user-management",
+      "clientClassName": "UserManagementClient",
+      "structuredMimeTypes": [
+        "application/json"
+      ]
+    },
+    "inventory": {
+      "descriptionLocation": "http://localhost:5002/swagger/v1/swagger.json",
+      "includePatterns": ["**/v1/**"],
+      "excludePatterns": [],
+      "language": "typescript",
+      "outputPath": "./frontend/src/generated/clients/inventory",
+      "clientClassName": "InventoryClient",
+      "structuredMimeTypes": [
+        "application/json"
+      ]
+    },
+    "sales": {
+      "descriptionLocation": "http://localhost:5003/swagger/v1/swagger.json",
+      "includePatterns": ["**/v1/**"],
+      "excludePatterns": [],
+      "language": "typescript",
+      "outputPath": "./frontend/src/generated/clients/sales",
+      "clientClassName": "SalesClient",
+      "structuredMimeTypes": [
+        "application/json"
+      ]
+    },
+    "financial": {
+      "descriptionLocation": "http://localhost:5004/swagger/v1/swagger.json",
+      "includePatterns": ["**/v1/**"],
+      "excludePatterns": [],
+      "language": "typescript",
+      "outputPath": "./frontend/src/generated/clients/financial",
+      "clientClassName": "FinancialClient",
+      "structuredMimeTypes": [
+        "application/json"
+      ]
+    }
+  }
+}

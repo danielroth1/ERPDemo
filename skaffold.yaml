@@ -1,0 +1,167 @@
+apiVersion: skaffold/v4beta7
+kind: Config
+metadata:
+  name: erp-system
+
+# Build configuration for all services
+build:
+  artifacts:
+    # Backend services
+    - image: erp/user-management
+      context: services/user-management
+      docker:
+        dockerfile: Dockerfile
+    
+    - image: erp/inventory
+      context: services/inventory
+      docker:
+        dockerfile: Dockerfile
+    
+    - image: erp/sales
+      context: services/sales
+      docker:
+        dockerfile: Dockerfile
+    
+    - image: erp/financial
+      context: services/financial
+      docker:
+        dockerfile: Dockerfile
+    
+    - image: erp/dashboard
+      context: services/dashboard
+      docker:
+        dockerfile: Dockerfile
+    
+    - image: erp/gateway
+      context: services/gateway
+      docker:
+        dockerfile: Dockerfile
+    
+    # Frontend
+    - image: erp/frontend
+      context: frontend
+      docker:
+        dockerfile: Dockerfile
+  
+  tagPolicy:
+    gitCommit: {}
+
+# Deploy configuration
+deploy:
+  kubectl:
+    paths:
+      - infrastructure/k8s/local/*.yaml
+
+# Port forwarding for local access
+portForward:
+  - resourceType: service
+    resourceName: frontend
+    port: 80
+    localPort: 3000
+  
+  - resourceType: service
+    resourceName: gateway
+    port: 80
+    localPort: 8080
+  
+  - resourceType: service
+    resourceName: grafana
+    port: 3000
+    localPort: 3001
+
+# Profiles for different environments
+profiles:
+  # Local development profile (default)
+  - name: local
+    activation:
+      - command: dev
+    deploy:
+      kubectl:
+        paths:
+          - infrastructure/k8s/base/namespace.yaml
+          - infrastructure/k8s/base/mongodb.yaml
+          - infrastructure/k8s/base/kafka.yaml
+          - infrastructure/k8s/base/user-management.yaml
+          - infrastructure/k8s/base/inventory.yaml
+          - infrastructure/k8s/base/sales.yaml
+          - infrastructure/k8s/base/financial.yaml
+          - infrastructure/k8s/base/dashboard.yaml
+          - infrastructure/k8s/base/gateway.yaml
+          - infrastructure/k8s/base/frontend.yaml
+          - infrastructure/k8s/base/prometheus.yaml
+          - infrastructure/k8s/base/grafana.yaml
+    
+    # File sync for hot reload
+    build:
+      artifacts:
+        - image: erp/user-management
+          sync:
+            manual:
+              - src: "**/*.cs"
+                dest: /app
+        - image: erp/inventory
+          sync:
+            manual:
+              - src: "**/*.cs"
+                dest: /app
+        - image: erp/sales
+          sync:
+            manual:
+              - src: "**/*.cs"
+                dest: /app
+        - image: erp/financial
+          sync:
+            manual:
+              - src: "**/*.cs"
+                dest: /app
+        - image: erp/dashboard
+          sync:
+            manual:
+              - src: "**/*.cs"
+                dest: /app
+        - image: erp/gateway
+          sync:
+            manual:
+              - src: "**/*.cs"
+                dest: /app
+        - image: erp/frontend
+          sync:
+            manual:
+              - src: "src/**/*"
+                dest: /app/src
+
+  # Testing profile for CI/CD
+  - name: testing
+    deploy:
+      kubectl:
+        paths:
+          - infrastructure/k8s/base/namespace.yaml
+          - infrastructure/k8s/base/mongodb.yaml
+          - infrastructure/k8s/base/kafka.yaml
+          - infrastructure/k8s/base/user-management.yaml
+          - infrastructure/k8s/base/inventory.yaml
+          - infrastructure/k8s/base/sales.yaml
+          - infrastructure/k8s/base/financial.yaml
+          - infrastructure/k8s/base/dashboard.yaml
+          - infrastructure/k8s/base/gateway.yaml
+          - infrastructure/k8s/base/frontend.yaml
+          - infrastructure/k8s/base/prometheus.yaml
+          - infrastructure/k8s/base/grafana.yaml
+
+  # Production profile
+  - name: production
+    deploy:
+      kubectl:
+        paths:
+          - infrastructure/k8s/base/namespace.yaml
+          - infrastructure/k8s/base/mongodb.yaml
+          - infrastructure/k8s/base/kafka.yaml
+          - infrastructure/k8s/base/user-management.yaml
+          - infrastructure/k8s/base/inventory.yaml
+          - infrastructure/k8s/base/sales.yaml
+          - infrastructure/k8s/base/financial.yaml
+          - infrastructure/k8s/base/dashboard.yaml
+          - infrastructure/k8s/base/gateway.yaml
+          - infrastructure/k8s/base/frontend.yaml
+          - infrastructure/k8s/base/prometheus.yaml
+          - infrastructure/k8s/base/grafana.yaml

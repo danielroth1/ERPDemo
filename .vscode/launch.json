@@ -1,0 +1,335 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launch API Gateway",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-gateway",
+      "program": "${workspaceFolder}/services/gateway/ApiGateway/bin/Debug/net8.0/ApiGateway.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/services/gateway/ApiGateway",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:8080"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch User Management",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-user-management",
+      "program": "${workspaceFolder}/services/user-management/UserManagement/bin/Debug/net8.0/UserManagement.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/services/user-management/UserManagement",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5001"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch Inventory Management",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-inventory",
+      "program": "${workspaceFolder}/services/inventory/InventoryManagement/bin/Debug/net8.0/InventoryManagement.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/services/inventory/InventoryManagement",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5002"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch Sales & Orders",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-sales-orders",
+      "program": "${workspaceFolder}/services/sales-orders/SalesOrders/bin/Debug/net8.0/SalesOrders.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/services/sales-orders/SalesOrders",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5003"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch Financial Management",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-financial",
+      "program": "${workspaceFolder}/services/financial/FinancialManagement/bin/Debug/net8.0/FinancialManagement.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/services/financial/FinancialManagement",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5004"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Launch Dashboard & Analytics",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-dashboard",
+      "program": "${workspaceFolder}/services/dashboard/DashboardAnalytics/bin/Debug/net8.0/DashboardAnalytics.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}/services/dashboard/DashboardAnalytics",
+      "stopAtEntry": false,
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+        "uriFormat": "%s/swagger"
+      },
+      "env": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "ASPNETCORE_URLS": "http://localhost:5005"
+      },
+      "sourceFileMap": {
+        "/Views": "${workspaceFolder}/Views"
+      }
+    },
+    {
+      "name": "Attach to API Gateway",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "ApiGateway"
+    },
+    {
+      "name": "Attach to User Management",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "UserManagement"
+    },
+    {
+      "name": "Attach to Inventory Management",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "InventoryManagement"
+    },
+    {
+      "name": "Attach to Sales & Orders",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "SalesOrders"
+    },
+    {
+      "name": "Attach to Financial Management",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "FinancialManagement"
+    },
+    {
+      "name": "Attach to Dashboard & Analytics",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "DashboardAnalytics"
+    },
+    {
+      "name": "Launch Frontend (Chrome)",
+      "type": "chrome",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "dev-frontend",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/src/*"
+      }
+    },
+    {
+      "name": "Launch Frontend (Edge)",
+      "type": "msedge",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "dev-frontend",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/src/*"
+      }
+    },
+    {
+      "name": "Launch Frontend (Firefox)",
+      "type": "firefox",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "dev-frontend",
+      "pathMappings": [
+        {
+          "url": "http://localhost:5173",
+          "path": "${workspaceFolder}/frontend"
+        }
+      ]
+    },
+    {
+      "name": "Attach to Frontend (Chrome)",
+      "type": "chrome",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/frontend",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/src/*"
+      }
+    },
+    {
+      "name": "Attach to Frontend (Edge)",
+      "type": "msedge",
+      "request": "attach",
+      "port": 9222,
+      "webRoot": "${workspaceFolder}/frontend",
+      "sourceMaps": true,
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/src/*"
+      }
+    },
+    {
+      "name": "Attach to Frontend (Firefox)",
+      "type": "firefox",
+      "request": "attach",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "pathMappings": [
+        {
+          "url": "http://localhost:5173",
+          "path": "${workspaceFolder}/frontend"
+        }
+      ]
+    }
+  ],
+  "compounds": [
+    {
+      "name": "Launch All Backend Services",
+      "configurations": [
+        "Launch API Gateway",
+        "Launch User Management",
+        "Launch Inventory Management",
+        "Launch Sales & Orders",
+        "Launch Financial Management",
+        "Launch Dashboard & Analytics"
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "all",
+        "order": 1
+      },
+      "stopAll": true
+    },
+    {
+      "name": "Attach to All Services",
+      "configurations": [
+        "Attach to API Gateway",
+        "Attach to User Management",
+        "Attach to Inventory Management",
+        "Attach to Sales & Orders",
+        "Attach to Financial Management",
+        "Attach to Dashboard & Analytics"
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "attach",
+        "order": 1
+      }
+    },
+    {
+      "name": "Launch Full Stack (Chrome)",
+      "configurations": [
+        "Launch API Gateway",
+        "Launch User Management",
+        "Launch Inventory Management",
+        "Launch Sales & Orders",
+        "Launch Financial Management",
+        "Launch Dashboard & Analytics",
+        "Launch Frontend (Chrome)"
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "fullstack",
+        "order": 1
+      },
+      "stopAll": true
+    },
+    {
+      "name": "Launch Full Stack (Edge)",
+      "configurations": [
+        "Launch API Gateway",
+        "Launch User Management",
+        "Launch Inventory Management",
+        "Launch Sales & Orders",
+        "Launch Financial Management",
+        "Launch Dashboard & Analytics",
+        "Launch Frontend (Edge)"
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "fullstack",
+        "order": 2
+      },
+      "stopAll": true
+    },
+    {
+      "name": "Launch Full Stack (Firefox)",
+      "configurations": [
+        "Launch API Gateway",
+        "Launch User Management",
+        "Launch Inventory Management",
+        "Launch Sales & Orders",
+        "Launch Financial Management",
+        "Launch Dashboard & Analytics",
+        "Launch Frontend (Firefox)"
+      ],
+      "presentation": {
+        "hidden": false,
+        "group": "fullstack",
+        "order": 3
+      },
+      "stopAll": true
+    }
+  ]
+}

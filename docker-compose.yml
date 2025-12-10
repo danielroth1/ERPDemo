@@ -1,0 +1,273 @@
+services:
+  # MongoDB - Single instance with multiple databases
+  mongodb:
+    image: mongo:7
+    container_name: erp-mongodb
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+    volumes:
+      - mongodb-data:/data/db
+      - ./infrastructure/docker/mongodb-init.js:/docker-entrypoint-initdb.d/init.js:ro
+    networks:
+      - erp-network
+
+  # Kafka with KRaft (no Zookeeper)
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: erp-kafka
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093,EXTERNAL://0.0.0.0:9094
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092,EXTERNAL://localhost:9094
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - erp-network
+
+  # Kafka UI
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: erp-kafka-ui
+    ports:
+      - "9001:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
+    depends_on:
+      - kafka
+    networks:
+      - erp-network
+
+  # User Management Service
+  user-management:
+    build:
+      context: ./services/user-management
+      dockerfile: Dockerfile
+    container_name: erp-user-management
+    ports:
+      - "5001:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
+      MongoDB__DatabaseName: erp_users
+      Kafka__BootstrapServers: kafka:9092
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER:-erp-system}
+      Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
+      Smtp__Host: ${SMTP_HOST}
+      Smtp__Port: ${SMTP_PORT}
+      Smtp__Username: ${SMTP_USERNAME}
+      Smtp__Password: ${SMTP_PASSWORD}
+      Smtp__FromEmail: ${SMTP_FROM_EMAIL}
+    depends_on:
+      - mongodb
+      - kafka
+    networks:
+      - erp-network
+
+  # Inventory Service
+  inventory:
+    build:
+      context: ./services/inventory
+      dockerfile: Dockerfile
+    container_name: erp-inventory
+    ports:
+      - "5002:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
+      MongoDB__DatabaseName: erp_inventory
+      Kafka__BootstrapServers: kafka:9092
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER:-erp-system}
+      Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
+      Services__Financial: http://financial:8080
+    depends_on:
+      - mongodb
+      - kafka
+      - financial
+    networks:
+      - erp-network
+
+  # Sales Service
+  sales:
+    build:
+      context: ./services/sales
+      dockerfile: Dockerfile
+    container_name: erp-sales
+    ports:
+      - "5003:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
+      MongoDB__DatabaseName: erp_sales
+      Kafka__BootstrapServers: kafka:9092
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER:-erp-system}
+      Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
+    depends_on:
+      - mongodb
+      - kafka
+    networks:
+      - erp-network
+
+  # Financial Service
+  financial:
+    build:
+      context: ./services/financial
+      dockerfile: Dockerfile
+    container_name: erp-financial
+    ports:
+      - "5004:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
+      MongoDB__DatabaseName: erp_financial
+      Kafka__BootstrapServers: kafka:9092
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER:-erp-system}
+      Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
+    depends_on:
+      - mongodb
+      - kafka
+    networks:
+      - erp-network
+
+  # Dashboard Service
+  dashboard:
+    build:
+      context: ./services/dashboard
+      dockerfile: Dockerfile
+    container_name: erp-dashboard
+    ports:
+      - "5005:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
+      MongoDB__DatabaseName: erp_dashboard
+      Kafka__BootstrapServers: kafka:9092
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER:-erp-system}
+      Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
+    depends_on:
+      - mongodb
+      - kafka
+    networks:
+      - erp-network
+
+  # API Gateway
+  gateway:
+    build:
+      context: ./services/gateway
+      dockerfile: Dockerfile
+    container_name: erp-gateway
+    ports:
+      - "8080:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER:-erp-system}
+      Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
+      Services__UserManagement: http://user-management:8080
+      Services__Inventory: http://inventory:8080
+      Services__Sales: http://sales:8080
+      Services__Financial: http://financial:8080
+      Services__Dashboard: http://dashboard:8080
+    depends_on:
+      - user-management
+      - inventory
+      - sales
+      - financial
+      - dashboard
+    networks:
+      - erp-network
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_API_GATEWAY_URL: https://shopping-now.net
+    container_name: erp-frontend
+    ports:
+      - "8081:80"
+    depends_on:
+      - gateway
+    networks:
+      - erp-network
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: erp-prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./infrastructure/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+    networks:
+      - erp-network
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: erp-grafana
+    ports:
+      - "3001:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./infrastructure/monitoring/grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./infrastructure/monitoring/grafana/dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+      - ./infrastructure/monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - erp-network
+
+  # Loki
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: erp-loki
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./infrastructure/logging/loki-config.yml:/etc/loki/config.yaml:ro
+      - loki-data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - erp-network
+
+networks:
+  erp-network:
+    driver: bridge
+
+volumes:
+  mongodb-data:
+  kafka-data:
+  prometheus-data:
+  grafana-data:
+  loki-data:
