@@ -1,104 +1,93 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace InventoryManagement.Models;
 
+[Table("products")]
+[Index(nameof(Sku), IsUnique = true)]
+[Index(nameof(CategoryId))]
 public class Product
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
+    [Key]
     public string Id { get; set; } = string.Empty;
 
-    [BsonElement("sku")]
-    [BsonRequired]
+    [Required]
+    [MaxLength(50)]
     public string Sku { get; set; } = string.Empty;
 
-    [BsonElement("name")]
-    [BsonRequired]
+    [Required]
+    [MaxLength(255)]
     public string Name { get; set; } = string.Empty;
 
-    [BsonElement("description")]
     public string Description { get; set; } = string.Empty;
 
-    [BsonElement("categoryId")]
     public string CategoryId { get; set; } = string.Empty;
 
-    [BsonElement("price")]
+    [Precision(18, 2)]
     public decimal Price { get; set; }
 
-    [BsonElement("cost")]
+    [Precision(18, 2)]
     public decimal Cost { get; set; }
 
-    [BsonElement("stockQuantity")]
     public int StockQuantity { get; set; }
 
-    [BsonElement("minStockLevel")]
     public int MinStockLevel { get; set; } = 10;
 
-    [BsonElement("maxStockLevel")]
     public int MaxStockLevel { get; set; } = 1000;
 
-    [BsonElement("unit")]
+    [MaxLength(20)]
     public string Unit { get; set; } = "pcs";
 
-    [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+    [NotMapped]
     public bool IsLowStock => StockQuantity <= MinStockLevel;
 }
 
+[Table("categories")]
+[Index(nameof(Name), IsUnique = true)]
 public class Category
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
+    [Key]
     public string Id { get; set; } = string.Empty;
 
-    [BsonElement("name")]
-    [BsonRequired]
+    [Required]
+    [MaxLength(100)]
     public string Name { get; set; } = string.Empty;
 
-    [BsonElement("description")]
     public string Description { get; set; } = string.Empty;
 
-    [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 
+[Table("stock_movements")]
+[Index(nameof(ProductId))]
 public class StockMovement
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
+    [Key]
     public string Id { get; set; } = string.Empty;
 
-    [BsonElement("productId")]
-    [BsonRequired]
+    [Required]
     public string ProductId { get; set; } = string.Empty;
 
-    [BsonElement("movementType")]
     public MovementType MovementType { get; set; }
 
-    [BsonElement("quantity")]
     public int Quantity { get; set; }
 
-    [BsonElement("reference")]
+    [MaxLength(100)]
     public string Reference { get; set; } = string.Empty;
 
-    [BsonElement("notes")]
     public string Notes { get; set; } = string.Empty;
 
-    [BsonElement("createdBy")]
     public string CreatedBy { get; set; } = string.Empty;
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }
 

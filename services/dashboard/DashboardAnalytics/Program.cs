@@ -1,12 +1,12 @@
 using Serilog;
 using Serilog.Formatting.Compact;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using DashboardAnalytics.Configuration;
 using DashboardAnalytics.Infrastructure;
 using DashboardAnalytics.Services;
-using DashboardAnalytics.HealthChecks;
 using DashboardAnalytics.Hubs;
 using DashboardAnalytics.GraphQL;
 using Prometheus;
@@ -24,15 +24,21 @@ try
     builder.Host.UseSerilog();
 
     // Configure settings
-    builder.Services.Configure<MongoDbSettings>(
-        builder.Configuration.GetSection("MongoDb"));
+    var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>()
+        ?? throw new InvalidOperationException("PostgreSQL configuration is missing");
+    builder.Services.AddSingleton(postgresSettings);
+    
     builder.Services.Configure<JwtSettings>(
         builder.Configuration.GetSection("Jwt"));
     builder.Services.Configure<KafkaSettings>(
         builder.Configuration.GetSection("Kafka"));
 
-    // Add infrastructure
-    builder.Services.AddSingleton<MongoDbContext>();
+    // Add PostgreSQL DbContext
+    builder.Services.AddDbContext<AppDbContext>(options =>
+        options.UseNpgsql(postgresSettings.ConnectionString)
+            .UseSnakeCaseNamingConvention());
+
+    // Add Kafka consumer
     builder.Services.AddHostedService<KafkaConsumerService>();
 
     // Add services
@@ -120,7 +126,10 @@ try
 
     // Add health checks
     builder.Services.AddHealthChecks()
-        .AddCheck<MongoDbHealthCheck>("mongodb");
+        .AddNpgSql(
+            postgresSettings.ConnectionString,
+            name: "postgresql",
+            timeout: TimeSpan.FromSeconds(3));
 
     // Add CORS
     builder.Services.AddCors(options =>
@@ -135,6 +144,14 @@ try
     });
 
     var app = builder.Build();
+
+    // Apply migrations on startup in development
+    if (app.Environment.IsDevelopment())
+    {
+        using var scope = app.Services.CreateScope();
+        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        dbContext.Database.EnsureCreated();
+    }
 
     // Configure middleware
     app.UseSerilogRequestLogging();
@@ -168,7 +185,6 @@ try
     // Display startup information
     var urls = app.Configuration["ASPNETCORE_URLS"] ?? "http://localhost:5005";
     var environment = app.Environment.EnvironmentName;
-    var mongoDbSettings = app.Configuration.GetSection("MongoDb").Get<MongoDbSettings>();
     
     Console.WriteLine("\n" + new string('=', 80));
     Console.WriteLine("DASHBOARD & ANALYTICS SERVICE - Enterprise Resource Planning System");
@@ -183,7 +199,7 @@ try
     Console.WriteLine($"Health Check:       {urls}/health/live");
     Console.WriteLine($"Ready Check:        {urls}/health/ready");
     Console.WriteLine($"Metrics:            {urls}/metrics");
-    Console.WriteLine($"Database:           MongoDB - {mongoDbSettings?.ConnectionString.Split('@').LastOrDefault()?.Split('?').FirstOrDefault() ?? "configured"}");
+    Console.WriteLine($"Database:           PostgreSQL - {postgresSettings.ConnectionString.Split(';').FirstOrDefault(s => s.Contains("Host="))?.Replace("Host=", "") ?? "configured"}");
     Console.WriteLine($"Started at:         {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
     Console.WriteLine(new string('=', 80) + "\n");
     

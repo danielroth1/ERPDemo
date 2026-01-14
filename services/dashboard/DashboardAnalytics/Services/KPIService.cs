@@ -1,7 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using DashboardAnalytics.Infrastructure;
 using DashboardAnalytics.Models;
 using DashboardAnalytics.Models.DTOs;
-using MongoDB.Driver;
 
 namespace DashboardAnalytics.Services;
 
@@ -16,12 +16,12 @@ public interface IKPIService
 
 public class KPIService : IKPIService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<KPIService> _logger;
 
-    public KPIService(MongoDbContext context, ILogger<KPIService> logger)
+    public KPIService(AppDbContext dbContext, ILogger<KPIService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _logger = logger;
     }
 
@@ -29,27 +29,31 @@ public class KPIService : IKPIService
     {
         var kpi = new KPI
         {
+            Id = Guid.NewGuid().ToString(),
             Name = request.Name,
             Description = request.Description,
             TargetValue = request.TargetValue,
             CurrentValue = 0,
             PreviousValue = 0,
-            Status = KPIStatus.OnTrack
+            Status = KPIStatus.OnTrack,
+            LastUpdated = DateTime.UtcNow
         };
 
-        await _context.KPIs.InsertOneAsync(kpi);
+        _dbContext.KPIs.Add(kpi);
+        await _dbContext.SaveChangesAsync();
+        
         _logger.LogInformation("Created KPI: {Name}", kpi.Name);
         return kpi;
     }
 
     public async Task<KPI?> GetKPIByIdAsync(string id)
     {
-        return await _context.KPIs.Find(k => k.Id == id).FirstOrDefaultAsync();
+        return await _dbContext.KPIs.FindAsync(id);
     }
 
     public async Task<List<KPI>> GetAllKPIsAsync()
     {
-        return await _context.KPIs.Find(_ => true).ToListAsync();
+        return await _dbContext.KPIs.ToListAsync();
     }
 
     public async Task<KPI?> UpdateKPIAsync(string id, UpdateKPIRequest request)
@@ -74,8 +78,7 @@ public class KPIService : IKPIService
 
         kpi.LastUpdated = DateTime.UtcNow;
 
-        var filter = Builders<KPI>.Filter.Eq(k => k.Id, id);
-        await _context.KPIs.ReplaceOneAsync(filter, kpi);
+        await _dbContext.SaveChangesAsync();
         
         _logger.LogInformation("Updated KPI: {Name}", kpi.Name);
         return kpi;
@@ -83,7 +86,11 @@ public class KPIService : IKPIService
 
     public async Task<bool> DeleteKPIAsync(string id)
     {
-        var result = await _context.KPIs.DeleteOneAsync(k => k.Id == id);
-        return result.DeletedCount > 0;
+        var kpi = await _dbContext.KPIs.FindAsync(id);
+        if (kpi == null) return false;
+
+        _dbContext.KPIs.Remove(kpi);
+        await _dbContext.SaveChangesAsync();
+        return true;
     }
 }

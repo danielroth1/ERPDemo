@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using FinancialManagement.Infrastructure;
 using FinancialManagement.Models;
 using FinancialManagement.Models.DTOs;
@@ -13,12 +13,12 @@ public interface IReportService
 
 public class ReportService : IReportService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<ReportService> _logger;
 
-    public ReportService(MongoDbContext context, ILogger<ReportService> logger)
+    public ReportService(AppDbContext dbContext, ILogger<ReportService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _logger = logger;
     }
 
@@ -26,8 +26,8 @@ public class ReportService : IReportService
     {
         _logger.LogInformation("Generating balance sheet as of {AsOfDate}", asOfDate);
 
-        var accounts = await _context.Accounts
-            .Find(a => a.IsActive)
+        var accounts = await _dbContext.Accounts
+            .Where(a => a.IsActive)
             .ToListAsync();
 
         var assets = new AssetSection();
@@ -105,21 +105,19 @@ public class ReportService : IReportService
         _logger.LogInformation("Generating income statement from {StartDate} to {EndDate}", 
             startDate, endDate);
 
-        var accounts = await _context.Accounts
-            .Find(a => a.IsActive && (a.Type == AccountType.Revenue || a.Type == AccountType.Expense))
+        var accounts = await _dbContext.Accounts
+            .Where(a => a.IsActive && (a.Type == AccountType.Revenue || a.Type == AccountType.Expense))
             .ToListAsync();
 
         var revenue = new List<AccountBalance>();
         var expenses = new List<AccountBalance>();
 
         // Get transactions in date range to calculate period balances
-        var filter = Builders<Transaction>.Filter.And(
-            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Posted),
-            Builders<Transaction>.Filter.Gte(t => t.Date, startDate),
-            Builders<Transaction>.Filter.Lte(t => t.Date, endDate)
-        );
-
-        var transactions = await _context.Transactions.Find(filter).ToListAsync();
+        var transactions = await _dbContext.Transactions
+            .Where(t => t.Status == TransactionStatus.Posted &&
+                       t.Date >= startDate &&
+                       t.Date <= endDate)
+            .ToListAsync();
 
         // Calculate account balances for the period
         var accountBalances = new Dictionary<string, decimal>();

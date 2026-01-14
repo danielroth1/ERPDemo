@@ -1,18 +1,24 @@
 services:
-  # MongoDB - Single instance with multiple databases
-  mongodb:
-    image: mongo:7
-    container_name: erp-mongodb
+  # PostgreSQL - Single instance with multiple databases
+  postgres:
+    image: postgres:16-alpine
+    container_name: erp-postgres
     ports:
-      - "27017:27017"
+      - "5432:5432"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_MULTIPLE_DATABASES: erp_users,erp_inventory,erp_sales,erp_financial,erp_dashboard
     volumes:
-      - mongodb-data:/data/db
-      - ./infrastructure/docker/mongodb-init.js:/docker-entrypoint-initdb.d/init.js:ro
+      - postgres-data:/var/lib/postgresql/data
+      - ./infrastructure/docker/postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
     networks:
       - erp-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Kafka with KRaft (no Zookeeper)
   kafka:
@@ -64,8 +70,7 @@ services:
       - "5001:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
-      MongoDB__DatabaseName: erp_users
+      PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_users;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
       Kafka__BootstrapServers: kafka:9092
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER:-erp-system}
@@ -76,8 +81,10 @@ services:
       Smtp__Password: ${SMTP_PASSWORD}
       Smtp__FromEmail: ${SMTP_FROM_EMAIL}
     depends_on:
-      - mongodb
-      - kafka
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -91,17 +98,19 @@ services:
       - "5002:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
-      MongoDB__DatabaseName: erp_inventory
+      PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_inventory;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
       Kafka__BootstrapServers: kafka:9092
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER:-erp-system}
       Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
       Services__Financial: http://financial:8080
     depends_on:
-      - mongodb
-      - kafka
-      - financial
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+      financial:
+        condition: service_started
     networks:
       - erp-network
 
@@ -115,15 +124,16 @@ services:
       - "5003:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
-      MongoDB__DatabaseName: erp_sales
+      PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_sales;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
       Kafka__BootstrapServers: kafka:9092
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER:-erp-system}
       Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
     depends_on:
-      - mongodb
-      - kafka
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -137,15 +147,16 @@ services:
       - "5004:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
-      MongoDB__DatabaseName: erp_financial
+      PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_financial;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
       Kafka__BootstrapServers: kafka:9092
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER:-erp-system}
       Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
     depends_on:
-      - mongodb
-      - kafka
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -159,15 +170,16 @@ services:
       - "5005:8080"
     environment:
       ASPNETCORE_ENVIRONMENT: Production
-      MongoDB__ConnectionString: mongodb://${MONGODB_ROOT_USERNAME:-admin}:${MONGODB_ROOT_PASSWORD}@mongodb:27017
-      MongoDB__DatabaseName: erp_dashboard
+      PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_dashboard;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
       Kafka__BootstrapServers: kafka:9092
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER:-erp-system}
       Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
     depends_on:
-      - mongodb
-      - kafka
+      postgres:
+        condition: service_healthy
+      kafka:
+        condition: service_started
     networks:
       - erp-network
 
@@ -266,7 +278,7 @@ networks:
     driver: bridge
 
 volumes:
-  mongodb-data:
+  postgres-data:
   kafka-data:
   prometheus-data:
   grafana-data:

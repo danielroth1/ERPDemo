@@ -64,23 +64,23 @@ public class DatabaseQuery
             service.DatabaseName,
             service.ConnectionString,
             service.Port,
-            service.Collections.Select(MapCollectionToResponse).ToList(),
+            service.Tables.Select(MapCollectionToResponse).ToList(),
             MapStatsToResponse(service.Stats),
             service.IsConnected,
             service.ErrorMessage
         );
     }
 
-    private static CollectionInfoResponse MapCollectionToResponse(CollectionInfo collection)
+    private static CollectionInfoResponse MapCollectionToResponse(TableInfo table)
     {
         return new CollectionInfoResponse(
-            collection.Name,
-            collection.DocumentCount,
-            collection.SizeInBytes,
-            collection.AverageSizeInBytes,
-            collection.Indexes.Select(MapIndexToResponse).ToList(),
-            collection.SampleDocument,
-            collection.Schema
+            table.Name,
+            table.RowCount,
+            table.SizeInBytes,
+            table.AverageSizeInBytes,
+            table.Indexes.Select(MapIndexToResponse).ToList(),
+            table.SampleDocument,
+            table.Schema
         );
     }
 

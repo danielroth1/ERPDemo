@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using SalesManagement.Infrastructure;
 using SalesManagement.Models;
 using SalesManagement.Models.DTOs;
@@ -19,7 +19,7 @@ public interface IOrderService
 
 public class OrderService : IOrderService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly ICustomerService _customerService;
     private readonly KafkaProducer _kafkaProducer;
     private readonly ILogger<OrderService> _logger;
@@ -27,12 +27,12 @@ public class OrderService : IOrderService
     private const decimal TaxRate = 0.1m; // 10% tax
 
     public OrderService(
-        MongoDbContext context,
+        AppDbContext dbContext,
         ICustomerService customerService,
         KafkaProducer kafkaProducer,
         ILogger<OrderService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _customerService = customerService;
         _kafkaProducer = kafkaProducer;
         _logger = logger;
@@ -78,6 +78,7 @@ public class OrderService : IOrderService
 
         var order = new Order
         {
+            Id = Guid.NewGuid().ToString(),
             CustomerId = request.CustomerId,
             OrderNumber = orderNumber,
             Items = items,
@@ -88,10 +89,13 @@ public class OrderService : IOrderService
             Status = OrderStatus.Pending,
             Notes = request.Notes,
             ShippingAddress = request.ShippingAddress != null ? MapAddress(request.ShippingAddress) : customer.DefaultShippingAddress,
-            BillingAddress = request.BillingAddress != null ? MapAddress(request.BillingAddress) : customer.DefaultBillingAddress
+            BillingAddress = request.BillingAddress != null ? MapAddress(request.BillingAddress) : customer.DefaultBillingAddress,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        await _context.Orders.InsertOneAsync(order);
+        _dbContext.Orders.Add(order);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created order {OrderNumber} for customer {CustomerId}", orderNumber, request.CustomerId);
 
@@ -118,17 +122,16 @@ public class OrderService : IOrderService
 
     public async Task<OrderResponse?> GetOrderByIdAsync(string id)
     {
-        var order = await _context.Orders.Find(o => o.Id == id).FirstOrDefaultAsync();
+        var order = await _dbContext.Orders.FindAsync(id);
         return order != null ? MapToResponse(order) : null;
     }
 
     public async Task<List<OrderResponse>> GetAllOrdersAsync(int skip = 0, int limit = 100)
     {
-        var orders = await _context.Orders
-            .Find(_ => true)
-            .SortByDescending(o => o.CreatedAt)
+        var orders = await _dbContext.Orders
+            .OrderByDescending(o => o.CreatedAt)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return orders.Select(MapToResponse).ToList();
@@ -136,11 +139,11 @@ public class OrderService : IOrderService
 
     public async Task<List<OrderResponse>> GetOrdersByCustomerAsync(string customerId, int skip = 0, int limit = 100)
     {
-        var orders = await _context.Orders
-            .Find(o => o.CustomerId == customerId)
-            .SortByDescending(o => o.CreatedAt)
+        var orders = await _dbContext.Orders
+            .Where(o => o.CustomerId == customerId)
+            .OrderByDescending(o => o.CreatedAt)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return orders.Select(MapToResponse).ToList();
@@ -148,11 +151,11 @@ public class OrderService : IOrderService
 
     public async Task<List<OrderResponse>> GetOrdersByStatusAsync(OrderStatus status, int skip = 0, int limit = 100)
     {
-        var orders = await _context.Orders
-            .Find(o => o.Status == status)
-            .SortByDescending(o => o.CreatedAt)
+        var orders = await _dbContext.Orders
+            .Where(o => o.Status == status)
+            .OrderByDescending(o => o.CreatedAt)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return orders.Select(MapToResponse).ToList();
@@ -160,7 +163,7 @@ public class OrderService : IOrderService
 
     public async Task<OrderResponse?> UpdateOrderAsync(string id, UpdateOrderRequest request)
     {
-        var order = await _context.Orders.Find(o => o.Id == id).FirstOrDefaultAsync();
+        var order = await _dbContext.Orders.FindAsync(id);
         if (order == null) return null;
 
         // Can only update draft or pending orders
@@ -213,7 +216,7 @@ public class OrderService : IOrderService
 
         order.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Orders.ReplaceOneAsync(o => o.Id == id, order);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Updated order {OrderNumber}", order.OrderNumber);
 
@@ -222,7 +225,7 @@ public class OrderService : IOrderService
 
     public async Task<OrderResponse?> UpdateOrderStatusAsync(string id, OrderStatus status)
     {
-        var order = await _context.Orders.Find(o => o.Id == id).FirstOrDefaultAsync();
+        var order = await _dbContext.Orders.FindAsync(id);
         if (order == null) return null;
 
         var oldStatus = order.Status;
@@ -238,7 +241,7 @@ public class OrderService : IOrderService
             order.CancelledAt = DateTime.UtcNow;
         }
 
-        await _context.Orders.ReplaceOneAsync(o => o.Id == id, order);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Updated order {OrderNumber} status from {OldStatus} to {NewStatus}", 
             order.OrderNumber, oldStatus, status);
@@ -260,7 +263,7 @@ public class OrderService : IOrderService
 
     public async Task<bool> DeleteOrderAsync(string id)
     {
-        var order = await _context.Orders.Find(o => o.Id == id).FirstOrDefaultAsync();
+        var order = await _dbContext.Orders.FindAsync(id);
         if (order == null) return false;
 
         // Can only delete draft orders
@@ -269,16 +272,17 @@ public class OrderService : IOrderService
             throw new InvalidOperationException($"Cannot delete order in {order.Status} status");
         }
 
-        var result = await _context.Orders.DeleteOneAsync(o => o.Id == id);
+        _dbContext.Orders.Remove(order);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Deleted order {OrderNumber}", order.OrderNumber);
 
-        return result.DeletedCount > 0;
+        return true;
     }
 
     private async Task<string> GenerateOrderNumberAsync()
     {
-        var count = await _context.Orders.CountDocumentsAsync(_ => true);
+        var count = await _dbContext.Orders.CountAsync();
         return $"ORD-{DateTime.UtcNow:yyyyMMdd}-{(count + 1):D6}";
     }
 

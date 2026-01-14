@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using SalesManagement.Infrastructure;
 using SalesManagement.Models;
 using SalesManagement.Models.DTOs;
@@ -18,21 +18,20 @@ public interface ICustomerService
 
 public class CustomerService : ICustomerService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<CustomerService> _logger;
 
-    public CustomerService(MongoDbContext context, ILogger<CustomerService> logger)
+    public CustomerService(AppDbContext dbContext, ILogger<CustomerService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _logger = logger;
     }
 
     public async Task<CustomerResponse> CreateCustomerAsync(CreateCustomerRequest request)
     {
         // Check if email already exists
-        var existing = await _context.Customers
-            .Find(c => c.Email == request.Email)
-            .FirstOrDefaultAsync();
+        var existing = await _dbContext.Customers
+            .FirstOrDefaultAsync(c => c.Email == request.Email);
 
         if (existing != null)
         {
@@ -41,6 +40,7 @@ public class CustomerService : ICustomerService
 
         var customer = new Customer
         {
+            Id = Guid.NewGuid().ToString(),
             FirstName = request.FirstName,
             LastName = request.LastName,
             Email = request.Email,
@@ -49,10 +49,13 @@ public class CustomerService : ICustomerService
             TaxId = request.TaxId,
             DefaultBillingAddress = request.DefaultBillingAddress != null ? MapAddress(request.DefaultBillingAddress) : null,
             DefaultShippingAddress = request.DefaultShippingAddress != null ? MapAddress(request.DefaultShippingAddress) : null,
-            Notes = request.Notes
+            Notes = request.Notes,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        await _context.Customers.InsertOneAsync(customer);
+        _dbContext.Customers.Add(customer);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created customer {Email}", customer.Email);
 
@@ -61,24 +64,24 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerResponse?> GetCustomerByIdAsync(string id)
     {
-        var customer = await _context.Customers.Find(c => c.Id == id).FirstOrDefaultAsync();
+        var customer = await _dbContext.Customers.FindAsync(id);
         return customer != null ? MapToResponse(customer) : null;
     }
 
     public async Task<CustomerResponse?> GetCustomerByEmailAsync(string email)
     {
-        var customer = await _context.Customers.Find(c => c.Email == email).FirstOrDefaultAsync();
+        var customer = await _dbContext.Customers.FirstOrDefaultAsync(c => c.Email == email);
         return customer != null ? MapToResponse(customer) : null;
     }
 
     public async Task<List<CustomerResponse>> GetAllCustomersAsync(int skip = 0, int limit = 100)
     {
-        var customers = await _context.Customers
-            .Find(c => c.IsActive)
-            .SortBy(c => c.LastName)
+        var customers = await _dbContext.Customers
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.LastName)
             .ThenBy(c => c.FirstName)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return customers.Select(MapToResponse).ToList();
@@ -86,20 +89,15 @@ public class CustomerService : ICustomerService
 
     public async Task<List<CustomerResponse>> SearchCustomersAsync(string searchTerm, int skip = 0, int limit = 100)
     {
-        var filter = Builders<Customer>.Filter.And(
-            Builders<Customer>.Filter.Eq(c => c.IsActive, true),
-            Builders<Customer>.Filter.Or(
-                Builders<Customer>.Filter.Regex(c => c.FirstName, new MongoDB.Bson.BsonRegularExpression(searchTerm, "i")),
-                Builders<Customer>.Filter.Regex(c => c.LastName, new MongoDB.Bson.BsonRegularExpression(searchTerm, "i")),
-                Builders<Customer>.Filter.Regex(c => c.Email, new MongoDB.Bson.BsonRegularExpression(searchTerm, "i")),
-                Builders<Customer>.Filter.Regex(c => c.Company, new MongoDB.Bson.BsonRegularExpression(searchTerm, "i"))
-            )
-        );
-
-        var customers = await _context.Customers
-            .Find(filter)
+        var lowerSearchTerm = searchTerm.ToLower();
+        var customers = await _dbContext.Customers
+            .Where(c => c.IsActive &&
+                (c.FirstName.ToLower().Contains(lowerSearchTerm) ||
+                 c.LastName.ToLower().Contains(lowerSearchTerm) ||
+                 c.Email.ToLower().Contains(lowerSearchTerm) ||
+                 (c.Company != null && c.Company.ToLower().Contains(lowerSearchTerm))))
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return customers.Select(MapToResponse).ToList();
@@ -107,7 +105,7 @@ public class CustomerService : ICustomerService
 
     public async Task<CustomerResponse?> UpdateCustomerAsync(string id, UpdateCustomerRequest request)
     {
-        var customer = await _context.Customers.Find(c => c.Id == id).FirstOrDefaultAsync();
+        var customer = await _dbContext.Customers.FindAsync(id);
         if (customer == null) return null;
 
         if (request.FirstName != null) customer.FirstName = request.FirstName;
@@ -115,9 +113,8 @@ public class CustomerService : ICustomerService
         if (request.Email != null)
         {
             // Check if new email already exists
-            var existing = await _context.Customers
-                .Find(c => c.Email == request.Email && c.Id != id)
-                .FirstOrDefaultAsync();
+            var existing = await _dbContext.Customers
+                .FirstOrDefaultAsync(c => c.Email == request.Email && c.Id != id);
 
             if (existing != null)
             {
@@ -136,7 +133,7 @@ public class CustomerService : ICustomerService
 
         customer.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Customers.ReplaceOneAsync(c => c.Id == id, customer);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Updated customer {Email}", customer.Email);
 
@@ -145,14 +142,14 @@ public class CustomerService : ICustomerService
 
     public async Task<bool> DeleteCustomerAsync(string id)
     {
-        var customer = await _context.Customers.Find(c => c.Id == id).FirstOrDefaultAsync();
+        var customer = await _dbContext.Customers.FindAsync(id);
         if (customer == null) return false;
 
         // Soft delete
         customer.IsActive = false;
         customer.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Customers.ReplaceOneAsync(c => c.Id == id, customer);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Deactivated customer {Email}", customer.Email);
 

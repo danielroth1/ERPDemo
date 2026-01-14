@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using InventoryManagement.Infrastructure;
 using InventoryManagement.Models;
 
@@ -6,32 +6,35 @@ namespace InventoryManagement.Services;
 
 public class CategoryService
 {
-    private readonly IMongoCollection<Category> _categories;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<CategoryService> _logger;
 
-    public CategoryService(MongoDbContext dbContext, ILogger<CategoryService> logger)
+    public CategoryService(AppDbContext dbContext, ILogger<CategoryService> logger)
     {
-        _categories = dbContext.GetCollection<Category>("categories");
+        _dbContext = dbContext;
         _logger = logger;
     }
 
     public async Task<List<Category>> GetAllAsync()
     {
-        return await _categories
-            .Find(c => c.IsActive)
-            .SortBy(c => c.Name)
+        return await _dbContext.Categories
+            .Where(c => c.IsActive)
+            .OrderBy(c => c.Name)
             .ToListAsync();
     }
 
     public async Task<Category?> GetByIdAsync(string id)
     {
-        return await _categories.Find(c => c.Id == id).FirstOrDefaultAsync();
+        return await _dbContext.Categories.FindAsync(id);
     }
 
     public async Task<Category> CreateAsync(Category category)
     {
+        category.Id = Guid.NewGuid().ToString();
         category.CreatedAt = DateTime.UtcNow;
-        await _categories.InsertOneAsync(category);
+        
+        _dbContext.Categories.Add(category);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Category created: {CategoryId} - {CategoryName}", category.Id, category.Name);
 
@@ -40,27 +43,28 @@ public class CategoryService
 
     public async Task<bool> UpdateAsync(string id, Category category)
     {
-        var result = await _categories.ReplaceOneAsync(c => c.Id == id, category);
+        var existingCategory = await _dbContext.Categories.FindAsync(id);
+        if (existingCategory == null) return false;
 
-        if (result.ModifiedCount > 0)
-        {
-            _logger.LogInformation("Category updated: {CategoryId}", id);
-            return true;
-        }
+        existingCategory.Name = category.Name;
+        existingCategory.Description = category.Description;
+        existingCategory.IsActive = category.IsActive;
 
-        return false;
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation("Category updated: {CategoryId}", id);
+        return true;
     }
 
     public async Task<bool> DeleteAsync(string id)
     {
-        var result = await _categories.DeleteOneAsync(c => c.Id == id);
+        var category = await _dbContext.Categories.FindAsync(id);
+        if (category == null) return false;
 
-        if (result.DeletedCount > 0)
-        {
-            _logger.LogInformation("Category deleted: {CategoryId}", id);
-            return true;
-        }
+        _dbContext.Categories.Remove(category);
+        await _dbContext.SaveChangesAsync();
 
-        return false;
+        _logger.LogInformation("Category deleted: {CategoryId}", id);
+        return true;
     }
 }

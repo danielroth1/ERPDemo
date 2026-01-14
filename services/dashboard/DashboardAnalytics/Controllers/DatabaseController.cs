@@ -102,7 +102,7 @@ public class DatabaseController : ControllerBase
     }
 
     /// <summary>
-    /// Execute a MongoDB query (Admin only)
+    /// Execute a SQL query (Admin only)
     /// </summary>
     [HttpPost("query")]
     [Authorize(Roles = "Admin")]
@@ -212,23 +212,23 @@ public class DatabaseController : ControllerBase
             service.DatabaseName,
             service.ConnectionString,
             service.Port,
-            service.Collections.Select(MapToCollectionResponse).ToList(),
+            service.Tables.Select(MapToCollectionResponse).ToList(),
             MapToStatsResponse(service.Stats),
             service.IsConnected,
             service.ErrorMessage
         );
     }
 
-    private static CollectionInfoResponse MapToCollectionResponse(Models.CollectionInfo collection)
+    private static CollectionInfoResponse MapToCollectionResponse(Models.TableInfo table)
     {
         return new CollectionInfoResponse(
-            collection.Name,
-            collection.DocumentCount,
-            collection.SizeInBytes,
-            collection.AverageSizeInBytes,
-            collection.Indexes.Select(MapToIndexResponse).ToList(),
-            collection.SampleDocument,
-            collection.Schema
+            table.Name,
+            table.RowCount,
+            table.SizeInBytes,
+            table.AverageSizeInBytes,
+            table.Indexes.Select(MapToIndexResponse).ToList(),
+            table.SampleDocument,
+            table.Schema
         );
     }
 

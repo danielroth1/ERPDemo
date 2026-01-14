@@ -1,5 +1,4 @@
-using MongoDB.Driver;
-using UserManagement.Configuration;
+using Microsoft.EntityFrameworkCore;
 using UserManagement.Infrastructure;
 using UserManagement.Models;
 using UserManagement.Models.DTOs;
@@ -8,51 +7,54 @@ namespace UserManagement.Services;
 
 public class UserService
 {
-    private readonly IMongoCollection<User> _users;
+    private readonly AppDbContext _dbContext;
     private readonly KafkaProducer _kafkaProducer;
     private readonly ILogger<UserService> _logger;
 
     public UserService(
-        MongoDbContext dbContext,
+        AppDbContext dbContext,
         KafkaProducer kafkaProducer,
         ILogger<UserService> logger)
     {
-        _users = dbContext.GetCollection<User>("users");
+        _dbContext = dbContext;
         _kafkaProducer = kafkaProducer;
         _logger = logger;
     }
 
     public async Task<User?> GetByIdAsync(string id)
     {
-        return await _users.Find(u => u.Id == id).FirstOrDefaultAsync();
+        return await _dbContext.Users.FindAsync(id);
     }
 
     public async Task<User?> GetByEmailAsync(string email)
     {
-        return await _users.Find(u => u.Email.ToLower() == email.ToLower()).FirstOrDefaultAsync();
+        return await _dbContext.Users
+            .FirstOrDefaultAsync(u => u.Email.ToLower() == email.ToLower());
     }
 
     public async Task<List<User>> GetAllAsync(int page = 1, int pageSize = 20)
     {
-        return await _users
-            .Find(_ => true)
+        return await _dbContext.Users
+            .OrderByDescending(u => u.CreatedAt)
             .Skip((page - 1) * pageSize)
-            .Limit(pageSize)
+            .Take(pageSize)
             .ToListAsync();
     }
 
     public async Task<int> GetTotalCountAsync()
     {
-        return (int)await _users.CountDocumentsAsync(_ => true);
+        return await _dbContext.Users.CountAsync();
     }
 
     public async Task<User> CreateAsync(User user)
     {
+        user.Id = Guid.NewGuid().ToString();
         user.Email = user.Email.ToLower();
         user.CreatedAt = DateTime.UtcNow;
         user.UpdatedAt = DateTime.UtcNow;
 
-        await _users.InsertOneAsync(user);
+        _dbContext.Users.Add(user);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("User created: {UserId} - {Email}", user.Id, user.Email);
 
@@ -71,80 +73,82 @@ public class UserService
 
     public async Task<bool> UpdateAsync(string id, User user)
     {
-        user.UpdatedAt = DateTime.UtcNow;
+        var existingUser = await _dbContext.Users.FindAsync(id);
+        if (existingUser == null) return false;
 
-        var result = await _users.ReplaceOneAsync(u => u.Id == id, user);
+        existingUser.Email = user.Email;
+        existingUser.FirstName = user.FirstName;
+        existingUser.LastName = user.LastName;
+        existingUser.Roles = user.Roles;
+        existingUser.IsActive = user.IsActive;
+        existingUser.EmailConfirmed = user.EmailConfirmed;
+        existingUser.UpdatedAt = DateTime.UtcNow;
 
-        if (result.ModifiedCount > 0)
+        await _dbContext.SaveChangesAsync();
+
+        _logger.LogInformation("User updated: {UserId}", id);
+
+        await _kafkaProducer.PublishEventAsync("UserUpdated", new
         {
-            _logger.LogInformation("User updated: {UserId}", id);
+            user.Id,
+            user.Email,
+            user.FirstName,
+            user.LastName,
+            user.IsActive
+        });
 
-            await _kafkaProducer.PublishEventAsync("UserUpdated", new
-            {
-                user.Id,
-                user.Email,
-                user.FirstName,
-                user.LastName,
-                user.IsActive
-            });
-
-            return true;
-        }
-
-        return false;
+        return true;
     }
 
     public async Task<bool> DeleteAsync(string id)
     {
-        var result = await _users.DeleteOneAsync(u => u.Id == id);
+        var user = await _dbContext.Users.FindAsync(id);
+        if (user == null) return false;
 
-        if (result.DeletedCount > 0)
-        {
-            _logger.LogInformation("User deleted: {UserId}", id);
+        _dbContext.Users.Remove(user);
+        await _dbContext.SaveChangesAsync();
 
-            await _kafkaProducer.PublishEventAsync("UserDeleted", new { UserId = id });
+        _logger.LogInformation("User deleted: {UserId}", id);
 
-            return true;
-        }
+        await _kafkaProducer.PublishEventAsync("UserDeleted", new { UserId = id });
 
-        return false;
+        return true;
     }
 
     public async Task<bool> UpdateLastLoginAsync(string id)
     {
-        var update = Builders<User>.Update
-            .Set(u => u.LastLoginAt, DateTime.UtcNow)
-            .Set(u => u.UpdatedAt, DateTime.UtcNow);
+        var user = await _dbContext.Users.FindAsync(id);
+        if (user == null) return false;
 
-        var result = await _users.UpdateOneAsync(u => u.Id == id, update);
+        user.LastLoginAt = DateTime.UtcNow;
+        user.UpdatedAt = DateTime.UtcNow;
 
-        return result.ModifiedCount > 0;
+        await _dbContext.SaveChangesAsync();
+
+        return true;
     }
 
     public async Task<bool> DeactivateUserAsync(string id)
     {
-        var update = Builders<User>.Update
-            .Set(u => u.IsActive, false)
-            .Set(u => u.UpdatedAt, DateTime.UtcNow);
+        var user = await _dbContext.Users.FindAsync(id);
+        if (user == null) return false;
 
-        var result = await _users.UpdateOneAsync(u => u.Id == id, update);
+        user.IsActive = false;
+        user.UpdatedAt = DateTime.UtcNow;
 
-        if (result.ModifiedCount > 0)
-        {
-            _logger.LogInformation("User deactivated: {UserId}", id);
+        await _dbContext.SaveChangesAsync();
 
-            await _kafkaProducer.PublishEventAsync("UserDeactivated", new { UserId = id });
+        _logger.LogInformation("User deactivated: {UserId}", id);
 
-            return true;
-        }
+        await _kafkaProducer.PublishEventAsync("UserDeactivated", new { UserId = id });
 
-        return false;
+        return true;
     }
 
     public async Task<bool> EmailExistsAsync(string email)
     {
-        var count = await _users.CountDocumentsAsync(u => u.Email.ToLower() == email.ToLower());
-        return count > 0;
+        return await _dbContext.Users
+            .AnyAsync(u => u.Email.ToLower() == email.ToLower());
     }
 
     public UserResponse MapToResponse(User user)

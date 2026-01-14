@@ -1,5 +1,6 @@
 using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Prometheus;
@@ -17,8 +18,8 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Add configuration settings
-var mongoSettings = builder.Configuration.GetSection("MongoDB").Get<MongoDbSettings>()
-    ?? throw new InvalidOperationException("MongoDB settings not configured");
+var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>()
+    ?? throw new InvalidOperationException("PostgreSQL settings not configured");
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings not configured");
 var smtpSettings = builder.Configuration.GetSection("Smtp").Get<SmtpSettings>()
@@ -27,13 +28,17 @@ var kafkaSettings = builder.Configuration.GetSection("Kafka").Get<KafkaSettings>
     ?? throw new InvalidOperationException("Kafka settings not configured");
 
 // Register settings as singletons
-builder.Services.AddSingleton(mongoSettings);
+builder.Services.AddSingleton(postgresSettings);
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton(smtpSettings);
 builder.Services.AddSingleton(kafkaSettings);
 
-// Register infrastructure
-builder.Services.AddSingleton<MongoDbContext>();
+// Register PostgreSQL DbContext
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(postgresSettings.ConnectionString)
+        .UseSnakeCaseNamingConvention());
+
+// Register Kafka producer
 builder.Services.AddSingleton<KafkaProducer>();
 
 // Register services
@@ -76,8 +81,9 @@ builder.Services.AddCors(options =>
 
 // Add health checks
 builder.Services.AddHealthChecks()
-    .AddCheck<UserManagement.HealthChecks.MongoDbHealthCheck>(
-        "mongodb",
+    .AddNpgSql(
+        postgresSettings.ConnectionString,
+        name: "postgresql",
         timeout: TimeSpan.FromSeconds(3));
 
 // Configure Swagger
@@ -85,6 +91,14 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
+
+// Apply migrations on startup in development
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.EnsureCreated();
+}
 
 // Configure middleware
 app.UseSerilogRequestLogging();
@@ -132,7 +146,7 @@ try
     Console.WriteLine($"Health Check:       {urls}/health/live");
     Console.WriteLine($"Ready Check:        {urls}/health/ready");
     Console.WriteLine($"Metrics:            {urls}/metrics");
-    Console.WriteLine($"Database:           MongoDB - {mongoSettings.ConnectionString.Split('@').LastOrDefault()?.Split('?').FirstOrDefault() ?? "configured"}");
+    Console.WriteLine($"Database:           PostgreSQL - {postgresSettings.ConnectionString.Split(';').FirstOrDefault(s => s.Contains("Host="))?.Replace("Host=", "") ?? "configured"}");
     Console.WriteLine($"Started at:         {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
     Console.WriteLine(new string('=', 80) + "\n");
     

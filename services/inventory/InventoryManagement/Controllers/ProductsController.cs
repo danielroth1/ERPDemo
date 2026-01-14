@@ -241,13 +241,14 @@ public class ProductsController : ControllerBase
         {
             _logger.LogInformation("Starting product seeding process");
 
-            // Delete all existing products (batch operation)
+            // Delete all existing products sequentially (DbContext is not thread-safe)
             var existingProducts = await _productService.GetAllAsync(1, int.MaxValue, null);
             var deleteCount = existingProducts.Count();
             
-            // Delete in parallel for better performance
-            var deleteTasks = existingProducts.Select(p => _productService.DeleteAsync(p.Id));
-            await Task.WhenAll(deleteTasks);
+            foreach (var product in existingProducts)
+            {
+                await _productService.DeleteAsync(product.Id);
+            }
             
             _logger.LogInformation("Deleted {Count} existing products", deleteCount);
 
@@ -255,7 +256,7 @@ public class ProductsController : ControllerBase
             var seedProducts = SeedData.GetSampleProducts();
             var random = new Random();
 
-            // Pre-create all categories in one batch
+            // Pre-create all categories sequentially
             var uniqueCategoryNames = seedProducts
                 .Select(s => s.CategoryName)
                 .Distinct()
@@ -284,8 +285,9 @@ public class ProductsController : ControllerBase
 
             _logger.LogInformation("Prepared {Count} categories", categoryCache.Count);
 
-            // Create all products in parallel batches
-            var createTasks = seedProducts.Select(async seed =>
+            // Create all products sequentially (DbContext is not thread-safe)
+            var createdCount = 0;
+            foreach (var seed in seedProducts)
             {
                 var quantity = random.Next(1, 101);
                 var createRequest = new CreateProductRequest
@@ -299,37 +301,12 @@ public class ProductsController : ControllerBase
                 };
 
                 await _productService.CreateAsync(createRequest);
-            });
-
-            // Process in batches of 10 to avoid overwhelming the database
-            var batchSize = 10;
-            var batches = seedProducts
-                .Select((product, index) => new { product, index })
-                .GroupBy(x => x.index / batchSize)
-                .Select(g => g.Select(x => x.product).ToList());
-
-            var createdCount = 0;
-            foreach (var batch in batches)
-            {
-                var batchTasks = batch.Select(async seed =>
+                createdCount++;
+                
+                if (createdCount % 10 == 0)
                 {
-                    var quantity = random.Next(1, 101);
-                    var createRequest = new CreateProductRequest
-                    {
-                        Name = seed.Name,
-                        Description = seed.Description,
-                        CategoryId = categoryCache[seed.CategoryName],
-                        Price = seed.Price,
-                        Sku = seed.Sku,
-                        Quantity = quantity
-                    };
-
-                    await _productService.CreateAsync(createRequest);
-                });
-
-                await Task.WhenAll(batchTasks);
-                createdCount += batch.Count;
-                _logger.LogInformation("Created batch of {Count} products (total: {Total})", batch.Count, createdCount);
+                    _logger.LogInformation("Created {Count} products so far", createdCount);
+                }
             }
 
             _logger.LogInformation("Successfully seeded {Count} products", createdCount);

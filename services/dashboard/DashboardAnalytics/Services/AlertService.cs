@@ -1,7 +1,7 @@
+using Microsoft.EntityFrameworkCore;
 using DashboardAnalytics.Infrastructure;
 using DashboardAnalytics.Models;
 using DashboardAnalytics.Models.DTOs;
-using MongoDB.Driver;
 
 namespace DashboardAnalytics.Services;
 
@@ -16,49 +16,54 @@ public interface IAlertService
 
 public class AlertService : IAlertService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<AlertService> _logger;
 
-    public AlertService(MongoDbContext context, ILogger<AlertService> logger)
+    public AlertService(AppDbContext dbContext, ILogger<AlertService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _logger = logger;
     }
 
     public async Task<Alert?> GetAlertByIdAsync(string id)
     {
-        return await _context.Alerts.Find(a => a.Id == id).FirstOrDefaultAsync();
+        return await _dbContext.Alerts.FindAsync(id);
     }
 
     public async Task<List<Alert>> GetAllAlertsAsync(int page = 1, int pageSize = 50)
     {
-        return await _context.Alerts
-            .Find(_ => true)
-            .SortByDescending(a => a.CreatedAt)
+        return await _dbContext.Alerts
+            .OrderByDescending(a => a.CreatedAt)
             .Skip((page - 1) * pageSize)
-            .Limit(pageSize)
+            .Take(pageSize)
             .ToListAsync();
     }
 
     public async Task<List<Alert>> GetUnreadAlertsAsync()
     {
-        return await _context.Alerts
-            .Find(a => !a.IsRead)
-            .SortByDescending(a => a.CreatedAt)
+        return await _dbContext.Alerts
+            .Where(a => !a.IsRead)
+            .OrderByDescending(a => a.CreatedAt)
             .ToListAsync();
     }
 
     public async Task<bool> MarkAsReadAsync(string id)
     {
-        var filter = Builders<Alert>.Filter.Eq(a => a.Id, id);
-        var update = Builders<Alert>.Update.Set(a => a.IsRead, true);
-        var result = await _context.Alerts.UpdateOneAsync(filter, update);
-        return result.ModifiedCount > 0;
+        var alert = await _dbContext.Alerts.FindAsync(id);
+        if (alert == null) return false;
+
+        alert.IsRead = true;
+        await _dbContext.SaveChangesAsync();
+        return true;
     }
 
     public async Task<bool> DeleteAlertAsync(string id)
     {
-        var result = await _context.Alerts.DeleteOneAsync(a => a.Id == id);
-        return result.DeletedCount > 0;
+        var alert = await _dbContext.Alerts.FindAsync(id);
+        if (alert == null) return false;
+
+        _dbContext.Alerts.Remove(alert);
+        await _dbContext.SaveChangesAsync();
+        return true;
     }
 }

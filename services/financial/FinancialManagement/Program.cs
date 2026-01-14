@@ -1,11 +1,11 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Prometheus;
 using Serilog;
 using Serilog.Formatting.Compact;
 using System.Text;
 using FinancialManagement.Configuration;
-using FinancialManagement.HealthChecks;
 using FinancialManagement.Infrastructure;
 using FinancialManagement.Services;
 using FinancialManagement.Models.DTOs;
@@ -21,20 +21,28 @@ Log.Logger = new LoggerConfiguration()
 builder.Host.UseSerilog();
 
 // Load configuration
-var mongoDbSettings = builder.Configuration.GetSection("MongoDb").Get<MongoDbSettings>()
-    ?? throw new InvalidOperationException("MongoDb configuration is missing");
+var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>()
+    ?? throw new InvalidOperationException("PostgreSQL configuration is missing");
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT configuration is missing");
 var kafkaSettings = builder.Configuration.GetSection("Kafka").Get<KafkaSettings>()
     ?? throw new InvalidOperationException("Kafka configuration is missing");
 
 // Add services to the container
-builder.Services.AddSingleton(mongoDbSettings);
+builder.Services.AddSingleton(postgresSettings);
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton(kafkaSettings);
 
-// Register infrastructure services
-builder.Services.AddSingleton<MongoDbContext>();
+// Register PostgreSQL DbContext with dynamic JSON support
+var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(postgresSettings.ConnectionString);
+dataSourceBuilder.EnableDynamicJson();
+var dataSource = dataSourceBuilder.Build();
+
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(dataSource)
+        .UseSnakeCaseNamingConvention());
+
+// Register Kafka producer
 builder.Services.AddSingleton<KafkaProducer>();
 
 // Register application services
@@ -70,12 +78,23 @@ builder.Services.AddSwaggerGen();
 
 // Add health checks
 builder.Services.AddHealthChecks()
-    .AddCheck<MongoDbHealthCheck>("mongodb");
+    .AddNpgSql(
+        postgresSettings.ConnectionString,
+        name: "postgresql",
+        timeout: TimeSpan.FromSeconds(3));
 
 // Add Prometheus metrics
 builder.Services.UseHttpClientMetrics();
 
 var app = builder.Build();
+
+// Apply migrations on startup in development
+if (app.Environment.IsDevelopment())
+{
+    using var scope = app.Services.CreateScope();
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.EnsureCreated();
+}
 
 // Configure the HTTP request pipeline
 if (app.Environment.IsDevelopment())
@@ -119,7 +138,7 @@ Console.WriteLine($"Listening on:       {urls}");
 Console.WriteLine($"Swagger UI:         {urls}/swagger");
 Console.WriteLine($"Health Check:       {urls}/health");
 Console.WriteLine($"Metrics:            {urls}/metrics");
-Console.WriteLine($"Database:           MongoDB - {mongoDbSettings.ConnectionString.Split('@').LastOrDefault()?.Split('?').FirstOrDefault() ?? "configured"}");
+Console.WriteLine($"Database:           PostgreSQL - {postgresSettings.ConnectionString.Split(';').FirstOrDefault(s => s.Contains("Host="))?.Replace("Host=", "") ?? "configured"}");
 Console.WriteLine($"Started at:         {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
 Console.WriteLine(new string('=', 80) + "\n");
 

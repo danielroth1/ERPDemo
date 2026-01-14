@@ -1,44 +1,39 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace UserManagement.Models;
 
+[Table("users")]
+[Index(nameof(Email), IsUnique = true)]
 public class User
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
+    [Key]
     public string Id { get; set; } = string.Empty;
 
-    [BsonElement("email")]
-    [BsonRequired]
+    [Required]
+    [MaxLength(255)]
     public string Email { get; set; } = string.Empty;
 
-    [BsonElement("passwordHash")]
-    [BsonRequired]
+    [Required]
     public string PasswordHash { get; set; } = string.Empty;
 
-    [BsonElement("firstName")]
+    [MaxLength(100)]
     public string FirstName { get; set; } = string.Empty;
 
-    [BsonElement("lastName")]
+    [MaxLength(100)]
     public string LastName { get; set; } = string.Empty;
 
-    [BsonElement("roles")]
     public List<Role> Roles { get; set; } = new() { Role.User };
 
-    [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
-    [BsonElement("emailConfirmed")]
     public bool EmailConfirmed { get; set; } = false;
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("lastLoginAt")]
     public DateTime? LastLoginAt { get; set; }
 }
 
@@ -49,31 +44,28 @@ public enum Role
     Admin
 }
 
+[Table("refresh_tokens")]
+[Index(nameof(UserId))]
+[Index(nameof(Token))]
 public class RefreshToken
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.ObjectId)]
+    [Key]
     public string Id { get; set; } = string.Empty;
 
-    [BsonElement("userId")]
-    [BsonRequired]
+    [Required]
     public string UserId { get; set; } = string.Empty;
 
-    [BsonElement("token")]
-    [BsonRequired]
+    [Required]
     public string Token { get; set; } = string.Empty;
 
-    [BsonElement("expiresAt")]
     public DateTime ExpiresAt { get; set; }
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("revokedAt")]
     public DateTime? RevokedAt { get; set; }
 
-    [BsonElement("replacedByToken")]
     public string? ReplacedByToken { get; set; }
 
+    [NotMapped]
     public bool IsActive => RevokedAt == null && DateTime.UtcNow < ExpiresAt;
 }

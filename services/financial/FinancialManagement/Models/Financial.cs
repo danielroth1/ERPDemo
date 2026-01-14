@@ -1,149 +1,132 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace FinancialManagement.Models;
 
+[Table("accounts")]
+[Index(nameof(AccountNumber), IsUnique = true)]
+[Index(nameof(Type))]
+[Index(nameof(UserId))]
 public class Account
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.String)]
+    [Key]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [BsonElement("accountNumber")]
+    [MaxLength(50)]
     public string AccountNumber { get; set; } = string.Empty;
 
-    [BsonElement("name")]
+    [Required]
+    [MaxLength(255)]
     public string Name { get; set; } = string.Empty;
 
-    [BsonElement("type")]
     public AccountType Type { get; set; }
 
-    [BsonElement("category")]
     public AccountCategory Category { get; set; }
 
-    [BsonElement("balance")]
+    [Precision(18, 2)]
     public decimal Balance { get; set; }
 
-    [BsonElement("currency")]
+    [MaxLength(3)]
     public string Currency { get; set; } = "USD";
 
-    [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
-    [BsonElement("parentAccountId")]
     public string? ParentAccountId { get; set; }
 
-    [BsonElement("userId")]
     public string? UserId { get; set; }
 
-    [BsonElement("description")]
     public string? Description { get; set; }
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
+[Table("transactions")]
+[Index(nameof(TransactionNumber), IsUnique = true)]
+[Index(nameof(Date))]
+[Index(nameof(Type))]
+[Index(nameof(Status))]
 public class Transaction
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.String)]
+    [Key]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [BsonElement("transactionNumber")]
+    [MaxLength(50)]
     public string TransactionNumber { get; set; } = string.Empty;
 
-    [BsonElement("date")]
     public DateTime Date { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("description")]
     public string Description { get; set; } = string.Empty;
 
-    [BsonElement("entries")]
+    [Column(TypeName = "jsonb")]
     public List<JournalEntry> Entries { get; set; } = new();
 
-    [BsonElement("type")]
     public TransactionType Type { get; set; }
 
-    [BsonElement("status")]
     public TransactionStatus Status { get; set; } = TransactionStatus.Posted;
 
-    [BsonElement("referenceId")]
     public string? ReferenceId { get; set; }
 
-    [BsonElement("referenceType")]
+    [MaxLength(50)]
     public string? ReferenceType { get; set; }
 
-    [BsonElement("attachments")]
+    [Column(TypeName = "jsonb")]
     public List<string> Attachments { get; set; } = new();
 
-    [BsonElement("createdBy")]
     public string CreatedBy { get; set; } = string.Empty;
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class JournalEntry
 {
-    [BsonElement("accountId")]
     public string AccountId { get; set; } = string.Empty;
 
-    [BsonElement("accountName")]
     public string AccountName { get; set; } = string.Empty;
 
-    [BsonElement("debit")]
     public decimal Debit { get; set; }
 
-    [BsonElement("credit")]
     public decimal Credit { get; set; }
 
-    [BsonElement("memo")]
     public string? Memo { get; set; }
 }
 
+[Table("budgets")]
+[Index(nameof(AccountId))]
 public class Budget
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.String)]
+    [Key]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [BsonElement("name")]
+    [Required]
+    [MaxLength(255)]
     public string Name { get; set; } = string.Empty;
 
-    [BsonElement("accountId")]
     public string AccountId { get; set; } = string.Empty;
 
-    [BsonElement("period")]
     public BudgetPeriod Period { get; set; }
 
-    [BsonElement("startDate")]
     public DateTime StartDate { get; set; }
 
-    [BsonElement("endDate")]
     public DateTime EndDate { get; set; }
 
-    [BsonElement("amount")]
+    [Precision(18, 2)]
     public decimal Amount { get; set; }
 
-    [BsonElement("spent")]
+    [Precision(18, 2)]
     public decimal Spent { get; set; }
 
-    [BsonElement("remaining")]
+    [Precision(18, 2)]
     public decimal Remaining { get; set; }
 
-    [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 

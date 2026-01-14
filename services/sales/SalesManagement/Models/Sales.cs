@@ -1,206 +1,183 @@
-using MongoDB.Bson;
-using MongoDB.Bson.Serialization.Attributes;
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+using Microsoft.EntityFrameworkCore;
 
 namespace SalesManagement.Models;
 
+[Table("orders")]
+[Index(nameof(CustomerId))]
+[Index(nameof(OrderNumber), IsUnique = true)]
+[Index(nameof(Status))]
 public class Order
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.String)]
+    [Key]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [BsonElement("customerId")]
     public string CustomerId { get; set; } = string.Empty;
 
-    [BsonElement("orderNumber")]
+    [MaxLength(50)]
     public string OrderNumber { get; set; } = string.Empty;
 
-    [BsonElement("items")]
+    [Column(TypeName = "jsonb")]
     public List<OrderItem> Items { get; set; } = new();
 
-    [BsonElement("subtotal")]
+    [Precision(18, 2)]
     public decimal Subtotal { get; set; }
 
-    [BsonElement("tax")]
+    [Precision(18, 2)]
     public decimal Tax { get; set; }
 
-    [BsonElement("discount")]
+    [Precision(18, 2)]
     public decimal Discount { get; set; }
 
-    [BsonElement("total")]
+    [Precision(18, 2)]
     public decimal Total { get; set; }
 
-    [BsonElement("status")]
     public OrderStatus Status { get; set; } = OrderStatus.Draft;
 
-    [BsonElement("notes")]
     public string? Notes { get; set; }
 
-    [BsonElement("shippingAddress")]
+    [Column(TypeName = "jsonb")]
     public Address? ShippingAddress { get; set; }
 
-    [BsonElement("billingAddress")]
+    [Column(TypeName = "jsonb")]
     public Address? BillingAddress { get; set; }
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("completedAt")]
     public DateTime? CompletedAt { get; set; }
 
-    [BsonElement("cancelledAt")]
     public DateTime? CancelledAt { get; set; }
 }
 
 public class OrderItem
 {
-    [BsonElement("productId")]
     public string ProductId { get; set; } = string.Empty;
 
-    [BsonElement("productName")]
     public string ProductName { get; set; } = string.Empty;
 
-    [BsonElement("sku")]
     public string Sku { get; set; } = string.Empty;
 
-    [BsonElement("quantity")]
     public int Quantity { get; set; }
 
-    [BsonElement("unitPrice")]
     public decimal UnitPrice { get; set; }
 
-    [BsonElement("discount")]
     public decimal Discount { get; set; }
 
-    [BsonElement("subtotal")]
     public decimal Subtotal { get; set; }
 
-    [BsonElement("total")]
     public decimal Total { get; set; }
 }
 
+[Table("customers")]
+[Index(nameof(Email), IsUnique = true)]
 public class Customer
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.String)]
+    [Key]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [BsonElement("firstName")]
+    [MaxLength(100)]
     public string FirstName { get; set; } = string.Empty;
 
-    [BsonElement("lastName")]
+    [MaxLength(100)]
     public string LastName { get; set; } = string.Empty;
 
-    [BsonElement("email")]
+    [Required]
+    [MaxLength(255)]
     public string Email { get; set; } = string.Empty;
 
-    [BsonElement("phone")]
+    [MaxLength(50)]
     public string? Phone { get; set; }
 
-    [BsonElement("company")]
+    [MaxLength(255)]
     public string? Company { get; set; }
 
-    [BsonElement("taxId")]
+    [MaxLength(50)]
     public string? TaxId { get; set; }
 
-    [BsonElement("defaultBillingAddress")]
+    [Column(TypeName = "jsonb")]
     public Address? DefaultBillingAddress { get; set; }
 
-    [BsonElement("defaultShippingAddress")]
+    [Column(TypeName = "jsonb")]
     public Address? DefaultShippingAddress { get; set; }
 
-    [BsonElement("notes")]
     public string? Notes { get; set; }
 
-    [BsonElement("isActive")]
     public bool IsActive { get; set; } = true;
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
+[Table("invoices")]
+[Index(nameof(InvoiceNumber), IsUnique = true)]
+[Index(nameof(OrderId))]
+[Index(nameof(CustomerId))]
+[Index(nameof(Status))]
 public class Invoice
 {
-    [BsonId]
-    [BsonRepresentation(BsonType.String)]
+    [Key]
     public string Id { get; set; } = Guid.NewGuid().ToString();
 
-    [BsonElement("invoiceNumber")]
+    [MaxLength(50)]
     public string InvoiceNumber { get; set; } = string.Empty;
 
-    [BsonElement("orderId")]
     public string OrderId { get; set; } = string.Empty;
 
-    [BsonElement("customerId")]
     public string CustomerId { get; set; } = string.Empty;
 
-    [BsonElement("issueDate")]
     public DateTime IssueDate { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("dueDate")]
     public DateTime DueDate { get; set; }
 
-    [BsonElement("subtotal")]
+    [Precision(18, 2)]
     public decimal Subtotal { get; set; }
 
-    [BsonElement("tax")]
+    [Precision(18, 2)]
     public decimal Tax { get; set; }
 
-    [BsonElement("discount")]
+    [Precision(18, 2)]
     public decimal Discount { get; set; }
 
-    [BsonElement("total")]
+    [Precision(18, 2)]
     public decimal Total { get; set; }
 
-    [BsonElement("amountPaid")]
+    [Precision(18, 2)]
     public decimal AmountPaid { get; set; }
 
-    [BsonElement("amountDue")]
+    [Precision(18, 2)]
     public decimal AmountDue { get; set; }
 
-    [BsonElement("status")]
     public InvoiceStatus Status { get; set; } = InvoiceStatus.Draft;
 
-    [BsonElement("items")]
+    [Column(TypeName = "jsonb")]
     public List<OrderItem> Items { get; set; } = new();
 
-    [BsonElement("billingAddress")]
+    [Column(TypeName = "jsonb")]
     public Address? BillingAddress { get; set; }
 
-    [BsonElement("notes")]
     public string? Notes { get; set; }
 
-    [BsonElement("paidAt")]
     public DateTime? PaidAt { get; set; }
 
-    [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
-    [BsonElement("updatedAt")]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class Address
 {
-    [BsonElement("street")]
     public string Street { get; set; } = string.Empty;
 
-    [BsonElement("city")]
     public string City { get; set; } = string.Empty;
 
-    [BsonElement("state")]
     public string State { get; set; } = string.Empty;
 
-    [BsonElement("postalCode")]
     public string PostalCode { get; set; } = string.Empty;
 
-    [BsonElement("country")]
     public string Country { get; set; } = string.Empty;
 }
 

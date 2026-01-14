@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using FinancialManagement.Infrastructure;
 using FinancialManagement.Models;
 using FinancialManagement.Models.DTOs;
@@ -17,19 +17,19 @@ public interface ITransactionService
 
 public class TransactionService : ITransactionService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly IAccountService _accountService;
     private readonly KafkaProducer _kafkaProducer;
     private readonly ILogger<TransactionService> _logger;
     private const string FinancialTopic = "financial-events";
 
     public TransactionService(
-        MongoDbContext context,
+        AppDbContext dbContext,
         IAccountService accountService,
         KafkaProducer kafkaProducer,
         ILogger<TransactionService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _accountService = accountService;
         _kafkaProducer = kafkaProducer;
         _logger = logger;
@@ -88,6 +88,7 @@ public class TransactionService : ITransactionService
 
         var transaction = new Transaction
         {
+            Id = Guid.NewGuid().ToString(),
             TransactionNumber = transactionNumber,
             Date = request.Date ?? DateTime.UtcNow,
             Description = request.Description,
@@ -96,39 +97,27 @@ public class TransactionService : ITransactionService
             Status = TransactionStatus.Posted,
             ReferenceId = request.ReferenceId,
             ReferenceType = request.ReferenceType,
-            CreatedBy = createdBy
+            CreatedBy = createdBy,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        // Use transaction session for atomicity (if supported)
-        IClientSessionHandle? session = null;
-        var useTransactions = await IsTransactionSupportedAsync();
-        
-        if (useTransactions)
-        {
-            session = await _context.Transactions.Database.Client.StartSessionAsync();
-            session.StartTransaction();
-        }
-        else
-        {
-            _logger.LogWarning("MongoDB transactions not supported (standalone mode). Operations will not be atomic.");
-        }
+        // Use EF Core transaction for atomicity
+        using var dbTransaction = await _dbContext.Database.BeginTransactionAsync();
 
         try
         {
             // Insert transaction
-            if (session != null)
-                await _context.Transactions.InsertOneAsync(session, transaction);
-            else
-                await _context.Transactions.InsertOneAsync(transaction);
+            _dbContext.Transactions.Add(transaction);
+            await _dbContext.SaveChangesAsync();
 
             // Update account balances
             foreach (var entry in entries)
             {
-                await UpdateAccountBalanceAsync(session, entry.AccountId, entry.Debit, entry.Credit);
+                await UpdateAccountBalanceAsync(entry.AccountId, entry.Debit, entry.Credit);
             }
 
-            if (session != null)
-                await session.CommitTransactionAsync();
+            await dbTransaction.CommitAsync();
 
             _logger.LogInformation("Created transaction {TransactionNumber}: {Description}", 
                 transactionNumber, request.Description);
@@ -151,30 +140,25 @@ public class TransactionService : ITransactionService
         }
         catch (Exception ex)
         {
-            if (session != null)
-                await session.AbortTransactionAsync();
+            await dbTransaction.RollbackAsync();
             _logger.LogError(ex, "Failed to create transaction");
             throw;
-        }
-        finally
-        {
-            session?.Dispose();
         }
     }
 
     public async Task<TransactionResponse?> GetTransactionByIdAsync(string id)
     {
-        var transaction = await _context.Transactions.Find(t => t.Id == id).FirstOrDefaultAsync();
+        var transaction = await _dbContext.Transactions.FindAsync(id);
         return transaction != null ? MapToResponse(transaction) : null;
     }
 
     public async Task<List<TransactionResponse>> GetAllTransactionsAsync(int skip = 0, int limit = 100)
     {
-        var transactions = await _context.Transactions
-            .Find(t => t.Status == TransactionStatus.Posted)
-            .SortByDescending(t => t.Date)
+        var transactions = await _dbContext.Transactions
+            .Where(t => t.Status == TransactionStatus.Posted)
+            .OrderByDescending(t => t.Date)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return transactions.Select(MapToResponse).ToList();
@@ -182,16 +166,12 @@ public class TransactionService : ITransactionService
 
     public async Task<List<TransactionResponse>> GetTransactionsByAccountAsync(string accountId, int skip = 0, int limit = 100)
     {
-        var filter = Builders<Transaction>.Filter.And(
-            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Posted),
-            Builders<Transaction>.Filter.ElemMatch(t => t.Entries, e => e.AccountId == accountId)
-        );
-
-        var transactions = await _context.Transactions
-            .Find(filter)
-            .SortByDescending(t => t.Date)
+        var transactions = await _dbContext.Transactions
+            .Where(t => t.Status == TransactionStatus.Posted &&
+                       t.Entries.Any(e => e.AccountId == accountId))
+            .OrderByDescending(t => t.Date)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return transactions.Select(MapToResponse).ToList();
@@ -200,17 +180,13 @@ public class TransactionService : ITransactionService
     public async Task<List<TransactionResponse>> GetTransactionsByDateRangeAsync(
         DateTime startDate, DateTime endDate, int skip = 0, int limit = 100)
     {
-        var filter = Builders<Transaction>.Filter.And(
-            Builders<Transaction>.Filter.Eq(t => t.Status, TransactionStatus.Posted),
-            Builders<Transaction>.Filter.Gte(t => t.Date, startDate),
-            Builders<Transaction>.Filter.Lte(t => t.Date, endDate)
-        );
-
-        var transactions = await _context.Transactions
-            .Find(filter)
-            .SortByDescending(t => t.Date)
+        var transactions = await _dbContext.Transactions
+            .Where(t => t.Status == TransactionStatus.Posted &&
+                       t.Date >= startDate &&
+                       t.Date <= endDate)
+            .OrderByDescending(t => t.Date)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return transactions.Select(MapToResponse).ToList();
@@ -218,7 +194,7 @@ public class TransactionService : ITransactionService
 
     public async Task<TransactionResponse?> VoidTransactionAsync(string id)
     {
-        var transaction = await _context.Transactions.Find(t => t.Id == id).FirstOrDefaultAsync();
+        var transaction = await _dbContext.Transactions.FindAsync(id);
         if (transaction == null) return null;
 
         if (transaction.Status == TransactionStatus.Voided)
@@ -226,14 +202,7 @@ public class TransactionService : ITransactionService
             throw new InvalidOperationException("Transaction is already voided");
         }
 
-        IClientSessionHandle? session = null;
-        var useTransactions = await IsTransactionSupportedAsync();
-        
-        if (useTransactions)
-        {
-            session = await _context.Transactions.Database.Client.StartSessionAsync();
-            session.StartTransaction();
-        }
+        using var dbTransaction = await _dbContext.Database.BeginTransactionAsync();
 
         try
         {
@@ -241,20 +210,15 @@ public class TransactionService : ITransactionService
             foreach (var entry in transaction.Entries)
             {
                 // Reverse: debits become credits, credits become debits
-                await UpdateAccountBalanceAsync(session, entry.AccountId, entry.Credit, entry.Debit);
+                await UpdateAccountBalanceAsync(entry.AccountId, entry.Credit, entry.Debit);
             }
 
             // Update transaction status
             transaction.Status = TransactionStatus.Voided;
             transaction.UpdatedAt = DateTime.UtcNow;
 
-            if (session != null)
-                await _context.Transactions.ReplaceOneAsync(session, t => t.Id == id, transaction);
-            else
-                await _context.Transactions.ReplaceOneAsync(t => t.Id == id, transaction);
-
-            if (session != null)
-                await session.CommitTransactionAsync();
+            await _dbContext.SaveChangesAsync();
+            await dbTransaction.CommitAsync();
 
             _logger.LogInformation("Voided transaction {TransactionNumber}", transaction.TransactionNumber);
 
@@ -262,23 +226,15 @@ public class TransactionService : ITransactionService
         }
         catch (Exception ex)
         {
-            if (session != null)
-                await session.AbortTransactionAsync();
+            await dbTransaction.RollbackAsync();
             _logger.LogError(ex, "Failed to void transaction {TransactionNumber}", transaction.TransactionNumber);
             throw;
         }
-        finally
-        {
-            session?.Dispose();
-        }
     }
 
-    private async Task UpdateAccountBalanceAsync(
-        IClientSessionHandle? session, string accountId, decimal debit, decimal credit)
+    private async Task UpdateAccountBalanceAsync(string accountId, decimal debit, decimal credit)
     {
-        var account = session != null
-            ? await _context.Accounts.Find(session, a => a.Id == accountId).FirstOrDefaultAsync()
-            : await _context.Accounts.Find(a => a.Id == accountId).FirstOrDefaultAsync();
+        var account = await _dbContext.Accounts.FindAsync(accountId);
             
         if (account == null)
         {
@@ -301,49 +257,24 @@ public class TransactionService : ITransactionService
         account.Balance += balanceChange;
         account.UpdatedAt = DateTime.UtcNow;
 
-        if (session != null)
-            await _context.Accounts.ReplaceOneAsync(session, a => a.Id == accountId, account);
-        else
-            await _context.Accounts.ReplaceOneAsync(a => a.Id == accountId, account);
+        await _dbContext.SaveChangesAsync();
     }
 
     private async Task<string> GenerateTransactionNumberAsync()
     {
-        var count = await _context.Transactions.CountDocumentsAsync(_ => true);
+        var count = await _dbContext.Transactions.CountAsync();
         return $"TXN-{DateTime.UtcNow:yyyyMMdd}-{(count + 1):D6}";
-    }
-
-    private async Task<bool> IsTransactionSupportedAsync()
-    {
-        try
-        {
-            var client = _context.Transactions.Database.Client;
-            var isMasterCommand = new MongoDB.Bson.BsonDocument("isMaster", 1);
-            var result = await client.GetDatabase("admin").RunCommandAsync<MongoDB.Bson.BsonDocument>(isMasterCommand);
-            
-            // Check if it's a replica set or sharded cluster
-            var isReplicaSet = result.Contains("setName");
-            var isSharded = result.Contains("msg") && result["msg"].AsString == "isdbgrid";
-            
-            return isReplicaSet || isSharded;
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to detect MongoDB transaction support, assuming standalone mode");
-            return false;
-        }
     }
 
     private async Task<string?> GetRevenueAccountIdAsync()
     {
         // Look up revenue account by name and type
-        var revenueAccount = await _context.Accounts
-            .Find(a => 
+        var revenueAccount = await _dbContext.Accounts
+            .FirstOrDefaultAsync(a => 
                 a.Name == "Product Sales Revenue" && 
                 a.Type == AccountType.Revenue &&
                 a.Category == AccountCategory.CurrentAssets &&
-                a.IsActive)
-            .FirstOrDefaultAsync();
+                a.IsActive);
 
         return revenueAccount?.Id;
     }

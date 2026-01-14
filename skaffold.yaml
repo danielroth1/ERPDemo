@@ -79,7 +79,7 @@ profiles:
       kubectl:
         paths:
           - infrastructure/k8s/base/namespace.yaml
-          - infrastructure/k8s/base/mongodb.yaml
+          - infrastructure/k8s/base/postgres.yaml
           - infrastructure/k8s/base/kafka.yaml
           - infrastructure/k8s/base/user-management.yaml
           - infrastructure/k8s/base/inventory.yaml
@@ -136,7 +136,7 @@ profiles:
       kubectl:
         paths:
           - infrastructure/k8s/base/namespace.yaml
-          - infrastructure/k8s/base/mongodb.yaml
+          - infrastructure/k8s/base/postgres.yaml
           - infrastructure/k8s/base/kafka.yaml
           - infrastructure/k8s/base/user-management.yaml
           - infrastructure/k8s/base/inventory.yaml
@@ -154,7 +154,7 @@ profiles:
       kubectl:
         paths:
           - infrastructure/k8s/base/namespace.yaml
-          - infrastructure/k8s/base/mongodb.yaml
+          - infrastructure/k8s/base/postgres.yaml
           - infrastructure/k8s/base/kafka.yaml
           - infrastructure/k8s/base/user-management.yaml
           - infrastructure/k8s/base/inventory.yaml

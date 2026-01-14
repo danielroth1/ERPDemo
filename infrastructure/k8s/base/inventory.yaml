@@ -24,13 +24,11 @@ spec:
           value: "http://+:8080"
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
-        - name: MongoDB__ConnectionString
+        - name: PostgreSQL__ConnectionString
           valueFrom:
             secretKeyRef:
-              name: mongodb-secret
-              key: connection-string
-        - name: MongoDB__DatabaseName
-          value: "erp_inventory"
+              name: postgres-secret
+              key: connection-string-inventory
         - name: Kafka__BootstrapServers
           value: "kafka-service:9092"
         - name: Jwt__Secret

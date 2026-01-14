@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using InventoryManagement.Infrastructure;
 using InventoryManagement.Models;
 
@@ -6,20 +6,18 @@ namespace InventoryManagement.Services;
 
 public class StockMovementService
 {
-    private readonly IMongoCollection<StockMovement> _movements;
-    private readonly IMongoCollection<Product> _products;
+    private readonly AppDbContext _dbContext;
     private readonly KafkaProducer _kafkaProducer;
     private readonly ProductService _productService;
     private readonly ILogger<StockMovementService> _logger;
 
     public StockMovementService(
-        MongoDbContext dbContext,
+        AppDbContext dbContext,
         KafkaProducer kafkaProducer,
         ProductService productService,
         ILogger<StockMovementService> logger)
     {
-        _movements = dbContext.GetCollection<StockMovement>("stock_movements");
-        _products = dbContext.GetCollection<Product>("products");
+        _dbContext = dbContext;
         _kafkaProducer = kafkaProducer;
         _productService = productService;
         _logger = logger;
@@ -27,31 +25,32 @@ public class StockMovementService
 
     public async Task<List<StockMovement>> GetByProductIdAsync(string productId, int limit = 50)
     {
-        return await _movements
-            .Find(m => m.ProductId == productId)
-            .SortByDescending(m => m.CreatedAt)
-            .Limit(limit)
+        return await _dbContext.StockMovements
+            .Where(m => m.ProductId == productId)
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(limit)
             .ToListAsync();
     }
 
     public async Task<List<StockMovement>> GetRecentMovementsAsync(int limit = 100)
     {
-        return await _movements
-            .Find(_ => true)
-            .SortByDescending(m => m.CreatedAt)
-            .Limit(limit)
+        return await _dbContext.StockMovements
+            .OrderByDescending(m => m.CreatedAt)
+            .Take(limit)
             .ToListAsync();
     }
 
     public async Task<StockMovement> CreateAsync(StockMovement movement, string userId)
     {
+        movement.Id = Guid.NewGuid().ToString();
         movement.CreatedBy = userId;
         movement.CreatedAt = DateTime.UtcNow;
 
-        await _movements.InsertOneAsync(movement);
+        _dbContext.StockMovements.Add(movement);
+        await _dbContext.SaveChangesAsync();
 
         // Update product stock
-        var product = await _products.Find(p => p.Id == movement.ProductId).FirstOrDefaultAsync();
+        var product = await _dbContext.Products.FindAsync(movement.ProductId);
         if (product != null)
         {
             int newQuantity = product.StockQuantity;

@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using FinancialManagement.Infrastructure;
 using FinancialManagement.Models;
 using FinancialManagement.Models.DTOs;
@@ -21,12 +21,12 @@ public interface IAccountService
 
 public class AccountService : IAccountService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<AccountService> _logger;
 
-    public AccountService(MongoDbContext context, ILogger<AccountService> logger)
+    public AccountService(AppDbContext dbContext, ILogger<AccountService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _logger = logger;
     }
 
@@ -47,9 +47,8 @@ public class AccountService : IAccountService
         // Check if user already has an account (1:1 relationship)
         if (!string.IsNullOrEmpty(request.UserId))
         {
-            var existingAccount = await _context.Accounts
-                .Find(a => a.UserId == request.UserId && a.IsActive)
-                .FirstOrDefaultAsync();
+            var existingAccount = await _dbContext.Accounts
+                .FirstOrDefaultAsync(a => a.UserId == request.UserId && a.IsActive);
             
             if (existingAccount != null)
             {
@@ -61,6 +60,7 @@ public class AccountService : IAccountService
 
         var account = new Account
         {
+            Id = Guid.NewGuid().ToString(),
             AccountNumber = accountNumber,
             Name = request.Name,
             Type = accountType,
@@ -68,10 +68,13 @@ public class AccountService : IAccountService
             Currency = request.Currency,
             ParentAccountId = request.ParentAccountId,
             UserId = request.UserId,
-            Description = request.Description
+            Description = request.Description,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        await _context.Accounts.InsertOneAsync(account);
+        _dbContext.Accounts.Add(account);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created account {AccountNumber} - {Name} for user {UserId}", 
             accountNumber, request.Name, request.UserId ?? "(system)");
@@ -81,31 +84,30 @@ public class AccountService : IAccountService
 
     public async Task<AccountResponse?> GetAccountByIdAsync(string id)
     {
-        var account = await _context.Accounts.Find(a => a.Id == id).FirstOrDefaultAsync();
+        var account = await _dbContext.Accounts.FindAsync(id);
         return account != null ? MapToResponse(account) : null;
     }
 
     public async Task<AccountResponse?> GetAccountByNumberAsync(string accountNumber)
     {
-        var account = await _context.Accounts.Find(a => a.AccountNumber == accountNumber).FirstOrDefaultAsync();
+        var account = await _dbContext.Accounts.FirstOrDefaultAsync(a => a.AccountNumber == accountNumber);
         return account != null ? MapToResponse(account) : null;
     }
 
     public async Task<AccountResponse?> GetAccountByUserIdAsync(string userId)
     {
-        var account = await _context.Accounts
-            .Find(a => a.UserId == userId && a.IsActive)
-            .FirstOrDefaultAsync();
+        var account = await _dbContext.Accounts
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.IsActive);
         return account != null ? MapToResponse(account) : null;
     }
 
     public async Task<List<AccountResponse>> GetAllAccountsAsync(int skip = 0, int limit = 100)
     {
-        var accounts = await _context.Accounts
-            .Find(a => a.IsActive)
-            .SortBy(a => a.AccountNumber)
+        var accounts = await _dbContext.Accounts
+            .Where(a => a.IsActive)
+            .OrderBy(a => a.AccountNumber)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return accounts.Select(MapToResponse).ToList();
@@ -113,11 +115,11 @@ public class AccountService : IAccountService
 
     public async Task<List<AccountResponse>> GetAccountsByTypeAsync(AccountType type, int skip = 0, int limit = 100)
     {
-        var accounts = await _context.Accounts
-            .Find(a => a.Type == type && a.IsActive)
-            .SortBy(a => a.AccountNumber)
+        var accounts = await _dbContext.Accounts
+            .Where(a => a.Type == type && a.IsActive)
+            .OrderBy(a => a.AccountNumber)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return accounts.Select(MapToResponse).ToList();
@@ -125,7 +127,7 @@ public class AccountService : IAccountService
 
     public async Task<AccountResponse?> UpdateAccountAsync(string id, UpdateAccountRequest request)
     {
-        var account = await _context.Accounts.Find(a => a.Id == id).FirstOrDefaultAsync();
+        var account = await _dbContext.Accounts.FindAsync(id);
         if (account == null) return null;
 
         if (request.Name != null) account.Name = request.Name;
@@ -134,7 +136,7 @@ public class AccountService : IAccountService
 
         account.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Accounts.ReplaceOneAsync(a => a.Id == id, account);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Updated account {AccountNumber}", account.AccountNumber);
 
@@ -143,7 +145,7 @@ public class AccountService : IAccountService
 
     public async Task<bool> DeleteAccountAsync(string id)
     {
-        var account = await _context.Accounts.Find(a => a.Id == id).FirstOrDefaultAsync();
+        var account = await _dbContext.Accounts.FindAsync(id);
         if (account == null) return false;
 
         // Check if account has balance
@@ -156,7 +158,7 @@ public class AccountService : IAccountService
         account.IsActive = false;
         account.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Accounts.ReplaceOneAsync(a => a.Id == id, account);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Deactivated account {AccountNumber}", account.AccountNumber);
 
@@ -165,7 +167,7 @@ public class AccountService : IAccountService
 
     public async Task<decimal> GetAccountBalanceAsync(string id)
     {
-        var account = await _context.Accounts.Find(a => a.Id == id).FirstOrDefaultAsync();
+        var account = await _dbContext.Accounts.FindAsync(id);
         return account?.Balance ?? 0;
     }
 
@@ -181,19 +183,19 @@ public class AccountService : IAccountService
             _ => "9"
         };
 
-        var count = await _context.Accounts.CountDocumentsAsync(a => a.Type == type);
+        var count = await _dbContext.Accounts.CountAsync(a => a.Type == type);
         return $"{prefix}{(count + 1):D4}";
     }
 
     public async Task<AccountResponse?> AdjustBalanceAsync(string id, decimal amount)
     {
-        var account = await _context.Accounts.Find(a => a.Id == id).FirstOrDefaultAsync();
+        var account = await _dbContext.Accounts.FindAsync(id);
         if (account == null) return null;
 
         account.Balance += amount;
         account.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Accounts.ReplaceOneAsync(a => a.Id == id, account);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Adjusted account {AccountNumber} balance by {Amount}. New balance: {Balance}",
             account.AccountNumber, amount, account.Balance);

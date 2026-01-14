@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using FinancialManagement.Infrastructure;
 using FinancialManagement.Models;
 using FinancialManagement.Models.DTOs;
@@ -19,19 +19,19 @@ public interface IBudgetService
 
 public class BudgetService : IBudgetService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly IAccountService _accountService;
     private readonly KafkaProducer _kafkaProducer;
     private readonly ILogger<BudgetService> _logger;
     private const string FinancialTopic = "financial-events";
 
     public BudgetService(
-        MongoDbContext context,
+        AppDbContext dbContext,
         IAccountService accountService,
         KafkaProducer kafkaProducer,
         ILogger<BudgetService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _accountService = accountService;
         _kafkaProducer = kafkaProducer;
         _logger = logger;
@@ -53,6 +53,7 @@ public class BudgetService : IBudgetService
 
         var budget = new Budget
         {
+            Id = Guid.NewGuid().ToString(),
             Name = request.Name,
             AccountId = request.AccountId,
             Period = period,
@@ -60,10 +61,13 @@ public class BudgetService : IBudgetService
             EndDate = request.EndDate,
             Amount = request.Amount,
             Spent = 0,
-            Remaining = request.Amount
+            Remaining = request.Amount,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        await _context.Budgets.InsertOneAsync(budget);
+        _dbContext.Budgets.Add(budget);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created budget {Name} for account {AccountId}", request.Name, request.AccountId);
 
@@ -72,17 +76,16 @@ public class BudgetService : IBudgetService
 
     public async Task<BudgetResponse?> GetBudgetByIdAsync(string id)
     {
-        var budget = await _context.Budgets.Find(b => b.Id == id).FirstOrDefaultAsync();
+        var budget = await _dbContext.Budgets.FindAsync(id);
         return budget != null ? MapToResponse(budget) : null;
     }
 
     public async Task<List<BudgetResponse>> GetAllBudgetsAsync(int skip = 0, int limit = 100)
     {
-        var budgets = await _context.Budgets
-            .Find(_ => true)
-            .SortByDescending(b => b.CreatedAt)
+        var budgets = await _dbContext.Budgets
+            .OrderByDescending(b => b.CreatedAt)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return budgets.Select(MapToResponse).ToList();
@@ -91,16 +94,10 @@ public class BudgetService : IBudgetService
     public async Task<List<BudgetResponse>> GetActiveBudgetsAsync(int skip = 0, int limit = 100)
     {
         var now = DateTime.UtcNow;
-        var filter = Builders<Budget>.Filter.And(
-            Builders<Budget>.Filter.Eq(b => b.IsActive, true),
-            Builders<Budget>.Filter.Lte(b => b.StartDate, now),
-            Builders<Budget>.Filter.Gte(b => b.EndDate, now)
-        );
-
-        var budgets = await _context.Budgets
-            .Find(filter)
+        var budgets = await _dbContext.Budgets
+            .Where(b => b.IsActive && b.StartDate <= now && b.EndDate >= now)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return budgets.Select(MapToResponse).ToList();
@@ -108,11 +105,11 @@ public class BudgetService : IBudgetService
 
     public async Task<List<BudgetResponse>> GetBudgetsByAccountAsync(string accountId, int skip = 0, int limit = 100)
     {
-        var budgets = await _context.Budgets
-            .Find(b => b.AccountId == accountId)
-            .SortByDescending(b => b.CreatedAt)
+        var budgets = await _dbContext.Budgets
+            .Where(b => b.AccountId == accountId)
+            .OrderByDescending(b => b.CreatedAt)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return budgets.Select(MapToResponse).ToList();
@@ -120,7 +117,7 @@ public class BudgetService : IBudgetService
 
     public async Task<BudgetResponse?> UpdateBudgetAsync(string id, UpdateBudgetRequest request)
     {
-        var budget = await _context.Budgets.Find(b => b.Id == id).FirstOrDefaultAsync();
+        var budget = await _dbContext.Budgets.FindAsync(id);
         if (budget == null) return null;
 
         if (request.Name != null) budget.Name = request.Name;
@@ -133,7 +130,7 @@ public class BudgetService : IBudgetService
 
         budget.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Budgets.ReplaceOneAsync(b => b.Id == id, budget);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Updated budget {Name}", budget.Name);
 
@@ -142,14 +139,14 @@ public class BudgetService : IBudgetService
 
     public async Task<bool> DeleteBudgetAsync(string id)
     {
-        var budget = await _context.Budgets.Find(b => b.Id == id).FirstOrDefaultAsync();
+        var budget = await _dbContext.Budgets.FindAsync(id);
         if (budget == null) return false;
 
         // Soft delete
         budget.IsActive = false;
         budget.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Budgets.ReplaceOneAsync(b => b.Id == id, budget);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Deactivated budget {Name}", budget.Name);
 
@@ -159,22 +156,18 @@ public class BudgetService : IBudgetService
     public async Task UpdateBudgetSpendingAsync(string accountId, decimal amount)
     {
         var now = DateTime.UtcNow;
-        var filter = Builders<Budget>.Filter.And(
-            Builders<Budget>.Filter.Eq(b => b.AccountId, accountId),
-            Builders<Budget>.Filter.Eq(b => b.IsActive, true),
-            Builders<Budget>.Filter.Lte(b => b.StartDate, now),
-            Builders<Budget>.Filter.Gte(b => b.EndDate, now)
-        );
-
-        var budgets = await _context.Budgets.Find(filter).ToListAsync();
+        var budgets = await _dbContext.Budgets
+            .Where(b => b.AccountId == accountId && 
+                       b.IsActive && 
+                       b.StartDate <= now && 
+                       b.EndDate >= now)
+            .ToListAsync();
 
         foreach (var budget in budgets)
         {
             budget.Spent += amount;
             budget.Remaining = budget.Amount - budget.Spent;
             budget.UpdatedAt = DateTime.UtcNow;
-
-            await _context.Budgets.ReplaceOneAsync(b => b.Id == budget.Id, budget);
 
             // Check if budget exceeded
             if (budget.Spent > budget.Amount)
@@ -197,6 +190,8 @@ public class BudgetService : IBudgetService
                 await _kafkaProducer.PublishAsync(FinancialTopic, budget.Id, budgetEvent);
             }
         }
+
+        await _dbContext.SaveChangesAsync();
     }
 
     private static BudgetResponse MapToResponse(Budget budget)

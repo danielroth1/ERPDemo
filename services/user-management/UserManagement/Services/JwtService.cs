@@ -2,8 +2,8 @@ using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
 using System.Security.Cryptography;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
-using MongoDB.Driver;
 using UserManagement.Configuration;
 using UserManagement.Infrastructure;
 using UserManagement.Models;
@@ -13,16 +13,16 @@ namespace UserManagement.Services;
 public class JwtService
 {
     private readonly JwtSettings _jwtSettings;
-    private readonly IMongoCollection<RefreshToken> _refreshTokens;
+    private readonly AppDbContext _dbContext;
     private readonly ILogger<JwtService> _logger;
 
     public JwtService(
         JwtSettings jwtSettings,
-        MongoDbContext dbContext,
+        AppDbContext dbContext,
         ILogger<JwtService> logger)
     {
         _jwtSettings = jwtSettings;
-        _refreshTokens = dbContext.GetCollection<RefreshToken>("refreshTokens");
+        _dbContext = dbContext;
         _logger = logger;
     }
 
@@ -66,7 +66,8 @@ public class JwtService
             CreatedAt = DateTime.UtcNow
         };
 
-        await _refreshTokens.InsertOneAsync(refreshToken);
+        _dbContext.RefreshTokens.Add(refreshToken);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Refresh token generated for user: {UserId}", userId);
 
@@ -75,34 +76,36 @@ public class JwtService
 
     public async Task<RefreshToken?> GetRefreshTokenAsync(string token)
     {
-        return await _refreshTokens.Find(rt => rt.Token == token).FirstOrDefaultAsync();
+        return await _dbContext.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == token);
     }
 
     public async Task<bool> RevokeRefreshTokenAsync(string token, string? replacedByToken = null)
     {
-        var update = Builders<RefreshToken>.Update
-            .Set(rt => rt.RevokedAt, DateTime.UtcNow)
-            .Set(rt => rt.ReplacedByToken, replacedByToken);
+        var refreshToken = await _dbContext.RefreshTokens.FirstOrDefaultAsync(rt => rt.Token == token);
+        
+        if (refreshToken == null)
+            return false;
 
-        var result = await _refreshTokens.UpdateOneAsync(rt => rt.Token == token, update);
+        refreshToken.RevokedAt = DateTime.UtcNow;
+        refreshToken.ReplacedByToken = replacedByToken;
+        await _dbContext.SaveChangesAsync();
 
-        if (result.ModifiedCount > 0)
-        {
-            _logger.LogInformation("Refresh token revoked: {Token}", token);
-            return true;
-        }
-
-        return false;
+        _logger.LogInformation("Refresh token revoked: {Token}", token);
+        return true;
     }
 
     public async Task RevokeAllUserTokensAsync(string userId)
     {
-        var update = Builders<RefreshToken>.Update.Set(rt => rt.RevokedAt, DateTime.UtcNow);
+        var tokens = await _dbContext.RefreshTokens
+            .Where(rt => rt.UserId == userId && rt.RevokedAt == null)
+            .ToListAsync();
 
-        await _refreshTokens.UpdateManyAsync(
-            rt => rt.UserId == userId && rt.RevokedAt == null,
-            update
-        );
+        foreach (var token in tokens)
+        {
+            token.RevokedAt = DateTime.UtcNow;
+        }
+
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("All refresh tokens revoked for user: {UserId}", userId);
     }

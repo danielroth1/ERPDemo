@@ -1,4 +1,4 @@
-using MongoDB.Driver;
+using Microsoft.EntityFrameworkCore;
 using SalesManagement.Infrastructure;
 using SalesManagement.Models;
 using SalesManagement.Models.DTOs;
@@ -21,19 +21,19 @@ public interface IInvoiceService
 
 public class InvoiceService : IInvoiceService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly IOrderService _orderService;
     private readonly KafkaProducer _kafkaProducer;
     private readonly ILogger<InvoiceService> _logger;
     private const string InvoiceTopic = "sales-events";
 
     public InvoiceService(
-        MongoDbContext context,
+        AppDbContext dbContext,
         IOrderService orderService,
         KafkaProducer kafkaProducer,
         ILogger<InvoiceService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _orderService = orderService;
         _kafkaProducer = kafkaProducer;
         _logger = logger;
@@ -49,9 +49,8 @@ public class InvoiceService : IInvoiceService
         }
 
         // Check if invoice already exists for this order
-        var existing = await _context.Invoices
-            .Find(i => i.OrderId == request.OrderId)
-            .FirstOrDefaultAsync();
+        var existing = await _dbContext.Invoices
+            .FirstOrDefaultAsync(i => i.OrderId == request.OrderId);
 
         if (existing != null)
         {
@@ -63,6 +62,7 @@ public class InvoiceService : IInvoiceService
 
         var invoice = new Invoice
         {
+            Id = Guid.NewGuid().ToString(),
             InvoiceNumber = invoiceNumber,
             OrderId = request.OrderId,
             CustomerId = order.CustomerId,
@@ -77,10 +77,13 @@ public class InvoiceService : IInvoiceService
             Status = InvoiceStatus.Pending,
             Items = order.Items,
             BillingAddress = order.BillingAddress,
-            Notes = request.Notes
+            Notes = request.Notes,
+            CreatedAt = DateTime.UtcNow,
+            UpdatedAt = DateTime.UtcNow
         };
 
-        await _context.Invoices.InsertOneAsync(invoice);
+        _dbContext.Invoices.Add(invoice);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Created invoice {InvoiceNumber} for order {OrderNumber}", 
             invoiceNumber, order.OrderNumber);
@@ -104,23 +107,22 @@ public class InvoiceService : IInvoiceService
 
     public async Task<InvoiceResponse?> GetInvoiceByIdAsync(string id)
     {
-        var invoice = await _context.Invoices.Find(i => i.Id == id).FirstOrDefaultAsync();
+        var invoice = await _dbContext.Invoices.FindAsync(id);
         return invoice != null ? MapToResponse(invoice) : null;
     }
 
     public async Task<InvoiceResponse?> GetInvoiceByOrderIdAsync(string orderId)
     {
-        var invoice = await _context.Invoices.Find(i => i.OrderId == orderId).FirstOrDefaultAsync();
+        var invoice = await _dbContext.Invoices.FirstOrDefaultAsync(i => i.OrderId == orderId);
         return invoice != null ? MapToResponse(invoice) : null;
     }
 
     public async Task<List<InvoiceResponse>> GetAllInvoicesAsync(int skip = 0, int limit = 100)
     {
-        var invoices = await _context.Invoices
-            .Find(_ => true)
-            .SortByDescending(i => i.CreatedAt)
+        var invoices = await _dbContext.Invoices
+            .OrderByDescending(i => i.CreatedAt)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return invoices.Select(MapToResponse).ToList();
@@ -128,11 +130,11 @@ public class InvoiceService : IInvoiceService
 
     public async Task<List<InvoiceResponse>> GetInvoicesByCustomerAsync(string customerId, int skip = 0, int limit = 100)
     {
-        var invoices = await _context.Invoices
-            .Find(i => i.CustomerId == customerId)
-            .SortByDescending(i => i.CreatedAt)
+        var invoices = await _dbContext.Invoices
+            .Where(i => i.CustomerId == customerId)
+            .OrderByDescending(i => i.CreatedAt)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return invoices.Select(MapToResponse).ToList();
@@ -140,11 +142,11 @@ public class InvoiceService : IInvoiceService
 
     public async Task<List<InvoiceResponse>> GetInvoicesByStatusAsync(InvoiceStatus status, int skip = 0, int limit = 100)
     {
-        var invoices = await _context.Invoices
-            .Find(i => i.Status == status)
-            .SortByDescending(i => i.CreatedAt)
+        var invoices = await _dbContext.Invoices
+            .Where(i => i.Status == status)
+            .OrderByDescending(i => i.CreatedAt)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         return invoices.Select(MapToResponse).ToList();
@@ -153,18 +155,14 @@ public class InvoiceService : IInvoiceService
     public async Task<List<InvoiceResponse>> GetOverdueInvoicesAsync(int skip = 0, int limit = 100)
     {
         var now = DateTime.UtcNow;
-        var filter = Builders<Invoice>.Filter.And(
-            Builders<Invoice>.Filter.Lt(i => i.DueDate, now),
-            Builders<Invoice>.Filter.Gt(i => i.AmountDue, 0),
-            Builders<Invoice>.Filter.Ne(i => i.Status, InvoiceStatus.Paid),
-            Builders<Invoice>.Filter.Ne(i => i.Status, InvoiceStatus.Cancelled)
-        );
-
-        var invoices = await _context.Invoices
-            .Find(filter)
-            .SortBy(i => i.DueDate)
+        var invoices = await _dbContext.Invoices
+            .Where(i => i.DueDate < now &&
+                       i.AmountDue > 0 &&
+                       i.Status != InvoiceStatus.Paid &&
+                       i.Status != InvoiceStatus.Cancelled)
+            .OrderBy(i => i.DueDate)
             .Skip(skip)
-            .Limit(limit)
+            .Take(limit)
             .ToListAsync();
 
         // Update status to overdue
@@ -174,16 +172,17 @@ public class InvoiceService : IInvoiceService
             {
                 invoice.Status = InvoiceStatus.Overdue;
                 invoice.UpdatedAt = DateTime.UtcNow;
-                await _context.Invoices.ReplaceOneAsync(i => i.Id == invoice.Id, invoice);
             }
         }
+
+        await _dbContext.SaveChangesAsync();
 
         return invoices.Select(MapToResponse).ToList();
     }
 
     public async Task<InvoiceResponse?> UpdateInvoiceAsync(string id, UpdateInvoiceRequest request)
     {
-        var invoice = await _context.Invoices.Find(i => i.Id == id).FirstOrDefaultAsync();
+        var invoice = await _dbContext.Invoices.FindAsync(id);
         if (invoice == null) return null;
 
         // Can only update draft or pending invoices
@@ -197,7 +196,7 @@ public class InvoiceService : IInvoiceService
 
         invoice.UpdatedAt = DateTime.UtcNow;
 
-        await _context.Invoices.ReplaceOneAsync(i => i.Id == id, invoice);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Updated invoice {InvoiceNumber}", invoice.InvoiceNumber);
 
@@ -206,7 +205,7 @@ public class InvoiceService : IInvoiceService
 
     public async Task<InvoiceResponse?> RecordPaymentAsync(string id, RecordPaymentRequest request)
     {
-        var invoice = await _context.Invoices.Find(i => i.Id == id).FirstOrDefaultAsync();
+        var invoice = await _dbContext.Invoices.FindAsync(id);
         if (invoice == null) return null;
 
         if (invoice.Status == InvoiceStatus.Paid)
@@ -238,7 +237,7 @@ public class InvoiceService : IInvoiceService
             invoice.Status = InvoiceStatus.PartiallyPaid;
         }
 
-        await _context.Invoices.ReplaceOneAsync(i => i.Id == id, invoice);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Recorded payment of {Amount} for invoice {InvoiceNumber}", 
             request.Amount, invoice.InvoiceNumber);
@@ -262,7 +261,7 @@ public class InvoiceService : IInvoiceService
 
     public async Task<bool> DeleteInvoiceAsync(string id)
     {
-        var invoice = await _context.Invoices.Find(i => i.Id == id).FirstOrDefaultAsync();
+        var invoice = await _dbContext.Invoices.FindAsync(id);
         if (invoice == null) return false;
 
         // Can only delete draft invoices
@@ -271,16 +270,17 @@ public class InvoiceService : IInvoiceService
             throw new InvalidOperationException($"Cannot delete invoice in {invoice.Status} status");
         }
 
-        var result = await _context.Invoices.DeleteOneAsync(i => i.Id == id);
+        _dbContext.Invoices.Remove(invoice);
+        await _dbContext.SaveChangesAsync();
 
         _logger.LogInformation("Deleted invoice {InvoiceNumber}", invoice.InvoiceNumber);
 
-        return result.DeletedCount > 0;
+        return true;
     }
 
     private async Task<string> GenerateInvoiceNumberAsync()
     {
-        var count = await _context.Invoices.CountDocumentsAsync(_ => true);
+        var count = await _dbContext.Invoices.CountAsync();
         return $"INV-{DateTime.UtcNow:yyyyMMdd}-{(count + 1):D6}";
     }
 

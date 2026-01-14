@@ -3,20 +3,28 @@
 # They will connect to these containerized infrastructure services
 
 services:
-  # MongoDB - Single instance with multiple databases
-  mongodb:
-    image: mongo:7
-    container_name: erp-dev-mongodb
+  # PostgreSQL - Single instance with multiple databases
+  postgres:
+    image: postgres:16-alpine
+    container_name: erp-dev-postgres
     ports:
-      - "27017:27017"
+      - "5433:5432"
     environment:
-      MONGO_INITDB_ROOT_USERNAME: ${MONGODB_ROOT_USERNAME:-admin}
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_ROOT_PASSWORD:-admin123}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_MULTIPLE_DATABASES: erp_users,erp_inventory,erp_sales,erp_financial,erp_dashboard
     volumes:
-      - mongodb-data:/data/db
-      - ./docker/mongodb-init.js:/docker-entrypoint-initdb.d/init.js:ro
+      - postgres-data:/var/lib/postgresql/data
+      - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+      - ./docker/pg_hba.conf:/etc/postgresql/pg_hba.conf:ro
+    command: postgres -c hba_file=/etc/postgresql/pg_hba.conf
     networks:
       - erp-dev-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Kafka with KRaft (no Zookeeper)
   kafka:
@@ -120,7 +128,7 @@ services:
       retries: 5
 
 volumes:
-  mongodb-data:
+  postgres-data:
   kafka-data:
   prometheus-data:
   grafana-data:

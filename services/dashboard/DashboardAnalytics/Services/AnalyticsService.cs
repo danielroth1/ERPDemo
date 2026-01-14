@@ -1,9 +1,9 @@
+using Microsoft.EntityFrameworkCore;
 using DashboardAnalytics.Infrastructure;
 using DashboardAnalytics.Models;
 using DashboardAnalytics.Models.DTOs;
 using Microsoft.AspNetCore.SignalR;
 using DashboardAnalytics.Hubs;
-using MongoDB.Driver;
 using Microsoft.Extensions.Caching.Memory;
 
 namespace DashboardAnalytics.Services;
@@ -24,7 +24,7 @@ public interface IAnalyticsService
 
 public class AnalyticsService : IAnalyticsService
 {
-    private readonly MongoDbContext _context;
+    private readonly AppDbContext _dbContext;
     private readonly IHubContext<DashboardHub> _hubContext;
     private readonly IMemoryCache _cache;
     private readonly ILogger<AnalyticsService> _logger;
@@ -38,12 +38,12 @@ public class AnalyticsService : IAnalyticsService
     private decimal _totalExpenses = 0;
 
     public AnalyticsService(
-        MongoDbContext context,
+        AppDbContext dbContext,
         IHubContext<DashboardHub> hubContext,
         IMemoryCache cache,
         ILogger<AnalyticsService> logger)
     {
-        _context = context;
+        _dbContext = dbContext;
         _hubContext = hubContext;
         _cache = cache;
         _logger = logger;
@@ -145,6 +145,7 @@ public class AnalyticsService : IAnalyticsService
 
         var alert = new Alert
         {
+            Id = Guid.NewGuid().ToString(),
             Title = "Low Stock Alert",
             Message = $"Product '{productEvent.Name}' is running low on stock. Current level: {productEvent.StockLevel}",
             Severity = AlertSeverity.Warning,
@@ -154,10 +155,12 @@ public class AnalyticsService : IAnalyticsService
                 ["productId"] = productEvent.ProductId,
                 ["productName"] = productEvent.Name,
                 ["stockLevel"] = productEvent.StockLevel
-            }
+            },
+            CreatedAt = DateTime.UtcNow
         };
 
-        await _context.Alerts.InsertOneAsync(alert);
+        _dbContext.Alerts.Add(alert);
+        await _dbContext.SaveChangesAsync();
         await _hubContext.Clients.All.SendAsync("ReceiveAlert", alert);
 
         _cache.Remove("inventory_overview");
@@ -170,6 +173,7 @@ public class AnalyticsService : IAnalyticsService
 
         var alert = new Alert
         {
+            Id = Guid.NewGuid().ToString(),
             Title = "Budget Exceeded",
             Message = $"Budget '{budgetEvent.BudgetName}' has been exceeded by {budgetEvent.ExceededAmount:C}. " +
                      $"Current usage: {budgetEvent.PercentageUsed:F1}%",
@@ -183,10 +187,12 @@ public class AnalyticsService : IAnalyticsService
                 ["spentAmount"] = budgetEvent.SpentAmount,
                 ["exceededAmount"] = budgetEvent.ExceededAmount,
                 ["percentageUsed"] = budgetEvent.PercentageUsed
-            }
+            },
+            CreatedAt = DateTime.UtcNow
         };
 
-        await _context.Alerts.InsertOneAsync(alert);
+        _dbContext.Alerts.Add(alert);
+        await _dbContext.SaveChangesAsync();
         await _hubContext.Clients.All.SendAsync("ReceiveAlert", alert);
     }
 
@@ -231,14 +237,14 @@ public class AnalyticsService : IAnalyticsService
             var monthStart = new DateTime(today.Year, today.Month, 1);
 
             // Get order metrics
-            var ordersToday = await _context.Metrics
-                .CountDocumentsAsync(m => m.Type == MetricType.OrderCount && m.Timestamp >= today);
+            var ordersToday = await _dbContext.Metrics
+                .CountAsync(m => m.Type == MetricType.OrderCount && m.Timestamp >= today);
 
-            var ordersThisWeek = await _context.Metrics
-                .CountDocumentsAsync(m => m.Type == MetricType.OrderCount && m.Timestamp >= weekStart);
+            var ordersThisWeek = await _dbContext.Metrics
+                .CountAsync(m => m.Type == MetricType.OrderCount && m.Timestamp >= weekStart);
 
-            var ordersThisMonth = await _context.Metrics
-                .CountDocumentsAsync(m => m.Type == MetricType.OrderCount && m.Timestamp >= monthStart);
+            var ordersThisMonth = await _dbContext.Metrics
+                .CountAsync(m => m.Type == MetricType.OrderCount && m.Timestamp >= monthStart);
 
             var averageOrderValue = _totalOrders > 0 ? _totalRevenue / _totalOrders : 0;
 
@@ -246,9 +252,9 @@ public class AnalyticsService : IAnalyticsService
                 TotalOrders: _totalOrders,
                 TotalRevenue: _totalRevenue,
                 AverageOrderValue: averageOrderValue,
-                OrdersToday: (int)ordersToday,
-                OrdersThisWeek: (int)ordersThisWeek,
-                OrdersThisMonth: (int)ordersThisMonth,
+                OrdersToday: ordersToday,
+                OrdersThisWeek: ordersThisWeek,
+                OrdersThisMonth: ordersThisMonth,
                 TopProducts: new List<TopProductResponse>() // Would need product sales aggregation
             );
         }) ?? new SalesOverviewResponse(0, 0, 0, 0, 0, 0, new List<TopProductResponse>());
@@ -295,19 +301,22 @@ public class AnalyticsService : IAnalyticsService
     {
         var metric = new DashboardMetrics
         {
+            Id = Guid.NewGuid().ToString(),
             Type = type,
             Label = type.ToString(),
-            Value = value
+            Value = value,
+            Timestamp = DateTime.UtcNow
         };
 
-        await _context.Metrics.InsertOneAsync(metric);
+        _dbContext.Metrics.Add(metric);
+        await _dbContext.SaveChangesAsync();
     }
 
     private async Task<DashboardMetrics?> GetLatestMetricAsync(MetricType type)
     {
-        return await _context.Metrics
-            .Find(m => m.Type == type)
-            .SortByDescending(m => m.Timestamp)
+        return await _dbContext.Metrics
+            .Where(m => m.Type == type)
+            .OrderByDescending(m => m.Timestamp)
             .FirstOrDefaultAsync();
     }
 
