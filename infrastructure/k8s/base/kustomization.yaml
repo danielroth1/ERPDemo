@@ -1,0 +1,17 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# Base resources shared across all environments
+# Note: Namespaces are NOT here - they're environment-specific (in local/, staging/, prod/)
+resources:
+  - postgres.yaml
+  - kafka.yaml
+  - user-management.yaml
+  - inventory.yaml
+  - sales.yaml
+  - financial.yaml
+  - dashboard.yaml
+  - api-gateway.yaml
+  - frontend.yaml
+  - prometheus.yaml
+  - grafana.yaml

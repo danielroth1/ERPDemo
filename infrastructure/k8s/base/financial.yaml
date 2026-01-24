@@ -16,6 +16,7 @@ spec:
       containers:
       - name: financial
         image: erp/financial
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http

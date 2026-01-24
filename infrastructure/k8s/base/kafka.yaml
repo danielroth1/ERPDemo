@@ -10,13 +10,15 @@ data:
   KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka-service:9092"
   KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"
   KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
-  KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka-service:9093"
+  # For single-node KRaft, avoid depending on the Service endpoints during startup.
+  # Using the Service name here can deadlock because Endpoints are only published after readiness.
+  KAFKA_CONTROLLER_QUORUM_VOTERS: "1@localhost:9093"
   KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: "1"
   KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: "1"
   KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: "1"
   KAFKA_LOG_RETENTION_HOURS: "24"
   KAFKA_LOG_SEGMENT_BYTES: "104857600"
-  CLUSTER_ID: "erp-kafka-cluster-001"
+  CLUSTER_ID: "SIOelZD3O06P-hX-XIPBVg"
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -60,13 +62,17 @@ spec:
         livenessProbe:
           tcpSocket:
             port: 9092
-          initialDelaySeconds: 30
+          initialDelaySeconds: 60
+          timeoutSeconds: 2
           periodSeconds: 10
+          failureThreshold: 6
         readinessProbe:
           tcpSocket:
             port: 9092
-          initialDelaySeconds: 20
+          initialDelaySeconds: 30
+          timeoutSeconds: 2
           periodSeconds: 5
+          failureThreshold: 12
       volumes:
       - name: kafka-data
         persistentVolumeClaim:

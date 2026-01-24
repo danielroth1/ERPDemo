@@ -16,6 +16,7 @@ spec:
       containers:
       - name: inventory
         image: erp/inventory
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http

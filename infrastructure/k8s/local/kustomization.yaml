@@ -2,17 +2,11 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - ../base/namespace.yaml
-  - ../base/postgres.yaml
-  - ../base/kafka.yaml
-  - ../base/user-management.yaml
-  - ../base/inventory.yaml
-  - ../base/sales.yaml
-  - ../base/financial.yaml
-  - ../base/dashboard.yaml
-  - ../base/gateway.yaml
-  - ../base/frontend.yaml
-  - ../base/prometheus.yaml
-  - ../base/grafana.yaml
+  - namespace.yaml  # Local environment namespace
+  - ../base         # Reference the entire base directory
 
-namespace: erp-local
+# Note: namespace field not set here because base files already have hardcoded namespaces
+# TODO: For proper Kustomize usage, remove 'namespace:' fields from base/*.yaml files
+# and uncomment the line below to let Kustomize inject the namespace automatically:
+# namespace: erp-local
+

@@ -1,19 +1,30 @@
+# syntax=docker/dockerfile:1.7
+
 # Build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
+ENV NUGET_PACKAGES=/root/.nuget/packages \
+  NUGET_HTTP_CACHE_PATH=/root/.local/share/NuGet/v3-cache
+
 # Copy csproj and restore dependencies
 COPY FinancialManagement/*.csproj ./FinancialManagement/
-RUN dotnet restore FinancialManagement/FinancialManagement.csproj
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
+  dotnet restore FinancialManagement/FinancialManagement.csproj
 
 # Copy source code and build
 COPY FinancialManagement/. ./FinancialManagement/
 WORKDIR /src/FinancialManagement
-RUN dotnet build -c Release -o /app/build --no-restore
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
+  dotnet build -c Release -o /app/build --no-restore
 
 # Publish stage
 FROM build AS publish
-RUN dotnet publish -c Release -o /app/publish --no-restore
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
+  dotnet publish -c Release -o /app/publish --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime

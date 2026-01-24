@@ -16,6 +16,7 @@ spec:
       containers:
       - name: user-management
         image: erp/user-management
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http

@@ -16,6 +16,7 @@ spec:
       containers:
       - name: sales
         image: erp/sales
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
           name: http

@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: erp-local
+  labels:
+    name: erp-local
+    environment: development
+    app: erp-system
+  annotations:
+    description: "Local development environment for ERP system"

@@ -445,9 +445,9 @@
     },
     {
       "label": "dev-infrastructure",
-      "command": "docker-compose",
+      "command": "nerdctl",
       "type": "shell",
-      "args": ["-f", "docker-compose.dev.yml", "up", "-d"],
+      "args": ["compose", "-f", "docker-compose.dev.yml", "up", "-d"],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -460,9 +460,9 @@
     },
     {
       "label": "stop-dev-infrastructure",
-      "command": "docker-compose",
+      "command": "nerdctl",
       "type": "shell",
-      "args": ["-f", "docker-compose.dev.yml", "down"],
+      "args": ["compose", "-f", "docker-compose.dev.yml", "down"],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -475,9 +475,9 @@
     },
     {
       "label": "docker-compose-up",
-      "command": "docker-compose",
+      "command": "nerdctl",
       "type": "shell",
-      "args": ["up", "-d"],
+      "args": ["compose", "up", "-d"],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -489,9 +489,9 @@
     },
     {
       "label": "docker-compose-down",
-      "command": "docker-compose",
+      "command": "nerdctl",
       "type": "shell",
-      "args": ["down"],
+      "args": ["compose", "down"],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -557,9 +557,9 @@
     },
     {
       "label": "infrastructure-up",
-      "command": "docker-compose",
+      "command": "nerdctl",
       "type": "shell",
-      "args": ["up", "-d"],
+      "args": ["compose", "up", "-d"],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -572,9 +572,9 @@
     },
     {
       "label": "infrastructure-down",
-      "command": "docker-compose",
+      "command": "nerdctl",
       "type": "shell",
-      "args": ["down"],
+      "args": ["compose", "down"],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -587,9 +587,9 @@
     },
     {
       "label": "infrastructure-logs",
-      "command": "docker-compose",
+      "command": "nerdctl",
       "type": "shell",
-      "args": ["logs", "-f"],
+      "args": ["compose", "logs", "-f"],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
@@ -603,7 +603,7 @@
     },
     {
       "label": "mongodb-shell",
-      "command": "docker",
+      "command": "nerdctl",
       "type": "shell",
       "args": [
         "exec",
@@ -624,7 +624,7 @@
     },
     {
       "label": "kafka-topics-list",
-      "command": "docker",
+      "command": "nerdctl",
       "type": "shell",
       "args": [
         "exec",
@@ -854,16 +854,89 @@
       }
     },
     {
-      "label": "skaffold-dev",
-      "command": "skaffold",
+      "label": "containerd-build-images",
+      "command": "powershell",
       "type": "shell",
-      "args": ["dev", "--profile=local"],
+      "args": [
+        "-NoProfile",
+        "-ExecutionPolicy",
+        "Bypass",
+        "-File",
+        "${workspaceFolder}\\scripts\\containerd-build-images.ps1"
+      ],
       "problemMatcher": [],
       "presentation": {
         "reveal": "always",
         "panel": "dedicated"
       },
-      "isBackground": true
+      "options": {
+        "cwd": "${workspaceFolder}"
+      }
+    },
+    {
+      "label": "k8s-apply-local",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "apply",
+        "-k",
+        "${workspaceFolder}\\infrastructure\\k8s\\local"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "k8s-port-forward-frontend",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "-n",
+        "erp-local",
+        "port-forward",
+        "svc/frontend-service",
+        "3000:80"
+      ],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "port-forward"
+      }
+    },
+    {
+      "label": "k8s-port-forward-gateway",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "-n",
+        "erp-local",
+        "port-forward",
+        "svc/gateway-service",
+        "8080:80"
+      ],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "port-forward"
+      }
+    },
+    {
+      "label": "skaffold-dev",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "dev-infrastructure",
+        "containerd-build-images",
+        "k8s-apply-local",
+        "k8s-port-forward-frontend",
+        "k8s-port-forward-gateway"
+      ],
+      "problemMatcher": []
     },
     {
       "label": "skaffold-stop",

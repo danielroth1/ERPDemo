@@ -16,6 +16,7 @@ spec:
       containers:
       - name: frontend
         image: erp/frontend
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 80
           name: http

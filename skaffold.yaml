@@ -9,63 +9,128 @@ build:
     # Backend services
     - image: erp/user-management
       context: services/user-management
-      docker:
-        dockerfile: Dockerfile
+      custom:
+        buildCommand: powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/user-management -Dockerfile services/user-management/Dockerfile
+        dependencies:
+          paths:
+            - "**/*"
+      sync:
+        manual:
+          - src: "**/*.cs"
+            dest: /app
     
     - image: erp/inventory
       context: services/inventory
-      docker:
-        dockerfile: Dockerfile
+      custom:
+        buildCommand: powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/inventory -Dockerfile services/inventory/Dockerfile
+        dependencies:
+          paths:
+            - "**/*"
+      sync:
+        manual:
+          - src: "**/*.cs"
+            dest: /app
     
     - image: erp/sales
       context: services/sales
-      docker:
-        dockerfile: Dockerfile
+      custom:
+        buildCommand: powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/sales -Dockerfile services/sales/Dockerfile
+        dependencies:
+          paths:
+            - "**/*"
+      sync:
+        manual:
+          - src: "**/*.cs"
+            dest: /app
     
     - image: erp/financial
       context: services/financial
-      docker:
-        dockerfile: Dockerfile
+      custom:
+        buildCommand: powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/financial -Dockerfile services/financial/Dockerfile
+        dependencies:
+          paths:
+            - "**/*"
+      sync:
+        manual:
+          - src: "**/*.cs"
+            dest: /app
     
     - image: erp/dashboard
       context: services/dashboard
-      docker:
-        dockerfile: Dockerfile
+      custom:
+        buildCommand: powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/dashboard -Dockerfile services/dashboard/Dockerfile
+        dependencies:
+          paths:
+            - "**/*"
+      sync:
+        manual:
+          - src: "**/*.cs"
+            dest: /app
     
     - image: erp/gateway
       context: services/gateway
-      docker:
-        dockerfile: Dockerfile
+      custom:
+        buildCommand: powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/gateway -Dockerfile services/gateway/Dockerfile
+        dependencies:
+          paths:
+            - "**/*"
+      sync:
+        manual:
+          - src: "**/*.cs"
+            dest: /app
     
     # Frontend
     - image: erp/frontend
       context: frontend
-      docker:
-        dockerfile: Dockerfile
+      custom:
+        buildCommand: powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context frontend -Dockerfile frontend/Dockerfile
+        dependencies:
+          paths:
+            - Dockerfile
+            - nginx.conf
+            - index.html
+            - package.json
+            - package-lock.json
+            - vite.config.*
+            - tsconfig*.json
+            - public/**
+            - src/**
+      sync:
+        manual:
+          - src: "src/**/*"
+            dest: /app/src
   
   tagPolicy:
     gitCommit: {}
 
+  local:
+    push: false
+    tryImportMissing: false
+    useDockerCLI: true
+
+manifests:
+  kustomize:
+    paths:
+      - infrastructure/k8s/local
+
 # Deploy configuration
 deploy:
-  kubectl:
-    paths:
-      - infrastructure/k8s/local/*.yaml
+  kubectl: {}
 
 # Port forwarding for local access
 portForward:
   - resourceType: service
-    resourceName: frontend
+    resourceName: frontend-service
     port: 80
     localPort: 3000
   
   - resourceType: service
-    resourceName: gateway
+    resourceName: gateway-service
     port: 80
     localPort: 8080
   
   - resourceType: service
-    resourceName: grafana
+    resourceName: grafana-service
     port: 3000
     localPort: 3001
 
@@ -75,93 +140,9 @@ profiles:
   - name: local
     activation:
       - command: dev
-    deploy:
-      kubectl:
-        paths:
-          - infrastructure/k8s/base/namespace.yaml
-          - infrastructure/k8s/base/postgres.yaml
-          - infrastructure/k8s/base/kafka.yaml
-          - infrastructure/k8s/base/user-management.yaml
-          - infrastructure/k8s/base/inventory.yaml
-          - infrastructure/k8s/base/sales.yaml
-          - infrastructure/k8s/base/financial.yaml
-          - infrastructure/k8s/base/dashboard.yaml
-          - infrastructure/k8s/base/gateway.yaml
-          - infrastructure/k8s/base/frontend.yaml
-          - infrastructure/k8s/base/prometheus.yaml
-          - infrastructure/k8s/base/grafana.yaml
-    
-    # File sync for hot reload
-    build:
-      artifacts:
-        - image: erp/user-management
-          sync:
-            manual:
-              - src: "**/*.cs"
-                dest: /app
-        - image: erp/inventory
-          sync:
-            manual:
-              - src: "**/*.cs"
-                dest: /app
-        - image: erp/sales
-          sync:
-            manual:
-              - src: "**/*.cs"
-                dest: /app
-        - image: erp/financial
-          sync:
-            manual:
-              - src: "**/*.cs"
-                dest: /app
-        - image: erp/dashboard
-          sync:
-            manual:
-              - src: "**/*.cs"
-                dest: /app
-        - image: erp/gateway
-          sync:
-            manual:
-              - src: "**/*.cs"
-                dest: /app
-        - image: erp/frontend
-          sync:
-            manual:
-              - src: "src/**/*"
-                dest: /app/src
 
   # Testing profile for CI/CD
   - name: testing
-    deploy:
-      kubectl:
-        paths:
-          - infrastructure/k8s/base/namespace.yaml
-          - infrastructure/k8s/base/postgres.yaml
-          - infrastructure/k8s/base/kafka.yaml
-          - infrastructure/k8s/base/user-management.yaml
-          - infrastructure/k8s/base/inventory.yaml
-          - infrastructure/k8s/base/sales.yaml
-          - infrastructure/k8s/base/financial.yaml
-          - infrastructure/k8s/base/dashboard.yaml
-          - infrastructure/k8s/base/gateway.yaml
-          - infrastructure/k8s/base/frontend.yaml
-          - infrastructure/k8s/base/prometheus.yaml
-          - infrastructure/k8s/base/grafana.yaml
 
   # Production profile
   - name: production
-    deploy:
-      kubectl:
-        paths:
-          - infrastructure/k8s/base/namespace.yaml
-          - infrastructure/k8s/base/postgres.yaml
-          - infrastructure/k8s/base/kafka.yaml
-          - infrastructure/k8s/base/user-management.yaml
-          - infrastructure/k8s/base/inventory.yaml
-          - infrastructure/k8s/base/sales.yaml
-          - infrastructure/k8s/base/financial.yaml
-          - infrastructure/k8s/base/dashboard.yaml
-          - infrastructure/k8s/base/gateway.yaml
-          - infrastructure/k8s/base/frontend.yaml
-          - infrastructure/k8s/base/prometheus.yaml
-          - infrastructure/k8s/base/grafana.yaml

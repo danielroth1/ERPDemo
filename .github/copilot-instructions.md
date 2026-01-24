@@ -68,7 +68,9 @@ erp/
 ### Prerequisites
 
 - **Windows 10/11** with PowerShell 7+
-- **Docker Desktop** for Windows
+- **Rancher Desktop** - [Download](https://rancherdesktop.io/) (k3s mode with containerd)
+  - Alternative: Docker Desktop for Windows
+  - See [RANCHER_DESKTOP_SETUP.md](../RANCHER_DESKTOP_SETUP.md) for configuration
 - **.NET 9 SDK** - [Download](https://dotnet.microsoft.com/download)
 - **Node.js 20+** with npm - [Download](https://nodejs.org/)
 - **Visual Studio Code** - [Download](https://code.visualstudio.com/)
@@ -77,26 +79,38 @@ erp/
 ### Initial Setup
 
 1. **Clone the repository**
+
    ```powershell
    git clone <repository-url>
    cd erp
    ```
 
-2. **Start infrastructure** (MongoDB, Kafka, Prometheus, Grafana)
+2. **Configure Rancher Desktop** (Recommended)
+   - Set to **k3s mode** with **containerd** runtime
+   - See [RANCHER_DESKTOP_SETUP.md](../RANCHER_DESKTOP_SETUP.md) for detailed setup
+   - Verify: `nerdctl --version` and `kubectl version`
+
+3. **Start infrastructure** (PostgreSQL, Kafka, Prometheus, Grafana)
+
    ```powershell
+   # Via VS Code Task (Recommended)
+   Terminal → Run Task → dev-infrastructure
+
+   # Or manually with nerdctl
    cd infrastructure
-   docker-compose up -d
+   nerdctl compose -f docker-compose.dev.yml up -d
    cd ..
    ```
 
-3. **Install frontend dependencies**
+4. **Install frontend dependencies**
+
    ```powershell
    cd frontend
    npm install
    cd ..
    ```
 
-4. **Open in VS Code**
+5. **Open in VS Code**
    ```powershell
    code .
    ```
@@ -108,11 +122,13 @@ erp/
 The project includes pre-configured VS Code tasks for common operations:
 
 #### Start All Services (Recommended)
+
 1. **Terminal > Run Task** → `docker-compose-up` (infrastructure)
 2. **Terminal > Run Task** → `watch-all-services` (all backend services with hot reload)
 3. **Terminal > Run Task** → `dev-frontend` (React dev server)
 
 #### Individual Service Tasks
+
 - `watch-gateway` - Run API Gateway with hot reload
 - `watch-user-management` - Run User Management with hot reload
 - `watch-inventory-management` - Run Inventory with hot reload
@@ -121,10 +137,12 @@ The project includes pre-configured VS Code tasks for common operations:
 - `watch-dashboard-analytics` - Run Dashboard with hot reload
 
 #### Build Tasks
+
 - `build-all-services` - Build all backend services
 - `build-frontend` - Build production frontend bundle
 
 #### Test Tasks
+
 - `test-all` - Run all tests
 - `test-user-management` - Run User Management tests
 - `test-inventory-management` - Run Inventory tests
@@ -132,19 +150,23 @@ The project includes pre-configured VS Code tasks for common operations:
 ### Using VS Code Debugger
 
 #### Debug All Services
+
 1. **Run > Start Debugging** (F5)
 2. Select **"Launch All Backend Services"**
 3. Set breakpoints in any service
 4. Services will stop at breakpoints automatically
 
 #### Debug Individual Service
+
 1. Set breakpoints in the service code
 2. **Run > Start Debugging** (F5)
 3. Select **"Launch API Gateway"** (or any service)
 4. Swagger opens automatically at the service endpoint
 
 #### Attach to Running Services
+
 If services are already running via `dotnet watch run`:
+
 1. **Run > Start Debugging** (F5)
 2. Select **"Attach to All Services"**
 3. Debugger attaches to all running processes
@@ -193,15 +215,15 @@ ServiceName.Tests/
 
 ### Service Ports
 
-| Service | Port | URL |
-|---------|------|-----|
-| API Gateway | 5001 | http://localhost:5001 |
-| User Management | 5002 | http://localhost:5002 |
-| Inventory Management | 5003 | http://localhost:5003 |
-| Sales & Orders | 5004 | http://localhost:5004 |
-| Financial Management | 5005 | http://localhost:5005 |
+| Service               | Port | URL                   |
+| --------------------- | ---- | --------------------- |
+| API Gateway           | 5001 | http://localhost:5001 |
+| User Management       | 5002 | http://localhost:5002 |
+| Inventory Management  | 5003 | http://localhost:5003 |
+| Sales & Orders        | 5004 | http://localhost:5004 |
+| Financial Management  | 5005 | http://localhost:5005 |
 | Dashboard & Analytics | 5006 | http://localhost:5006 |
-| Frontend (Dev) | 5173 | http://localhost:5173 |
+| Frontend (Dev)        | 5173 | http://localhost:5173 |
 
 ### Frontend Structure
 
@@ -268,6 +290,7 @@ npm run test:e2e
 - **Error Handling**: Use appropriate HTTP status codes
 
 Example:
+
 ```csharp
 [ApiController]
 [Route("api/v1/[controller]")]
@@ -324,6 +347,7 @@ public class ProductsController : ControllerBase
 - Register as typed `HttpClient` using `AddHttpClient<TClient, TImplementation>()`
 - Benefits: type safety, centralized error handling, better maintainability, easier testing
 - Example:
+
   ```csharp
   // Service client interface
   public interface IFinancialServiceClient
@@ -331,10 +355,11 @@ public class ProductsController : ControllerBase
       Task<AccountResponse?> GetAccountAsync(string accountId);
       Task<bool> CreateTransactionAsync(CreateTransactionRequest request);
   }
-  
+
   // Registration in Program.cs
   builder.Services.AddHttpClient<IFinancialServiceClient, FinancialServiceClient>();
   ```
+
 - **API Generation**: When backend APIs change or new endpoints are added:
   1. Navigate to the frontend folder
   2. Run `npm run generate:api` to regenerate all Kiota clients
@@ -350,19 +375,21 @@ public class ProductsController : ControllerBase
 **ALL REST API calls MUST use Kiota-generated TypeScript clients.**
 
 ❌ **NEVER DO THIS**:
+
 ```typescript
 // DON'T use direct fetch or axios
-const response = await fetch('/api/v1/products');
-const response = await axios.get('/api/v1/products');
-const response = await apiService.get('/products');
+const response = await fetch("/api/v1/products");
+const response = await axios.get("/api/v1/products");
+const response = await apiService.get("/products");
 ```
 
 ✅ **ALWAYS DO THIS**:
+
 ```typescript
 // DO use Kiota-generated clients
-import { createInventoryClient } from '../generated/clients/inventory/inventoryClient';
-import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
-import { BearerTokenAuthenticationProvider } from './auth/bearer-token-provider';
+import { createInventoryClient } from "../generated/clients/inventory/inventoryClient";
+import { FetchRequestAdapter } from "@microsoft/kiota-http-fetchlibrary";
+import { BearerTokenAuthenticationProvider } from "./auth/bearer-token-provider";
 
 class InventoryService {
   private client;
@@ -370,7 +397,8 @@ class InventoryService {
   constructor() {
     const authProvider = new BearerTokenAuthenticationProvider();
     const adapter = new FetchRequestAdapter(authProvider);
-    adapter.baseUrl = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5000';
+    adapter.baseUrl =
+      import.meta.env.VITE_API_GATEWAY_URL || "http://localhost:5000";
     this.client = createInventoryClient(adapter);
   }
 
@@ -383,6 +411,7 @@ class InventoryService {
 #### ⚠️ MANDATORY: Regenerating API Clients After Backend Changes
 
 **YOU MUST regenerate API clients after ANY backend API change:**
+
 - ✅ After adding new controllers or endpoints to backend
 - ✅ After modifying existing endpoint signatures
 - ✅ After adding new DTOs or response models
@@ -392,11 +421,13 @@ class InventoryService {
 **ALWAYS run this task after backend changes:**
 
 **Via VS Code Task (Recommended)**:
+
 1. Terminal → Run Task → `generate-api-clients` (all services)
 2. Or Terminal → Run Task → `generate-api-client-dashboard` (specific service)
 3. Or Terminal → Run Task → `check-services` (verify services are running)
 
 **Via PowerShell**:
+
 ```powershell
 # Make sure all services are running first
 .\scripts\generate-api-clients.ps1
@@ -411,6 +442,7 @@ class InventoryService {
 **⚠️ If you forget to regenerate**: Frontend will have TypeScript errors or runtime API call failures.
 
 **Client locations**:
+
 - Dashboard: `frontend/src/generated/clients/dashboard/`
 - User Management: `frontend/src/generated/clients/user-management/`
 - Inventory: `frontend/src/generated/clients/inventory/`
@@ -418,6 +450,7 @@ class InventoryService {
 - Financial: `frontend/src/generated/clients/financial/`
 
 Example:
+
 ```typescript
 interface Product {
   id: string;
@@ -476,6 +509,7 @@ Use conventional commit format:
 ```
 
 **Types**:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -485,6 +519,7 @@ Use conventional commit format:
 - `chore`: Build process or tooling changes
 
 **Examples**:
+
 ```
 feat(inventory): add low-stock alert functionality
 
@@ -513,17 +548,20 @@ Added comprehensive tests for User model including:
 ### Pull Request Process
 
 1. **Create feature branch**
+
    ```powershell
    git checkout -b feature/my-feature
    ```
 
 2. **Make changes and commit**
+
    ```powershell
    git add .
    git commit -m "feat(scope): description"
    ```
 
 3. **Push to remote**
+
    ```powershell
    git push origin feature/my-feature
    ```
@@ -556,19 +594,20 @@ Added comprehensive tests for User model including:
 
 ### Common Issues
 
-| Issue | Solution |
-|-------|----------|
-| Service won't start | Check MongoDB/Kafka are running (`docker-compose ps`) |
-| 401 Unauthorized | Verify JWT token is valid and not expired |
-| CORS errors | Ensure frontend origin is in Gateway CORS policy |
-| Database connection failed | Check connection string in `appsettings.json` |
-| Port already in use | Change port in `appsettings.json` or kill process |
+| Issue                      | Solution                                              |
+| -------------------------- | ----------------------------------------------------- |
+| Service won't start        | Check MongoDB/Kafka are running (`docker-compose ps`) |
+| 401 Unauthorized           | Verify JWT token is valid and not expired             |
+| CORS errors                | Ensure frontend origin is in Gateway CORS policy      |
+| Database connection failed | Check connection string in `appsettings.json`         |
+| Port already in use        | Change port in `appsettings.json` or kill process     |
 
 ## 🔧 Adding a New Service
 
 When creating a new microservice, follow these steps to integrate it properly:
 
 ### 1. Create Service Structure
+
 ```
 services/
 └── your-service/
@@ -587,6 +626,7 @@ services/
 #### Add to `.vscode/tasks.json`:
 
 **Watch Task** (for development with hot reload):
+
 ```json
 {
   "label": "watch-your-service",
@@ -609,13 +649,14 @@ services/
     "cwd": "${workspaceFolder}/services/your-service/YourService",
     "env": {
       "ASPNETCORE_ENVIRONMENT": "Development",
-      "ASPNETCORE_URLS": "http://localhost:500X"  // Use next available port
+      "ASPNETCORE_URLS": "http://localhost:500X" // Use next available port
     }
   }
 }
 ```
 
 **Build Task**:
+
 ```json
 {
   "label": "build-your-service",
@@ -633,6 +674,7 @@ services/
 ```
 
 **Test Task**:
+
 ```json
 {
   "label": "test-your-service",
@@ -650,6 +692,7 @@ services/
 ```
 
 **Update `watch-all-services` task** to include your new service:
+
 ```json
 {
   "label": "watch-all-services",
@@ -660,12 +703,13 @@ services/
     "watch-sales",
     "watch-financial",
     "watch-dashboard",
-    "watch-your-service"  // ADD THIS LINE
+    "watch-your-service" // ADD THIS LINE
   ]
 }
 ```
 
 **Update `build-all-services` task** to include your new service:
+
 ```json
 {
   "label": "build-all-services",
@@ -676,7 +720,7 @@ services/
     "build-sales",
     "build-financial",
     "build-dashboard",
-    "build-your-service"  // ADD THIS LINE
+    "build-your-service" // ADD THIS LINE
   ]
 }
 ```
@@ -684,6 +728,7 @@ services/
 #### Add to `.vscode/launch.json`:
 
 **Launch Configuration**:
+
 ```json
 {
   "name": "Launch Your Service",
@@ -701,7 +746,7 @@ services/
   },
   "env": {
     "ASPNETCORE_ENVIRONMENT": "Development",
-    "ASPNETCORE_URLS": "http://localhost:500X"  // Match the port from watch task
+    "ASPNETCORE_URLS": "http://localhost:500X" // Match the port from watch task
   },
   "sourceFileMap": {
     "/Views": "${workspaceFolder}/Views"
@@ -710,6 +755,7 @@ services/
 ```
 
 **Attach Configuration**:
+
 ```json
 {
   "name": "Attach to Your Service",
@@ -722,6 +768,7 @@ services/
 ### 3. Update Infrastructure
 
 #### Add to `docker-compose.yml`:
+
 ```yaml
 your-service:
   build:
@@ -742,7 +789,9 @@ your-service:
 ```
 
 #### Add to API Gateway routes (if needed):
+
 Update `services/gateway/ApiGateway/appsettings.json`:
+
 ```json
 {
   "ReverseProxy": {
@@ -752,9 +801,7 @@ Update `services/gateway/ApiGateway/appsettings.json`:
         "Match": {
           "Path": "/api/yourservice/{**catch-all}"
         },
-        "Transforms": [
-          { "PathPattern": "/api/{**catch-all}" }
-        ]
+        "Transforms": [{ "PathPattern": "/api/{**catch-all}" }]
       }
     },
     "Clusters": {
@@ -813,6 +860,7 @@ Update `services/gateway/ApiGateway/appsettings.json`:
 ## 🚨 Production Server Management
 
 ### Server Details
+
 - **Domain**: shopping-now.net
 - **Server**: <contabo-server> (Contabo VPS)
 - **SSH User**: daniel
@@ -839,6 +887,7 @@ docker-compose logs --tail=100 user-management
 ### Common Production Issues & Solutions
 
 #### 1. Containers Not Running
+
 ```bash
 # Check all containers
 docker-compose ps
@@ -854,9 +903,11 @@ docker-compose logs --tail=50 [service-name]
 ```
 
 #### 2. 401 Unauthorized Errors (JWT Token Issues)
+
 **Cause**: JWT secret mismatch between services
 
 **Solution**:
+
 ```bash
 # Verify JWT secrets match across all services
 docker exec erp-gateway printenv | grep Jwt
@@ -873,9 +924,11 @@ docker-compose up -d --force-recreate gateway user-management dashboard
 **Critical**: All services (gateway, user-management, inventory, sales, financial, dashboard) must have the same `Jwt__Secret`, `Jwt__Issuer`, and `Jwt__Audience`.
 
 #### 3. 502 Bad Gateway Errors
+
 **Cause**: Gateway can't reach backend services
 
 **Solution**:
+
 ```bash
 # Check if services are running
 docker-compose ps
@@ -894,14 +947,17 @@ docker-compose restart gateway
 ```
 
 #### 4. CORS Errors
+
 **Cause**: Gateway CORS policy doesn't include the frontend domain
 
 **Solution**: Gateway CORS must allow `https://shopping-now.net` and development ports (`localhost:5173`, `localhost:5174`)
 
 #### 5. Frontend Not Loading / 502 on Root URL
+
 **Cause**: Frontend container not running or nginx misconfigured
 
 **Solution**:
+
 ```bash
 # Check frontend container
 docker-compose ps frontend
@@ -919,6 +975,7 @@ sudo tail -f /var/log/nginx/error.log
 ### Production Deployment Process
 
 #### From Local Machine:
+
 ```bash
 # Deploy all services
 ./deploy.sh deploy
@@ -937,6 +994,7 @@ sudo tail -f /var/log/nginx/error.log
 ```
 
 #### On Production Server:
+
 ```bash
 cd /home/daniel/ERPDemo
 
@@ -956,9 +1014,11 @@ docker-compose logs -f
 ### Critical Production Configuration
 
 #### Environment Variables (.env file)
+
 Located at: `/home/daniel/ERPDemo/.env`
 
 **Must be configured**:
+
 ```bash
 # JWT Configuration (CRITICAL - must match across all services)
 JWT_SECRET=your-secret-key-min-32-characters-long-for-security-change-this
@@ -976,6 +1036,7 @@ SMTP_FROM_EMAIL=noreply@shopping-now.net
 **Note**: `docker-compose.override.yml` is **excluded** from production deployment. It only exists locally for development with dummy SMTP values.
 
 #### Port Mapping (Production)
+
 - Frontend (nginx container): Port 8081 → nginx proxy → HTTPS 443
 - Gateway: Port 8080 (internal only)
 - User Management: Port 5001 (internal only)
@@ -986,6 +1047,7 @@ SMTP_FROM_EMAIL=noreply@shopping-now.net
 - Kafka UI: Port 9001 (changed from 9000 - Portainer conflict)
 
 #### Nginx Reverse Proxy
+
 - Configuration: `/etc/nginx/sites-available/shopping-now.net`
 - SSL Certificates: `/etc/letsencrypt/live/shopping-now.net/`
 - Routes:
@@ -995,6 +1057,7 @@ SMTP_FROM_EMAIL=noreply@shopping-now.net
 ### Container Name Mapping (CRITICAL for Gateway Config)
 
 **In Docker**: Services communicate using **container names** on the `erp-network`:
+
 - `user-management:8080` (NOT `localhost:5001`)
 - `inventory:8080` (NOT `localhost:5002`)
 - `sales:8080` (NOT `localhost:5003`)
@@ -1002,6 +1065,7 @@ SMTP_FROM_EMAIL=noreply@shopping-now.net
 - `dashboard:8080` (NOT `localhost:5005`)
 
 **Gateway Configuration**:
+
 - Development: `appsettings.Development.json` uses `localhost:500X`
 - Production: `appsettings.Production.json` uses `service-name:8080`
 - Environment: Set `ASPNETCORE_ENVIRONMENT=Production` in docker-compose.yml
@@ -1017,7 +1081,7 @@ frontend:
     context: ./frontend
     dockerfile: Dockerfile
     args:
-      VITE_API_GATEWAY_URL: https://shopping-now.net  # No /api suffix!
+      VITE_API_GATEWAY_URL: https://shopping-now.net # No /api suffix!
 ```
 
 **Why**: Vite bakes environment variables into the JavaScript bundle during build. Runtime env vars don't work.
