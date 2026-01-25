@@ -25,15 +25,16 @@ spec:
           value: "http://+:8080"
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
-        - name: Services__UserManagement
+        # YARP destination addresses (override appsettings.json placeholders)
+        - name: ReverseProxy__Clusters__user-cluster__Destinations__destination1__Address
           value: "http://user-management-service:8080"
-        - name: Services__Inventory
+        - name: ReverseProxy__Clusters__inventory-cluster__Destinations__destination1__Address
           value: "http://inventory-service:8080"
-        - name: Services__Sales
+        - name: ReverseProxy__Clusters__sales-cluster__Destinations__destination1__Address
           value: "http://sales-service:8080"
-        - name: Services__Financial
+        - name: ReverseProxy__Clusters__financial-cluster__Destinations__destination1__Address
           value: "http://financial-service:8080"
-        - name: Services__Dashboard
+        - name: ReverseProxy__Clusters__dashboard-cluster__Destinations__destination1__Address
           value: "http://dashboard-service:8080"
         livenessProbe:
           httpGet:

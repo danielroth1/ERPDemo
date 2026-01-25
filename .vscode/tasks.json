@@ -459,6 +459,21 @@
       }
     },
     {
+      "label": "dev-infrastructure-offline",
+      "command": "nerdctl",
+      "type": "shell",
+      "args": ["compose", "-f", "docker-compose.dev.yml", "up", "-d", "--pull", "never"],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "group": "infrastructure"
+      },
+      "options": {
+        "cwd": "${workspaceFolder}/infrastructure"
+      }
+    },
+    {
       "label": "stop-dev-infrastructure",
       "command": "nerdctl",
       "type": "shell",
@@ -724,6 +739,24 @@
       }
     },
     {
+      "label": "k8s-exposed-ports",
+      "command": "kubectl",
+      "type": "shell",
+      "args": [
+        "get",
+        "services",
+        "-n",
+        "erp-local",
+        "-o",
+        "custom-columns=NAME:.metadata.name,TYPE:.spec.type,CLUSTER-IP:.spec.clusterIP,EXTERNAL-IP:.status.loadBalancer.ingress[0].ip,EXTERNAL-HOST:.status.loadBalancer.ingress[0].hostname,PORTS:.spec.ports[*].port,TARGETPORTS:.spec.ports[*].targetPort"
+      ],
+      "problemMatcher": [],
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared"
+      }
+    },
+    {
       "label": "generate-api-clients",
       "command": "npm",
       "type": "shell",
@@ -897,7 +930,7 @@
         "erp-local",
         "port-forward",
         "svc/frontend-service",
-        "3000:80"
+        "3002:80"
       ],
       "problemMatcher": [],
       "isBackground": true,
@@ -916,7 +949,7 @@
         "erp-local",
         "port-forward",
         "svc/gateway-service",
-        "8080:80"
+        "8081:80"
       ],
       "problemMatcher": [],
       "isBackground": true,
@@ -930,7 +963,6 @@
       "label": "skaffold-dev",
       "dependsOrder": "sequence",
       "dependsOn": [
-        "dev-infrastructure",
         "containerd-build-images",
         "k8s-apply-local",
         "k8s-port-forward-frontend",

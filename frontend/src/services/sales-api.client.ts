@@ -2,6 +2,7 @@
 import { createSalesClient } from '../generated/clients/sales/salesClient';
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
 import { BearerTokenAuthenticationProvider } from './auth/bearer-token-provider';
+import { getApiBaseUrl } from './api-base-url';
 import type {
   OrderResponse,
   CreateOrderRequest,
@@ -15,7 +16,7 @@ import type {
   RecordPaymentRequest,
 } from '../generated/clients/sales/models';
 
-const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5000';
+const API_BASE_URL = getApiBaseUrl();
 
 class SalesApiClient {
   private client;

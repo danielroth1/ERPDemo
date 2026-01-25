@@ -2,6 +2,7 @@
 import { createDashboardClient } from '../generated/clients/dashboard/dashboardClient';
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
 import { BearerTokenAuthenticationProvider } from './auth/bearer-token-provider';
+import { getApiBaseUrl } from './api-base-url';
 import type {
   DashboardMetricsResponse,
   KPIResponse,
@@ -10,7 +11,7 @@ import type {
   SalesOverviewResponse,
 } from '../generated/clients/dashboard/models';
 
-const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5000';
+const API_BASE_URL = getApiBaseUrl();
 
 class DashboardApiClient {
   private client;

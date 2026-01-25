@@ -3,6 +3,7 @@ import { createFinancialClient } from '../generated/clients/financial/financialC
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
 import { BearerTokenAuthenticationProvider } from './auth/bearer-token-provider';
 import { extractErrorMessage } from '../utils/error-handler';
+import { getApiBaseUrl } from './api-base-url';
 import type {
   AccountResponse,
   CreateAccountRequest,
@@ -16,7 +17,7 @@ import type {
   IncomeStatementResponse,
 } from '../generated/clients/financial/models';
 
-const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5000';
+const API_BASE_URL = getApiBaseUrl();
 
 class FinancialApiClient {
   private client;

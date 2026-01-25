@@ -1,5 +1,7 @@
 import * as signalR from '@microsoft/signalr';
 
+import { getApiBaseUrl } from './api-base-url';
+
 class SignalRService {
   private connection: signalR.HubConnection | null = null;
   private listeners: Map<string, Set<Function>> = new Map();
@@ -10,7 +12,7 @@ class SignalRService {
     }
 
     const token = localStorage.getItem('accessToken');
-    const url = `${import.meta.env.VITE_API_GATEWAY_URL}/dashboardHub`;
+    const url = `${getApiBaseUrl()}/dashboardHub`;
 
     this.connection = new signalR.HubConnectionBuilder()
       .withUrl(url, {

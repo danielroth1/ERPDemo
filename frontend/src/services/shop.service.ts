@@ -3,12 +3,13 @@ import { createInventoryClient } from '../generated/clients/inventory/inventoryC
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
 import { BearerTokenAuthenticationProvider } from './auth/bearer-token-provider';
 import { extractErrorMessage } from '../utils/error-handler';
+import { getApiBaseUrl } from './api-base-url';
 import type {
   ProductResponse,
   CategoryResponse,
 } from '../generated/clients/inventory/models';
 
-const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:8080';
+const API_BASE_URL = getApiBaseUrl();
 
 // Re-export types from generated models for convenience
 export type ShopProduct = ProductResponse;

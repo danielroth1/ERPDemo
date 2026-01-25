@@ -49,6 +49,10 @@ try
         {
             policy.RequireAuthenticatedUser();
         });
+        options.AddPolicy("anonymous", policy =>
+        {
+            policy.RequireAssertion(_ => true);
+        });
     });    // Add Rate Limiting
     builder.Services.AddMemoryCache();
     builder.Services.Configure<IpRateLimitOptions>(builder.Configuration.GetSection("IpRateLimiting"));

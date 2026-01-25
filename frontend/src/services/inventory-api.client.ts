@@ -2,6 +2,7 @@
 import { createInventoryClient } from '../generated/clients/inventory/inventoryClient';
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
 import { BearerTokenAuthenticationProvider } from './auth/bearer-token-provider';
+import { getApiBaseUrl } from './api-base-url';
 import type {
   ProductResponse,
   ProductRequest,
@@ -14,7 +15,7 @@ import type {
   ProductResponsePaginatedResponse,
 } from '../generated/clients/inventory/models';
 
-const API_BASE_URL = import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5000';
+const API_BASE_URL = getApiBaseUrl();
 
 class InventoryApiClient {
   private client;
