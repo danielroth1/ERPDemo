@@ -1,5 +1,49 @@
 {
   "version": "0.2.0",
+  "inputs": [
+    {
+      "id": "k8sNamespace",
+      "type": "promptString",
+      "description": "Kubernetes namespace",
+      "default": "erp-local"
+    },
+    {
+      "id": "k8sPodGateway",
+      "type": "promptString",
+      "description": "Pod name for gateway (kubectl -n erp-local get pods -l app=gateway)",
+      "default": "gateway-"
+    },
+    {
+      "id": "k8sPodUserManagement",
+      "type": "promptString",
+      "description": "Pod name for user-management (kubectl -n erp-local get pods -l app=user-management)",
+      "default": "user-management-"
+    },
+    {
+      "id": "k8sPodInventory",
+      "type": "promptString",
+      "description": "Pod name for inventory (kubectl -n erp-local get pods -l app=inventory)",
+      "default": "inventory-"
+    },
+    {
+      "id": "k8sPodSales",
+      "type": "promptString",
+      "description": "Pod name for sales (kubectl -n erp-local get pods -l app=sales)",
+      "default": "sales-"
+    },
+    {
+      "id": "k8sPodFinancial",
+      "type": "promptString",
+      "description": "Pod name for financial (kubectl -n erp-local get pods -l app=financial)",
+      "default": "financial-"
+    },
+    {
+      "id": "k8sPodDashboard",
+      "type": "promptString",
+      "description": "Pod name for dashboard (kubectl -n erp-local get pods -l app=dashboard)",
+      "default": "dashboard-"
+    }
+  ],
   "configurations": [
     {
       "name": "Launch API Gateway",
@@ -168,6 +212,252 @@
       "type": "coreclr",
       "request": "attach",
       "processName": "DashboardAnalytics"
+    },
+    {
+      "name": "Attach (K8s) API Gateway",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "kubectl",
+        "pipeArgs": [
+          "exec",
+          "-i",
+          "-n",
+          "${input:k8sNamespace}",
+          "${input:k8sPodGateway}",
+          "--"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/ApiGateway": "${workspaceFolder}/services/gateway/ApiGateway"
+      }
+    },
+    {
+      "name": "Attach (K8s) User Management",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "kubectl",
+        "pipeArgs": [
+          "exec",
+          "-i",
+          "-n",
+          "${input:k8sNamespace}",
+          "${input:k8sPodUserManagement}",
+          "--"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/UserManagement": "${workspaceFolder}/services/user-management/UserManagement"
+      }
+    },
+    {
+      "name": "Attach (K8s) Inventory",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "kubectl",
+        "pipeArgs": [
+          "exec",
+          "-i",
+          "-n",
+          "${input:k8sNamespace}",
+          "${input:k8sPodInventory}",
+          "--"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/InventoryManagement": "${workspaceFolder}/services/inventory/InventoryManagement"
+      }
+    },
+    {
+      "name": "Attach (K8s) Sales",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "kubectl",
+        "pipeArgs": [
+          "exec",
+          "-i",
+          "-n",
+          "${input:k8sNamespace}",
+          "${input:k8sPodSales}",
+          "--"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/SalesManagement": "${workspaceFolder}/services/sales/SalesManagement"
+      }
+    },
+    {
+      "name": "Attach (K8s) Financial",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "kubectl",
+        "pipeArgs": [
+          "exec",
+          "-i",
+          "-n",
+          "${input:k8sNamespace}",
+          "${input:k8sPodFinancial}",
+          "--"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/FinancialManagement": "${workspaceFolder}/services/financial/FinancialManagement"
+      }
+    },
+    {
+      "name": "Attach (K8s) Dashboard",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "kubectl",
+        "pipeArgs": [
+          "exec",
+          "-i",
+          "-n",
+          "${input:k8sNamespace}",
+          "${input:k8sPodDashboard}",
+          "--"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/DashboardAnalytics": "${workspaceFolder}/services/dashboard/DashboardAnalytics"
+      }
+    },
+    {
+      "name": "Attach (K8s Auto) API Gateway",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "powershell",
+        "pipeArgs": [
+          "-NoProfile",
+          "-Command",
+          "kubectl exec -i -n ${input:k8sNamespace} $(kubectl -n ${input:k8sNamespace} get pods -l app=gateway -o jsonpath='{.items[0].metadata.name}') -c gateway --"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/ApiGateway": "${workspaceFolder}/services/gateway/ApiGateway"
+      }
+    },
+    {
+      "name": "Attach (K8s Auto) User Management",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "powershell",
+        "pipeArgs": [
+          "-NoProfile",
+          "-Command",
+          "kubectl exec -i -n ${input:k8sNamespace} $(kubectl -n ${input:k8sNamespace} get pods -l app=user-management -o jsonpath='{.items[0].metadata.name}') -c user-management --"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/UserManagement": "${workspaceFolder}/services/user-management/UserManagement"
+      }
+    },
+    {
+      "name": "Attach (K8s Auto) Inventory",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "powershell",
+        "pipeArgs": [
+          "-NoProfile",
+          "-Command",
+          "kubectl exec -i -n ${input:k8sNamespace} $(kubectl -n ${input:k8sNamespace} get pods -l app=inventory -o jsonpath='{.items[0].metadata.name}') -c inventory --"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/InventoryManagement": "${workspaceFolder}/services/inventory/InventoryManagement"
+      }
+    },
+    {
+      "name": "Attach (K8s Auto) Sales",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "powershell",
+        "pipeArgs": [
+          "-NoProfile",
+          "-Command",
+          "kubectl exec -i -n ${input:k8sNamespace} $(kubectl -n ${input:k8sNamespace} get pods -l app=sales -o jsonpath='{.items[0].metadata.name}') -c sales --"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/SalesManagement": "${workspaceFolder}/services/sales/SalesManagement"
+      }
+    },
+    {
+      "name": "Attach (K8s Auto) Financial",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "powershell",
+        "pipeArgs": [
+          "-NoProfile",
+          "-Command",
+          "kubectl exec -i -n ${input:k8sNamespace} $(kubectl -n ${input:k8sNamespace} get pods -l app=financial -o jsonpath='{.items[0].metadata.name}') -c financial --"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/FinancialManagement": "${workspaceFolder}/services/financial/FinancialManagement"
+      }
+    },
+    {
+      "name": "Attach (K8s Auto) Dashboard",
+      "type": "coreclr",
+      "request": "attach",
+      "processId": "${command:pickRemoteProcess}",
+      "pipeTransport": {
+        "pipeProgram": "powershell",
+        "pipeArgs": [
+          "-NoProfile",
+          "-Command",
+          "kubectl exec -i -n ${input:k8sNamespace} $(kubectl -n ${input:k8sNamespace} get pods -l app=dashboard -o jsonpath='{.items[0].metadata.name}') -c dashboard --"
+        ],
+        "debuggerPath": "/vsdbg/vsdbg",
+        "quoteArgs": true
+      },
+      "sourceFileMap": {
+        "/src/DashboardAnalytics": "${workspaceFolder}/services/dashboard/DashboardAnalytics"
+      }
     },
     {
       "name": "Launch Frontend (Chrome)",

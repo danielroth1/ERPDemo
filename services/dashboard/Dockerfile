@@ -32,6 +32,14 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 WORKDIR /app
 EXPOSE 8080
 
+# Enable remote debugging (VS Code) via vsdbg
+RUN apt-get update \
+  && apt-get install -y --no-install-recommends curl \
+  && mkdir -p /vsdbg \
+  && curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg \
+  && apt-get purge -y --auto-remove curl \
+  && rm -rf /var/lib/apt/lists/*
+
 # Copy published output
 COPY --from=publish /app/publish .
 

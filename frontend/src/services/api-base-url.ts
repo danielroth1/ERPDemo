@@ -1,4 +1,10 @@
 export function getApiBaseUrl(): string {
+  // In dev, we use the Vite proxy (see vite.config.ts) to avoid CORS.
+  // Keep requests same-origin by using a relative base URL.
+  if (import.meta.env.DEV) {
+    return '';
+  }
+
   const configured = (import.meta.env.VITE_API_GATEWAY_URL ?? '').trim();
   if (configured.length > 0) {
     return configured.replace(/\/+$/, '');

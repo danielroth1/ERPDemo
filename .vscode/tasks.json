@@ -1,5 +1,13 @@
 {
   "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "k8sNamespace",
+      "type": "promptString",
+      "description": "Kubernetes namespace",
+      "default": "erp-local"
+    }
+  ],
   "tasks": [
     {
       "label": "watch-gateway",
@@ -967,6 +975,240 @@
         "k8s-apply-local",
         "k8s-port-forward-frontend",
         "k8s-port-forward-gateway"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy-gateway-only",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/gateway:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/gateway -Dockerfile services/gateway/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/gateway gateway=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/gateway --timeout=180s"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy-user-management-only",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/user-management:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/user-management -Dockerfile services/user-management/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/user-management user-management=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/user-management --timeout=180s"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy-inventory-only",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/inventory:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/inventory -Dockerfile services/inventory/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/inventory inventory=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/inventory --timeout=180s"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy-sales-only",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/sales:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/sales -Dockerfile services/sales/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/sales sales=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/sales --timeout=180s"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy-financial-only",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/financial:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/financial -Dockerfile services/financial/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/financial financial=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/financial --timeout=180s"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy-dashboard-only",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/dashboard:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/dashboard -Dockerfile services/dashboard/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/dashboard dashboard=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/dashboard --timeout=180s"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy-frontend-only",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/frontend:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context frontend -Dockerfile frontend/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/frontend frontend=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/frontend --timeout=180s"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "restart-gateway",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "-n",
+        "${input:k8sNamespace}",
+        "rollout",
+        "restart",
+        "deployment/gateway"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "restart-user-management",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "-n",
+        "${input:k8sNamespace}",
+        "rollout",
+        "restart",
+        "deployment/user-management"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "restart-inventory",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "-n",
+        "${input:k8sNamespace}",
+        "rollout",
+        "restart",
+        "deployment/inventory"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "restart-sales",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "-n",
+        "${input:k8sNamespace}",
+        "rollout",
+        "restart",
+        "deployment/sales"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "restart-financial",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "-n",
+        "${input:k8sNamespace}",
+        "rollout",
+        "restart",
+        "deployment/financial"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "restart-dashboard",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "-n",
+        "${input:k8sNamespace}",
+        "rollout",
+        "restart",
+        "deployment/dashboard"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "restart-frontend",
+      "type": "shell",
+      "command": "kubectl",
+      "args": [
+        "-n",
+        "${input:k8sNamespace}",
+        "rollout",
+        "restart",
+        "deployment/frontend"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "attach-gateway",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=gateway -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) API Gateway'"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "attach-user-management",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=user-management -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) User Management'"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "attach-inventory",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=inventory -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) Inventory'"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "attach-sales",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=sales -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) Sales'"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "attach-financial",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=financial -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) Financial'"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "attach-dashboard",
+      "type": "shell",
+      "command": "powershell",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=dashboard -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) Dashboard'"
       ],
       "problemMatcher": []
     },

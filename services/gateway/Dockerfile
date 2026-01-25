@@ -31,6 +31,12 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
 WORKDIR /app
 EXPOSE 8080
 
+# Enable remote debugging (VS Code) via vsdbg
+RUN apk add --no-cache bash curl \
+  && mkdir -p /vsdbg \
+  && curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg \
+  && apk del bash curl
+
 # Copy published output
 COPY --from=publish /app/publish .
 
