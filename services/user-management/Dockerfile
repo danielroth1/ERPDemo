@@ -4,6 +4,8 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
+ARG BUILD_CONFIGURATION=Release
+
 ENV NUGET_PACKAGES=/root/.nuget/packages \
   NUGET_HTTP_CACHE_PATH=/root/.local/share/NuGet/v3-cache
 
@@ -18,13 +20,15 @@ COPY UserManagement/. ./UserManagement/
 WORKDIR /src/UserManagement
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
-  dotnet build -c Release -o /app/build --no-restore
+  dotnet build -c $BUILD_CONFIGURATION -o /app/build --no-restore \
+  /p:DebugType=portable /p:DebugSymbols=true /p:EmbedAllSources=true
 
 # Publish stage
 FROM build AS publish
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
-  dotnet publish -c Release -o /app/publish --no-restore
+  dotnet publish -c $BUILD_CONFIGURATION -o /app/publish --no-restore \
+  /p:DebugType=portable /p:DebugSymbols=true /p:EmbedAllSources=true
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime

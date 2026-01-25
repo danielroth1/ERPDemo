@@ -6,6 +6,8 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$Dockerfile,
 
+    [string]$BuildConfiguration = "Release",
+
     [string]$Namespace = "k8s.io",
     [string]$Platform = "linux/amd64"
 )
@@ -40,6 +42,7 @@ $nerdctlArgs = @(
     "build",
     "--platform", $Platform,
     "--tag", $env:IMAGE,
+    "--build-arg", "BUILD_CONFIGURATION=$BuildConfiguration",
     "--file", $resolvedDockerfile,
     $resolvedContext
 )

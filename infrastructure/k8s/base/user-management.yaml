@@ -43,19 +43,22 @@ spec:
             path: /health/live
             port: 8080
           initialDelaySeconds: 30
+          timeoutSeconds: 5
           periodSeconds: 10
+          failureThreshold: 6
         readinessProbe:
           httpGet:
             path: /health/ready
             port: 8080
           initialDelaySeconds: 10
+          timeoutSeconds: 5
           periodSeconds: 5
         resources:
           requests:
-            memory: "256Mi"
+            memory: "512Mi"
             cpu: "100m"
           limits:
-            memory: "512Mi"
+            memory: "1Gi"
             cpu: "500m"
 ---
 apiVersion: v1

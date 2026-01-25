@@ -985,7 +985,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/gateway:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/gateway -Dockerfile services/gateway/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/gateway gateway=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/gateway --timeout=180s"
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/gateway:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/gateway -Dockerfile services/gateway/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/gateway gateway=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/gateway --timeout=180s"
       ],
       "problemMatcher": []
     },
@@ -996,7 +996,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/user-management:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/user-management -Dockerfile services/user-management/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/user-management user-management=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/user-management --timeout=180s"
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/user-management:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/user-management -Dockerfile services/user-management/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/user-management user-management=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/user-management --timeout=180s"
       ],
       "problemMatcher": []
     },
@@ -1007,7 +1007,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/inventory:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/inventory -Dockerfile services/inventory/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/inventory inventory=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/inventory --timeout=180s"
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/inventory:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/inventory -Dockerfile services/inventory/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/inventory inventory=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/inventory --timeout=180s"
       ],
       "problemMatcher": []
     },
@@ -1018,7 +1018,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/sales:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/sales -Dockerfile services/sales/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/sales sales=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/sales --timeout=180s"
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/sales:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/sales -Dockerfile services/sales/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/sales sales=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/sales --timeout=180s"
       ],
       "problemMatcher": []
     },
@@ -1029,7 +1029,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/financial:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/financial -Dockerfile services/financial/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/financial financial=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/financial --timeout=180s"
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/financial:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/financial -Dockerfile services/financial/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/financial financial=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/financial --timeout=180s"
       ],
       "problemMatcher": []
     },
@@ -1040,7 +1040,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/dashboard:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/dashboard -Dockerfile services/dashboard/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/dashboard dashboard=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/dashboard --timeout=180s"
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/dashboard:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/dashboard -Dockerfile services/dashboard/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/dashboard dashboard=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/dashboard --timeout=180s"
       ],
       "problemMatcher": []
     },
@@ -1051,7 +1051,7 @@
       "args": [
         "-NoProfile",
         "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/frontend:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context frontend -Dockerfile frontend/Dockerfile; kubectl -n ${input:k8sNamespace} set image deployment/frontend frontend=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/frontend --timeout=180s"
+        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/frontend:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context frontend -Dockerfile frontend/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/frontend frontend=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/frontend --timeout=180s"
       ],
       "problemMatcher": []
     },

@@ -217,7 +217,9 @@
       "name": "Attach (K8s) API Gateway",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "kubectl",
         "pipeArgs": [
@@ -239,7 +241,9 @@
       "name": "Attach (K8s) User Management",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "kubectl",
         "pipeArgs": [
@@ -261,7 +265,9 @@
       "name": "Attach (K8s) Inventory",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "kubectl",
         "pipeArgs": [
@@ -283,7 +289,9 @@
       "name": "Attach (K8s) Sales",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "kubectl",
         "pipeArgs": [
@@ -305,7 +313,9 @@
       "name": "Attach (K8s) Financial",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "kubectl",
         "pipeArgs": [
@@ -327,7 +337,9 @@
       "name": "Attach (K8s) Dashboard",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "kubectl",
         "pipeArgs": [
@@ -349,7 +361,9 @@
       "name": "Attach (K8s Auto) API Gateway",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "powershell",
         "pipeArgs": [
@@ -368,7 +382,9 @@
       "name": "Attach (K8s Auto) User Management",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "powershell",
         "pipeArgs": [
@@ -387,7 +403,9 @@
       "name": "Attach (K8s Auto) Inventory",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "powershell",
         "pipeArgs": [
@@ -406,7 +424,9 @@
       "name": "Attach (K8s Auto) Sales",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "powershell",
         "pipeArgs": [
@@ -425,7 +445,9 @@
       "name": "Attach (K8s Auto) Financial",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "powershell",
         "pipeArgs": [
@@ -444,7 +466,9 @@
       "name": "Attach (K8s Auto) Dashboard",
       "type": "coreclr",
       "request": "attach",
-      "processId": "${command:pickRemoteProcess}",
+      "processId": "1",
+      "justMyCode": false,
+      "requireExactSource": false,
       "pipeTransport": {
         "pipeProgram": "powershell",
         "pipeArgs": [
