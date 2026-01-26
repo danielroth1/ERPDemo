@@ -25,6 +25,12 @@ spec:
           value: "http://+:8080"
         - name: ASPNETCORE_ENVIRONMENT
           value: "Development"
+        - name: Jwt__Secret
+          value: "your-secret-key-change-in-production-min-32-chars"
+        - name: Jwt__Issuer
+          value: "erp-system"
+        - name: Jwt__Audience
+          value: "erp-client"
         # YARP destination addresses (override appsettings.json placeholders)
         - name: ReverseProxy__Clusters__user-cluster__Destinations__destination1__Address
           value: "http://user-management-service:8080"

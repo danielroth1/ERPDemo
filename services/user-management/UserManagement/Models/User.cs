@@ -50,7 +50,7 @@ public enum Role
 public class RefreshToken
 {
     [Key]
-    public string Id { get; set; } = string.Empty;
+    public string Id { get; set; } = null!;
 
     [Required]
     public string UserId { get; set; } = string.Empty;
