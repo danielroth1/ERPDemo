@@ -2,6 +2,39 @@
   "version": "2.0.0",
   "inputs": [
     {
+      "id": "service",
+      "type": "pickString",
+      "description": "Select service",
+      "options": ["gateway", "user-management", "inventory", "sales", "financial", "dashboard"],
+      "default": "gateway"
+    },
+    {
+      "id": "k8sService",
+      "type": "pickString",
+      "description": "Select service for k8s deployment",
+      "options": [
+        "api-gateway",
+        "user-management",
+        "inventory",
+        "sales",
+        "financial",
+        "dashboard",
+        "frontend",
+        "postgres",
+        "kafka",
+        "prometheus",
+        "grafana"
+      ],
+      "default": "api-gateway"
+    },
+    {
+      "id": "apiService",
+      "type": "pickString",
+      "description": "Select API service for client generation",
+      "options": ["dashboard", "user-management", "inventory", "sales", "financial"],
+      "default": "dashboard"
+    },
+    {
       "id": "k8sNamespace",
       "type": "promptString",
       "description": "Kubernetes namespace",
@@ -9,1219 +42,473 @@
     }
   ],
   "tasks": [
+    // ============================================================
+    // BACKEND TASKS
+    // ============================================================
     {
-      "label": "watch-gateway",
+      "label": "backend: watch-all-services",
+      "dependsOn": [
+        "backend: watch-gateway",
+        "backend: watch-user-management",
+        "backend: watch-inventory",
+        "backend: watch-sales",
+        "backend: watch-financial",
+        "backend: watch-dashboard"
+      ],
+      "problemMatcher": [],
+      "group": { "kind": "build", "isDefault": false }
+    },
+    {
+      "label": "backend: watch-gateway",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "watch",
-        "run",
-        "--project",
-        "${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj"
-      ],
+      "args": ["watch", "run", "--project", "${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj"],
       "problemMatcher": "$msCompile",
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/gateway/ApiGateway",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
+        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
       }
     },
     {
-      "label": "watch-user-management",
+      "label": "backend: watch-user-management",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "watch",
-        "run",
-        "--project",
-        "${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj"
-      ],
+      "args": ["watch", "run", "--project", "${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj"],
       "problemMatcher": "$msCompile",
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/user-management/UserManagement",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
+        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
       }
     },
     {
-      "label": "watch-inventory",
+      "label": "backend: watch-inventory",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "watch",
-        "run",
-        "--project",
-        "${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj"
-      ],
+      "args": ["watch", "run", "--project", "${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj"],
       "problemMatcher": "$msCompile",
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/inventory/InventoryManagement",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
+        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
       }
     },
     {
-      "label": "watch-sales",
+      "label": "backend: watch-sales",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "watch",
-        "run",
-        "--project",
-        "${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj"
-      ],
+      "args": ["watch", "run", "--project", "${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj"],
       "problemMatcher": "$msCompile",
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/sales/SalesManagement",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
+        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
       }
     },
     {
-      "label": "watch-financial",
+      "label": "backend: watch-financial",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "watch",
-        "run",
-        "--project",
-        "${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj"
-      ],
+      "args": ["watch", "run", "--project", "${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj"],
       "problemMatcher": "$msCompile",
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/financial/FinancialManagement",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
+        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
       }
     },
     {
-      "label": "watch-dashboard",
+      "label": "backend: watch-dashboard",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "watch",
-        "run",
-        "--project",
-        "${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj"
-      ],
+      "args": ["watch", "run", "--project", "${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj"],
       "problemMatcher": "$msCompile",
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/dashboard/DashboardAnalytics",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
+        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
       }
     },
     {
-      "label": "watch-all-services",
+      "label": "backend: build-all-services",
       "dependsOn": [
-        "watch-gateway",
-        "watch-user-management",
-        "watch-inventory",
-        "watch-sales",
-        "watch-financial",
-        "watch-dashboard"
+        "backend: build-gateway",
+        "backend: build-user-management",
+        "backend: build-inventory",
+        "backend: build-sales",
+        "backend: build-financial",
+        "backend: build-dashboard"
       ],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
-      "group": {
-        "kind": "build",
-        "isDefault": false
-      }
+      "group": { "kind": "build", "isDefault": true }
     },
     {
-      "label": "run-gateway",
+      "label": "backend: build-gateway",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "run",
-        "--project",
-        "${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj"
-      ],
-      "problemMatcher": "$msCompile",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/services/gateway/ApiGateway",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
-      }
-    },
-    {
-      "label": "run-user-management",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "run",
-        "--project",
-        "${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj"
-      ],
-      "problemMatcher": "$msCompile",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/services/user-management/UserManagement",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
-      }
-    },
-    {
-      "label": "run-inventory",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "run",
-        "--project",
-        "${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj"
-      ],
-      "problemMatcher": "$msCompile",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/services/inventory/InventoryManagement",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
-      }
-    },
-    {
-      "label": "run-sales",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "run",
-        "--project",
-        "${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj"
-      ],
-      "problemMatcher": "$msCompile",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/services/sales/SalesManagement",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
-      }
-    },
-    {
-      "label": "run-financial",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "run",
-        "--project",
-        "${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj"
-      ],
-      "problemMatcher": "$msCompile",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/services/financial/FinancialManagement",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
-      }
-    },
-    {
-      "label": "run-dashboard",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "run",
-        "--project",
-        "${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj"
-      ],
-      "problemMatcher": "$msCompile",
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "backend"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/services/dashboard/DashboardAnalytics",
-        "env": {
-          "ASPNETCORE_ENVIRONMENT": "Development"
-        }
-      }
-    },
-    {
-      "label": "run-all-services",
-      "dependsOn": [
-        "run-gateway",
-        "run-user-management",
-        "run-inventory",
-        "run-sales",
-        "run-financial",
-        "run-dashboard"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      }
-    },
-    {
-      "label": "build-gateway",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
+      "args": ["build", "${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
       "problemMatcher": "$msCompile",
       "group": "build"
     },
     {
-      "label": "build-user-management",
+      "label": "backend: build-user-management",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
+      "args": ["build", "${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
       "problemMatcher": "$msCompile",
       "group": "build"
     },
     {
-      "label": "build-inventory",
+      "label": "backend: build-inventory",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
+      "args": ["build", "${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
       "problemMatcher": "$msCompile",
       "group": "build"
     },
     {
-      "label": "build-sales",
+      "label": "backend: build-sales",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
+      "args": ["build", "${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
       "problemMatcher": "$msCompile",
       "group": "build"
     },
     {
-      "label": "build-financial",
+      "label": "backend: build-financial",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
+      "args": ["build", "${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
       "problemMatcher": "$msCompile",
       "group": "build"
     },
     {
-      "label": "build-dashboard",
+      "label": "backend: build-dashboard",
       "command": "dotnet",
       "type": "process",
-      "args": [
-        "build",
-        "${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj",
-        "/property:GenerateFullPaths=true",
-        "/consoleloggerparameters:NoSummary"
-      ],
+      "args": ["build", "${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj", "/property:GenerateFullPaths=true", "/consoleloggerparameters:NoSummary"],
       "problemMatcher": "$msCompile",
       "group": "build"
     },
     {
-      "label": "build-all-services",
-      "dependsOn": [
-        "build-gateway",
-        "build-user-management",
-        "build-inventory",
-        "build-sales",
-        "build-financial",
-        "build-dashboard"
-      ],
-      "problemMatcher": [],
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      }
+      "label": "backend: test-all",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["test", "${workspaceFolder}", "--verbosity", "minimal"],
+      "problemMatcher": "$msCompile",
+      "group": { "kind": "test", "isDefault": true }
     },
     {
-      "label": "dev-frontend",
+      "label": "backend: test-user-management",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["test", "${workspaceFolder}/services/user-management/UserManagement.Tests/UserManagement.Tests.csproj", "--verbosity", "minimal"],
+      "problemMatcher": "$msCompile",
+      "group": "test"
+    },
+    {
+      "label": "backend: test-inventory",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["test", "${workspaceFolder}/services/inventory/InventoryManagement.Tests/InventoryManagement.Tests.csproj", "--verbosity", "minimal"],
+      "problemMatcher": "$msCompile",
+      "group": "test"
+    },
+
+    // ============================================================
+    // FRONTEND TASKS
+    // ============================================================
+    {
+      "label": "frontend: dev",
       "command": "npm",
       "type": "shell",
       "args": ["run", "dev"],
       "problemMatcher": [],
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "frontend"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "frontend" },
+      "options": { "cwd": "${workspaceFolder}/frontend" }
     },
     {
-      "label": "build-frontend",
+      "label": "frontend: build",
       "command": "npm",
       "type": "shell",
       "args": ["run", "build"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "options": { "cwd": "${workspaceFolder}/frontend" }
     },
     {
-      "label": "dev-infrastructure",
+      "label": "frontend: generate-all-api-clients",
+      "command": "npm",
+      "type": "shell",
+      "args": ["run", "generate:api"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true },
+      "options": { "cwd": "${workspaceFolder}/frontend" }
+    },
+    {
+      "label": "frontend: generate-api-client",
+      "command": "npm",
+      "type": "shell",
+      "args": ["run", "generate:api:service", "${input:apiService}"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true },
+      "options": { "cwd": "${workspaceFolder}/frontend" }
+    },
+    {
+      "label": "frontend: check-services",
+      "command": "npm",
+      "type": "shell",
+      "args": ["run", "check:services"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "options": { "cwd": "${workspaceFolder}/frontend" }
+    },
+    {
+      "label": "frontend: use-local-gateway",
+      "command": "powershell",
+      "type": "shell",
+      "args": ["-Command", "Copy-Item -Path '.env.local' -Destination '.env.development' -Force; Write-Host 'Frontend configured for LOCAL gateway (port 8080)'"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "options": { "cwd": "${workspaceFolder}/frontend" }
+    },
+    {
+      "label": "frontend: use-k8s-gateway",
+      "command": "powershell",
+      "type": "shell",
+      "args": ["-Command", "Copy-Item -Path '.env.kubernetes' -Destination '.env.development' -Force; Write-Host 'Frontend configured for K8S gateway (port 8081). Run task: k8s: port-forward-gateway'"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "options": { "cwd": "${workspaceFolder}/frontend" }
+    },
+
+    // ============================================================
+    // INFRASTRUCTURE TASKS
+    // ============================================================
+    {
+      "label": "infra: dev-infrastructure",
       "command": "nerdctl",
       "type": "shell",
       "args": ["compose", "-f", "docker-compose.dev.yml", "up", "-d"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "infrastructure"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/infrastructure"
-      }
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "infrastructure" },
+      "options": { "cwd": "${workspaceFolder}/infrastructure" }
     },
     {
-      "label": "dev-infrastructure-offline",
+      "label": "infra: dev-infrastructure-offline",
       "command": "nerdctl",
       "type": "shell",
       "args": ["compose", "-f", "docker-compose.dev.yml", "up", "-d", "--pull", "never"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "infrastructure"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/infrastructure"
-      }
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "infrastructure" },
+      "options": { "cwd": "${workspaceFolder}/infrastructure" }
     },
     {
-      "label": "stop-dev-infrastructure",
+      "label": "infra: stop-dev-infrastructure",
       "command": "nerdctl",
       "type": "shell",
       "args": ["compose", "-f", "docker-compose.dev.yml", "down"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "group": "infrastructure"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/infrastructure"
-      }
+      "presentation": { "reveal": "always", "panel": "shared", "group": "infrastructure" },
+      "options": { "cwd": "${workspaceFolder}/infrastructure" }
     },
     {
-      "label": "docker-compose-up",
+      "label": "infra: docker-compose-up",
       "command": "nerdctl",
       "type": "shell",
       "args": ["compose", "up", "-d"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}"
-      }
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "options": { "cwd": "${workspaceFolder}" }
     },
     {
-      "label": "docker-compose-down",
+      "label": "infra: docker-compose-down",
       "command": "nerdctl",
       "type": "shell",
       "args": ["compose", "down"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}"
-      }
+      "presentation": { "reveal": "always", "panel": "shared" },
+      "options": { "cwd": "${workspaceFolder}" }
     },
     {
-      "label": "dev-setup",
-      "dependsOn": [
-        "dev-infrastructure",
-        "watch-all-services",
-        "dev-frontend"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always"
-      }
-    },
-    {
-      "label": "test-user-management",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "test",
-        "${workspaceFolder}/services/user-management/UserManagement.Tests/UserManagement.Tests.csproj",
-        "--verbosity",
-        "minimal"
-      ],
-      "problemMatcher": "$msCompile",
-      "group": "test"
-    },
-    {
-      "label": "test-inventory",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "test",
-        "${workspaceFolder}/services/inventory/InventoryManagement.Tests/InventoryManagement.Tests.csproj",
-        "--verbosity",
-        "minimal"
-      ],
-      "problemMatcher": "$msCompile",
-      "group": "test"
-    },
-    {
-      "label": "test-all",
-      "command": "dotnet",
-      "type": "process",
-      "args": [
-        "test",
-        "${workspaceFolder}",
-        "--verbosity",
-        "minimal"
-      ],
-      "problemMatcher": "$msCompile",
-      "group": {
-        "kind": "test",
-        "isDefault": true
-      }
-    },
-    {
-      "label": "infrastructure-up",
-      "command": "nerdctl",
-      "type": "shell",
-      "args": ["compose", "up", "-d"],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "infrastructure"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/infrastructure"
-      }
-    },
-    {
-      "label": "infrastructure-down",
-      "command": "nerdctl",
-      "type": "shell",
-      "args": ["compose", "down"],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "group": "infrastructure"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/infrastructure"
-      }
-    },
-    {
-      "label": "infrastructure-logs",
+      "label": "infra: logs",
       "command": "nerdctl",
       "type": "shell",
       "args": ["compose", "logs", "-f"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "infrastructure"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/infrastructure"
-      },
-      "isBackground": true
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "infrastructure" },
+      "options": { "cwd": "${workspaceFolder}/infrastructure" }
     },
     {
-      "label": "mongodb-shell",
+      "label": "infra: mongodb-shell",
       "command": "nerdctl",
       "type": "shell",
-      "args": [
-        "exec",
-        "-it",
-        "erp-mongodb",
-        "mongosh",
-        "-u",
-        "admin",
-        "-p",
-        "admin123"
-      ],
+      "args": ["exec", "-it", "erp-mongodb", "mongosh", "-u", "admin", "-p", "admin123"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "infrastructure"
-      }
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "infrastructure" }
     },
     {
-      "label": "kafka-topics-list",
+      "label": "infra: kafka-topics-list",
       "command": "nerdctl",
       "type": "shell",
-      "args": [
-        "exec",
-        "erp-kafka",
-        "kafka-topics",
-        "--bootstrap-server",
-        "localhost:9092",
-        "--list"
-      ],
+      "args": ["exec", "erp-kafka", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+
+    // ============================================================
+    // KUBERNETES TASKS
+    // ============================================================
+    {
+      "label": "k8s: deploy-local",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["apply", "-k", "${workspaceFolder}/infrastructure/k8s/local/"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
     },
     {
-      "label": "k8s-deploy-local",
+      "label": "k8s: delete-local",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["delete", "namespace", "erp-local"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "k8s: get-pods",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["get", "pods", "-n", "erp-local", "-o", "wide"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "k8s: get-services",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["get", "services", "-n", "erp-local"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared" }
+    },
+    {
+      "label": "k8s: logs-all",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["logs", "-f", "-n", "erp-local", "--all-containers=true", "--prefix=true"],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "k8s: build-images",
+      "command": "powershell",
+      "type": "shell",
+      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\scripts\\containerd-build-images.ps1"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "k8s: port-forward-frontend",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["-n", "erp-local", "port-forward", "svc/frontend-service", "3002:80"],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "port-forward" }
+    },
+    {
+      "label": "k8s: port-forward-gateway",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["-n", "erp-local", "port-forward", "svc/gateway-service", "8081:80"],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "port-forward" }
+    },
+    {
+      "label": "k8s: port-forward-postgres",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["-n", "erp-local", "port-forward", "svc/postgres-service", "5433:5432"],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "port-forward" }
+    },
+    {
+      "label": "k8s: port-forward-kafka",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["-n", "erp-local", "port-forward", "svc/kafka-service", "9092:9092"],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "port-forward" }
+    },
+    {
+      "label": "k8s: deploy-service",
       "command": "kubectl",
       "type": "shell",
       "args": [
         "apply",
-        "-k",
-        "${workspaceFolder}/infrastructure/k8s/local/"
+        "-f",
+        "${workspaceFolder}/infrastructure/k8s/base/${input:k8sService}.yaml"
       ],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
+      "presentation": { "reveal": "always", "panel": "shared" }
     },
     {
-      "label": "k8s-delete-local",
+      "label": "k8s: stop-service",
       "command": "kubectl",
       "type": "shell",
       "args": [
         "delete",
-        "namespace",
-        "erp-local"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "k8s-logs-all",
-      "command": "kubectl",
-      "type": "shell",
-      "args": [
-        "logs",
         "-f",
-        "-n",
-        "erp-local",
-        "--all-containers=true",
-        "--prefix=true"
+        "${workspaceFolder}/infrastructure/k8s/base/${input:k8sService}.yaml",
+        "--ignore-not-found"
       ],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
-      "isBackground": true
+      "presentation": { "reveal": "always", "panel": "shared" }
     },
     {
-      "label": "k8s-get-pods",
+      "label": "k8s: restart",
       "command": "kubectl",
       "type": "shell",
-      "args": [
-        "get",
-        "pods",
-        "-n",
-        "erp-local",
-        "-o",
-        "wide"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
+      "args": ["-n", "${input:k8sNamespace}", "rollout", "restart", "deployment/${input:service}"],
+      "problemMatcher": []
     },
     {
-      "label": "k8s-get-services",
-      "command": "kubectl",
-      "type": "shell",
-      "args": [
-        "get",
-        "services",
-        "-n",
-        "erp-local"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "k8s-exposed-ports",
-      "command": "kubectl",
-      "type": "shell",
-      "args": [
-        "get",
-        "services",
-        "-n",
-        "erp-local",
-        "-o",
-        "custom-columns=NAME:.metadata.name,TYPE:.spec.type,CLUSTER-IP:.spec.clusterIP,EXTERNAL-IP:.status.loadBalancer.ingress[0].ip,EXTERNAL-HOST:.status.loadBalancer.ingress[0].hostname,PORTS:.spec.ports[*].port,TARGETPORTS:.spec.ports[*].targetPort"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "generate-api-clients",
-      "command": "npm",
-      "type": "shell",
-      "args": [
-        "run",
-        "generate:api"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": true
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
-    },
-    {
-      "label": "generate-api-client-dashboard",
-      "command": "npm",
-      "type": "shell",
-      "args": [
-        "run",
-        "generate:api:service",
-        "dashboard"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": true
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
-    },
-    {
-      "label": "generate-api-client-user-management",
-      "command": "npm",
-      "type": "shell",
-      "args": [
-        "run",
-        "generate:api:service",
-        "user-management"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": true
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
-    },
-    {
-      "label": "generate-api-client-inventory",
-      "command": "npm",
-      "type": "shell",
-      "args": [
-        "run",
-        "generate:api:service",
-        "inventory"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": true
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
-    },
-    {
-      "label": "generate-api-client-sales",
-      "command": "npm",
-      "type": "shell",
-      "args": [
-        "run",
-        "generate:api:service",
-        "sales"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": true
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
-    },
-    {
-      "label": "generate-api-client-financial",
-      "command": "npm",
-      "type": "shell",
-      "args": [
-        "run",
-        "generate:api:service",
-        "financial"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "focus": true
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
-    },
-    {
-      "label": "check-services",
-      "command": "npm",
-      "type": "shell",
-      "args": [
-        "run",
-        "check:services"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}/frontend"
-      }
-    },
-    {
-      "label": "containerd-build-images",
+      "label": "k8s: get-pod-name",
       "command": "powershell",
       "type": "shell",
       "args": [
         "-NoProfile",
-        "-ExecutionPolicy",
-        "Bypass",
-        "-File",
-        "${workspaceFolder}\\scripts\\containerd-build-images.ps1"
+        "-Command",
+        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=${input:service} -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Use in: Run and Debug -> K8s: Attach'"
       ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated"
-      },
-      "options": {
-        "cwd": "${workspaceFolder}"
-      }
+      "problemMatcher": []
     },
+
+    // ============================================================
+    // MAIN COMPOSITE TASKS
+    // ============================================================
     {
-      "label": "k8s-apply-local",
-      "command": "kubectl",
-      "type": "shell",
-      "args": [
-        "apply",
-        "-k",
-        "${workspaceFolder}\\infrastructure\\k8s\\local"
-      ],
-      "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
-    },
-    {
-      "label": "k8s-port-forward-frontend",
-      "command": "kubectl",
-      "type": "shell",
-      "args": [
-        "-n",
-        "erp-local",
-        "port-forward",
-        "svc/frontend-service",
-        "3002:80"
-      ],
-      "problemMatcher": [],
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "port-forward"
-      }
-    },
-    {
-      "label": "k8s-port-forward-gateway",
-      "command": "kubectl",
-      "type": "shell",
-      "args": [
-        "-n",
-        "erp-local",
-        "port-forward",
-        "svc/gateway-service",
-        "8081:80"
-      ],
-      "problemMatcher": [],
-      "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "dedicated",
-        "group": "port-forward"
-      }
-    },
-    {
-      "label": "skaffold-dev",
-      "dependsOrder": "sequence",
+      "label": "dev-setup",
       "dependsOn": [
-        "containerd-build-images",
-        "k8s-apply-local",
-        "k8s-port-forward-frontend",
-        "k8s-port-forward-gateway"
+        "infra: dev-infrastructure",
+        "backend: watch-all-services",
+        "frontend: dev"
       ],
-      "problemMatcher": []
-    },
-    {
-      "label": "deploy-gateway-only",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/gateway:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/gateway -Dockerfile services/gateway/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/gateway gateway=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/gateway --timeout=180s"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "deploy-user-management-only",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/user-management:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/user-management -Dockerfile services/user-management/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/user-management user-management=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/user-management --timeout=180s"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "deploy-inventory-only",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/inventory:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/inventory -Dockerfile services/inventory/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/inventory inventory=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/inventory --timeout=180s"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "deploy-sales-only",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/sales:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/sales -Dockerfile services/sales/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/sales sales=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/sales --timeout=180s"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "deploy-financial-only",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/financial:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/financial -Dockerfile services/financial/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/financial financial=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/financial --timeout=180s"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "deploy-dashboard-only",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/dashboard:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context services/dashboard -Dockerfile services/dashboard/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/dashboard dashboard=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/dashboard --timeout=180s"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "deploy-frontend-only",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$ts = Get-Date -Format 'yyyyMMddHHmmss'; $image = 'erp/frontend:dev-' + $ts; Write-Host ('Building ' + $image); $env:IMAGE = $image; powershell -NoProfile -ExecutionPolicy Bypass -File tools/skaffold-build.ps1 -Context frontend -Dockerfile frontend/Dockerfile -BuildConfiguration Debug; kubectl -n ${input:k8sNamespace} set image deployment/frontend frontend=$image; kubectl -n ${input:k8sNamespace} rollout status deployment/frontend --timeout=180s"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "restart-gateway",
-      "type": "shell",
-      "command": "kubectl",
-      "args": [
-        "-n",
-        "${input:k8sNamespace}",
-        "rollout",
-        "restart",
-        "deployment/gateway"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "restart-user-management",
-      "type": "shell",
-      "command": "kubectl",
-      "args": [
-        "-n",
-        "${input:k8sNamespace}",
-        "rollout",
-        "restart",
-        "deployment/user-management"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "restart-inventory",
-      "type": "shell",
-      "command": "kubectl",
-      "args": [
-        "-n",
-        "${input:k8sNamespace}",
-        "rollout",
-        "restart",
-        "deployment/inventory"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "restart-sales",
-      "type": "shell",
-      "command": "kubectl",
-      "args": [
-        "-n",
-        "${input:k8sNamespace}",
-        "rollout",
-        "restart",
-        "deployment/sales"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "restart-financial",
-      "type": "shell",
-      "command": "kubectl",
-      "args": [
-        "-n",
-        "${input:k8sNamespace}",
-        "rollout",
-        "restart",
-        "deployment/financial"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "restart-dashboard",
-      "type": "shell",
-      "command": "kubectl",
-      "args": [
-        "-n",
-        "${input:k8sNamespace}",
-        "rollout",
-        "restart",
-        "deployment/dashboard"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "restart-frontend",
-      "type": "shell",
-      "command": "kubectl",
-      "args": [
-        "-n",
-        "${input:k8sNamespace}",
-        "rollout",
-        "restart",
-        "deployment/frontend"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "attach-gateway",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=gateway -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) API Gateway'"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "attach-user-management",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=user-management -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) User Management'"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "attach-inventory",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=inventory -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) Inventory'"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "attach-sales",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=sales -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) Sales'"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "attach-financial",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=financial -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) Financial'"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "attach-dashboard",
-      "type": "shell",
-      "command": "powershell",
-      "args": [
-        "-NoProfile",
-        "-Command",
-        "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=dashboard -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Run and Debug -> Attach (K8s) Dashboard'"
-      ],
-      "problemMatcher": []
-    },
-    {
-      "label": "skaffold-stop",
-      "command": "skaffold",
-      "type": "shell",
-      "args": ["delete"],
       "problemMatcher": [],
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared"
-      }
+      "presentation": { "reveal": "always" }
     }
   ]
 }

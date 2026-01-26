@@ -20,9 +20,6 @@ spec:
         ports:
         - containerPort: 80
           name: http
-        env:
-        - name: VITE_API_GATEWAY_URL
-          value: "http://gateway-service:80"
         resources:
           requests:
             memory: "128Mi"

@@ -849,7 +849,245 @@ Update `services/gateway/ApiGateway/appsettings.json`:
 - [ ] **Kiota API client generated** (run `scripts/generate-api-clients.ps1`)
 - [ ] **Frontend service wrapper created** using Kiota client (never direct API calls)
 
-## 📚 Additional Resources
+## � VS Code Tasks and Launch Configurations
+
+This project uses a **consolidated approach** for VS Code configuration with organized task and launch config naming.
+
+### Task Organization
+
+All tasks are in `.vscode/tasks.json` with **prefix-based naming** for easy filtering:
+
+- `backend:` - Backend service tasks (watch, build, test)
+- `frontend:` - Frontend tasks (dev, build, generate API clients)
+- `k8s:` - Kubernetes tasks (deploy, restart, attach, get pods)
+- `infra:` - Infrastructure tasks (docker-compose, logs)
+
+**Task Naming Convention**: `<category>: <action>-<target>`
+
+Examples:
+
+- `backend: watch-gateway`
+- `frontend: generate-api-client`
+- `k8s: restart`
+- `infra: docker-compose-up`
+
+### Adding New Tasks
+
+When adding a new task, follow this structure:
+
+```json
+{
+  "label": "backend: watch-your-service",
+  "command": "dotnet",
+  "type": "process",
+  "args": [
+    "watch",
+    "run",
+    "--project",
+    "${workspaceFolder}/services/your-service/YourService/YourService.csproj"
+  ],
+  "problemMatcher": "$msCompile",
+  "isBackground": true,
+  "presentation": {
+    "reveal": "always",
+    "panel": "dedicated",
+    "group": "backend"
+  },
+  "options": {
+    "cwd": "${workspaceFolder}/services/your-service/YourService",
+    "env": {
+      "ASPNETCORE_ENVIRONMENT": "Development",
+      "ASPNETCORE_URLS": "http://localhost:500X"
+    }
+  }
+}
+```
+
+**Critical Points**:
+
+- ✅ Use prefix (`backend:`, `frontend:`, `k8s:`, `infra:`)
+- ✅ Add to appropriate section in tasks.json (marked with comments)
+- ✅ Update composite tasks (`watch-all-services`, `build-all-services`) if needed
+- ✅ Use meaningful presentation groups for terminal organization
+
+### Parameterized Tasks
+
+Use **input variables** for reusable tasks:
+
+```json
+{
+  "label": "frontend: generate-api-client",
+  "type": "shell",
+  "command": "npm",
+  "args": ["run", "generate:api:${input:apiService}"],
+  "options": {
+    "cwd": "${workspaceFolder}/frontend"
+  }
+}
+```
+
+Define input variables at the end of tasks.json:
+
+```json
+{
+  "inputs": [
+    {
+      "id": "apiService",
+      "type": "pickString",
+      "description": "Select API service",
+      "options": [
+        "dashboard",
+        "user-management",
+        "inventory",
+        "sales",
+        "financial"
+      ]
+    }
+  ]
+}
+```
+
+### Launch Configuration Organization
+
+All launch configs are in `.vscode/launch.json` with organized sections:
+
+- **Backend Services** - Individual service debugging
+- **Frontend** - React app debugging
+- **Kubernetes** - K8s pod attachment
+- **Compound Configurations** - Launch multiple services together
+
+### Adding New Launch Configurations
+
+Example for a new backend service:
+
+```json
+{
+  "name": "Backend: Launch Your Service",
+  "type": "coreclr",
+  "request": "launch",
+  "preLaunchTask": "backend: build-your-service",
+  "program": "${workspaceFolder}/services/your-service/YourService/bin/Debug/net9.0/YourService.dll",
+  "args": [],
+  "cwd": "${workspaceFolder}/services/your-service/YourService",
+  "stopAtEntry": false,
+  "serverReadyAction": {
+    "action": "openExternally",
+    "pattern": "\\bNow listening on:\\s+(https?://\\S+)",
+    "uriFormat": "%s/swagger"
+  },
+  "env": {
+    "ASPNETCORE_ENVIRONMENT": "Development",
+    "ASPNETCORE_URLS": "http://localhost:500X"
+  }
+}
+```
+
+**Critical Points**:
+
+- ✅ Use prefix in name (`Backend:`, `Frontend:`, `K8s:`)
+- ✅ Match `preLaunchTask` to corresponding build task
+- ✅ Set correct port in `ASPNETCORE_URLS`
+- ✅ Use `serverReadyAction` to auto-open Swagger
+
+### Parameterized Launch Configurations
+
+Example for K8s pod attachment:
+
+```json
+{
+  "name": "K8s: Attach",
+  "type": "coreclr",
+  "request": "attach",
+  "processId": "${command:pickRemoteProcess}",
+  "pipeTransport": {
+    "pipeProgram": "kubectl",
+    "pipeArgs": ["exec", "-i", "${input:k8sPodName}", "--"],
+    "debuggerPath": "/vsdbg/vsdbg",
+    "pipeCwd": "${workspaceFolder}"
+  },
+  "sourceFileMap": {
+    "/app/services/gateway/ApiGateway": "${workspaceFolder}/services/gateway/ApiGateway",
+    "/app/services/user-management/UserManagement": "${workspaceFolder}/services/user-management/UserManagement",
+    "/app/services/inventory/InventoryManagement": "${workspaceFolder}/services/inventory/InventoryManagement",
+    "/app/services/sales/SalesManagement": "${workspaceFolder}/services/sales/SalesManagement",
+    "/app/services/financial/FinancialManagement": "${workspaceFolder}/services/financial/FinancialManagement",
+    "/app/services/dashboard/DashboardAnalytics": "${workspaceFolder}/services/dashboard/DashboardAnalytics"
+  }
+}
+```
+
+With input variable:
+
+```json
+{
+  "inputs": [
+    {
+      "id": "k8sPodName",
+      "type": "promptString",
+      "description": "Enter the Kubernetes pod name"
+    }
+  ]
+}
+```
+
+### Common Patterns
+
+#### Composite Launch Configuration
+
+Launch multiple services together:
+
+```json
+{
+  "name": "Backend: All Services",
+  "configurations": [
+    "Backend: Launch Gateway",
+    "Backend: Launch User Management",
+    "Backend: Launch Inventory",
+    "Backend: Launch Sales",
+    "Backend: Launch Financial",
+    "Backend: Launch Dashboard"
+  ]
+}
+```
+
+#### Task with Dependencies
+
+Chain tasks together:
+
+```json
+{
+  "label": "dev-setup",
+  "dependsOn": [
+    "infra: docker-compose-up",
+    "backend: watch-all-services",
+    "frontend: dev"
+  ]
+}
+```
+
+### Best Practices
+
+- ✅ **Use prefixes** for all tasks and launch configs
+- ✅ **Group related tasks** with presentation groups
+- ✅ **Parameterize** where possible (use input variables)
+- ✅ **Update composite tasks** when adding new services
+- ✅ **Add comments** to separate sections in JSON files
+- ✅ **Match ports** between tasks and launch configs
+- ❌ **Don't create duplicate tasks** - use input variables instead
+- ❌ **Don't use old aliases** - always use prefixed names
+
+### Quick Reference
+
+**Find tasks**: Press `Ctrl+Shift+P` → `Tasks: Run Task` → Type prefix (`backend`, `frontend`, `k8s`, `infra`)
+
+**Debug**: Press `F5` → Select configuration from dropdown
+
+**Edit configs**:
+
+- Tasks: `.vscode/tasks.json`
+- Launch: `.vscode/launch.json`
+
+## �📚 Additional Resources
 
 - **Project Documentation**: See `/docs` folder
 - **API Documentation**: Swagger UI at each service
