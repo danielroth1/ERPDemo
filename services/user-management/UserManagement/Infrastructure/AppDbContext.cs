@@ -24,6 +24,13 @@ public class AppDbContext : DbContext
                 v => v.Split(',', StringSplitOptions.RemoveEmptyEntries)
                       .Select(r => Enum.Parse<Role>(r))
                       .ToList()
+            )
+            .Metadata.SetValueComparer(
+                new Microsoft.EntityFrameworkCore.ChangeTracking.ValueComparer<List<Role>>(
+                    (c1, c2) => c1!.SequenceEqual(c2!),
+                    c => c.Aggregate(0, (a, v) => HashCode.Combine(a, v.GetHashCode())),
+                    c => c.ToList()
+                )
             );
 
         // Configure database-generated defaults

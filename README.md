@@ -4,15 +4,16 @@ A comprehensive microservices-based ERP system demonstrating modern cloud-native
 
 ## Quick Start
 
-### Local Development
-
 - install .net 8
 - start Rancher Desktop / Docker Desktop
 - start root folder in VS Code
 - `dotnet tool restore` -> installs kiota
+
+### Local Development
+
 - run some tasks with: ctrl + p -> `Task: Run Task`
-  - `dev-infrastructure`
-  - `watch-all-services`
+  - `infra: dev-infrastructure`
+  - `backend: watch-all-services`
 
 - close any local VS Code instance connecting to remote via ssh -> might block 8080 port
 
@@ -20,9 +21,21 @@ A comprehensive microservices-based ERP system demonstrating modern cloud-native
 - Run & Debug -> `Launch Frontend (Chrome)` (or whatever browser you prefer)
   - alternatively: Run Task `dev-frontend`
 
+#### Deploy to local Kubernetes
+
+- run task with: ctrl + p -> `Task: Run Task`
+  - `k8s: deploy-local`
+- make sure to forward ports:
+  - `k8s: port-forwards-frontend`
+  - `k8s: port-forwards-gateway`
+- open frontend in browser: `http://localhost:3002`
+- optional: Run & Debug -> `K8s: Attach` -> select a service that you want the debugger to attach to
+- optional: install `Kubernetes` extension in VS Code to work with running pods
+
 ## Frontend
 
 ## Generate Kiota API
+
 - `npm run generate:api`
 - `npm run generate:api:service`
 
@@ -71,40 +84,43 @@ A comprehensive microservices-based ERP system demonstrating modern cloud-native
 
 ## 🚀 Technology Stack
 
-| Component | Technology | Version |
-|-----------|-----------|---------|
-| Backend | ASP.NET Core | 9.0 |
-| Frontend | React + Vite + TypeScript | 19 / 7 / 5.9 |
-| State Management | Redux Toolkit | 2.11 |
-| Styling | TailwindCSS | 4.1 |
-| Database | MongoDB | 7.0 |
-| Message Broker | Apache Kafka (KRaft) | 7.5 |
-| API Gateway | YARP | Latest |
-| GraphQL | Hot Chocolate | 13 |
-| Real-time | SignalR | 10 |
-| Testing | xUnit + Moq | Latest |
-| Monitoring | Prometheus + Grafana | 2.48 / 10.2 |
-| Logging | Loki + Promtail | 2.9 |
-| Container Runtime | Docker / containerd | Latest |
-| Orchestration | Kubernetes | 1.28+ |
-| CI/CD | GitHub Actions | - |
-| Dev Tool | Skaffold | Latest |
+| Component         | Technology                | Version      |
+| ----------------- | ------------------------- | ------------ |
+| Backend           | ASP.NET Core              | 9.0          |
+| Frontend          | React + Vite + TypeScript | 19 / 7 / 5.9 |
+| State Management  | Redux Toolkit             | 2.11         |
+| Styling           | TailwindCSS               | 4.1          |
+| Database          | MongoDB                   | 7.0          |
+| Message Broker    | Apache Kafka (KRaft)      | 7.5          |
+| API Gateway       | YARP                      | Latest       |
+| GraphQL           | Hot Chocolate             | 13           |
+| Real-time         | SignalR                   | 10           |
+| Testing           | xUnit + Moq               | Latest       |
+| Monitoring        | Prometheus + Grafana      | 2.48 / 10.2  |
+| Logging           | Loki + Promtail           | 2.9          |
+| Container Runtime | Docker / containerd       | Latest       |
+| Orchestration     | Kubernetes                | 1.28+        |
+| CI/CD             | GitHub Actions            | -            |
+| Dev Tool          | Skaffold                  | Latest       |
 
 ## ✨ Features
 
 ### User Management
+
 - User registration and authentication (JWT)
 - Email/password management
 - Role-based access control (Admin, Manager, User)
 - Password reset via email
 
 ### Inventory Management
+
 - Product catalog with CRUD operations
 - Stock level tracking and adjustments
 - Warehouse/location management
 - Low-stock alerts
 
 ### Sales & Orders
+
 - Order creation and management
 - Customer information
 - Invoice generation
@@ -112,12 +128,14 @@ A comprehensive microservices-based ERP system demonstrating modern cloud-native
 - Stock validation
 
 ### Financial Management
+
 - Double-entry ledger
 - Expense/revenue tracking
 - Payment status tracking
 - Basic financial reports
 
 ### Dashboard & Analytics
+
 - Real-time metrics and KPIs
 - Interactive charts
 - Event aggregation
@@ -142,11 +160,12 @@ A comprehensive microservices-based ERP system demonstrating modern cloud-native
 ✅ **API Gateway Service**: Complete (100%)  
 ✅ **React Frontend**: Complete (100%) - 5 feature modules, 576KB bundle  
 ✅ **Testing Infrastructure**: Complete (100%) - 14 passing tests  
-🚧 **Expanded Test Coverage**: In Progress (30%)  
+🚧 **Expanded Test Coverage**: In Progress (30%)
 
 **Overall Progress: 95%** 🎉
 
 ### Completed Components
+
 - Project structure and infrastructure configurations
 - User Management service with full authentication (JWT + refresh tokens)
 - Inventory Management service with products, categories, stock tracking
@@ -169,17 +188,20 @@ See [PROGRESS.md](docs/PROGRESS.md) for detailed status.
 ## 🏃 Quick Start (Windows Development)
 
 ### 1. Clone the repository
+
 ```powershell
 git clone <repository-url>
 cd erp
 ```
 
 ### 1.5 Stop existing Containers
+
 ```
 docker-compose -f docker-compose.dev.yml down
 ```
 
 ### 2. Start Infrastructure (Docker Compose)
+
 ```powershell
 # Start MongoDB, Kafka, Prometheus, Grafana
 cd infrastructure
@@ -190,6 +212,7 @@ docker-compose ps
 ```
 
 ### 3. Run Backend Services
+
 ```powershell
 # Terminal 1 - API Gateway
 cd services/gateway/ApiGateway
@@ -210,6 +233,7 @@ dotnet run
 ```
 
 ### 4. Run Frontend
+
 ```powershell
 cd frontend
 npm install
@@ -217,23 +241,24 @@ npm run dev
 ```
 
 ### 5. Access the Application
+
 - **Frontend**: http://localhost:5173
 - **API Gateway**: http://localhost:5001
 - **Swagger UI**: http://localhost:5001/swagger
 - **Grafana**: http://localhost:3000 (admin/admin)
 - **Kafka UI**: http://localhost:8080
 
-
 ### Running with Kubernetes and Rancher Desktop
 
 install skaffold
+
 ```
 scoop bucket add extras
 scoop install skaffold
 ```
 
-
 ### Production Deployment (Linux/Kubernetes)
+
 For production deployment on Linux with Kubernetes and Linkerd service mesh, see [DEPLOYMENT.md](DEPLOYMENT.md)
 
 ## 📚 Documentation
@@ -268,6 +293,7 @@ See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for detailed instructions on deploy
 ## 📊 CI/CD Pipeline
 
 GitHub Actions workflow automatically:
+
 - Runs unit and integration tests
 - Collects code coverage (70% threshold)
 - Builds and pushes Docker images

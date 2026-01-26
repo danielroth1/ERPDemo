@@ -207,6 +207,34 @@
       "sourceMaps": true,
       "sourceMapPathOverrides": { "webpack:///./src/*": "${webRoot}/src/*" }
     },
+    {
+      "name": "Frontend: Launch (Firefox)",
+      "type": "firefox",
+      "request": "launch",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "preLaunchTask": "frontend: dev",
+      "reAttach": true,
+      "pathMappings": [
+        {
+          "url": "http://localhost:5173",
+          "path": "${workspaceFolder}/frontend"
+        }
+      ]
+    },
+    {
+      "name": "Frontend: Attach (Firefox)",
+      "type": "firefox",
+      "request": "attach",
+      "url": "http://localhost:5173",
+      "webRoot": "${workspaceFolder}/frontend",
+      "pathMappings": [
+        {
+          "url": "http://localhost:5173",
+          "path": "${workspaceFolder}/frontend"
+        }
+      ]
+    },
 
     // ============================================================
     // KUBERNETES LAUNCH CONFIGURATIONS
@@ -286,6 +314,20 @@
         "Frontend: Launch (Edge)"
       ],
       "presentation": { "hidden": false, "group": "fullstack", "order": 2 },
+      "stopAll": true
+    },
+    {
+      "name": "Full Stack: Launch All (Firefox)",
+      "configurations": [
+        "Backend: Launch Gateway",
+        "Backend: Launch User Management",
+        "Backend: Launch Inventory",
+        "Backend: Launch Sales",
+        "Backend: Launch Financial",
+        "Backend: Launch Dashboard",
+        "Frontend: Launch (Firefox)"
+      ],
+      "presentation": { "hidden": false, "group": "fullstack", "order": 3 },
       "stopAll": true
     }
   ]
