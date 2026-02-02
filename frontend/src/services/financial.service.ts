@@ -19,7 +19,7 @@ function mapAccountResponse(account: AccountResponse): Account {
 function mapTransactionResponse(transaction: TransactionResponse): Transaction {
   // Calculate total from entries (sum of debits or credits)
   const amount = transaction.entries?.reduce((sum, entry) => 
-    sum + ((entry.debit ?? 0) + (entry.credit ?? 0)), 0
+    sum + ((entry.debit ?? 0) - (entry.credit ?? 0)), 0
   ) ?? 0;
   
   return {

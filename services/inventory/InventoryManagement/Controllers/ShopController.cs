@@ -286,13 +286,13 @@ public class ShopController : ControllerBase
                     {
                         AccountId = inventoryId,
                         Debit = 0m,
-                        Credit = totalCost * quantity,
+                        Credit = totalCost,
                         Memo = $"Product leaving inventory: {productName}"
                     },
                     new FinancialJournalEntry
                     {
                         AccountId = productExpenseId,
-                        Debit = totalCost * quantity,
+                        Debit = totalCost,
                         Credit = 0m,
                         Memo = $"Cost of goods sold: {productName}"
                     },

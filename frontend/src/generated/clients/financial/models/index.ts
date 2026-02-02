@@ -26,6 +26,42 @@ export interface AccountBalance extends BackedModel, Parsable {
      */
     balance?: number | null;
 }
+export interface AccountBalanceSummary extends BackedModel, Parsable {
+    /**
+     * Stores model information.
+     */
+    backingStoreEnabled?: boolean | null;
+    /**
+     * The totalAssets property
+     */
+    totalAssets?: number | null;
+    /**
+     * The totalEquity property
+     */
+    totalEquity?: number | null;
+    /**
+     * The totalLiabilities property
+     */
+    totalLiabilities?: number | null;
+}
+export interface AccountBalanceSummaryApiResponse extends BackedModel, Parsable {
+    /**
+     * Stores model information.
+     */
+    backingStoreEnabled?: boolean | null;
+    /**
+     * The data property
+     */
+    data?: AccountBalanceSummary | null;
+    /**
+     * The message property
+     */
+    message?: string | null;
+    /**
+     * The success property
+     */
+    success?: boolean | null;
+}
 export interface AccountResponse extends BackedModel, Parsable {
     /**
      * The accountNumber property
@@ -296,6 +332,24 @@ export interface BudgetResponseListApiResponse extends BackedModel, Parsable {
 // @ts-ignore
 export function createAccountBalanceFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
     return deserializeIntoAccountBalance;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {AccountBalanceSummaryApiResponse}
+ */
+// @ts-ignore
+export function createAccountBalanceSummaryApiResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoAccountBalanceSummaryApiResponse;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {AccountBalanceSummary}
+ */
+// @ts-ignore
+export function createAccountBalanceSummaryFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoAccountBalanceSummary;
 }
 export interface CreateAccountRequest extends BackedModel, Parsable {
     /**
@@ -643,6 +697,34 @@ export function deserializeIntoAccountBalance(accountBalance: Partial<AccountBal
         "accountNumber": n => { accountBalance.accountNumber = n.getStringValue(); },
         "backingStoreEnabled": n => { accountBalance.backingStoreEnabled = true; },
         "balance": n => { accountBalance.balance = n.getNumberValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param AccountBalanceSummary The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoAccountBalanceSummary(accountBalanceSummary: Partial<AccountBalanceSummary> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "backingStoreEnabled": n => { accountBalanceSummary.backingStoreEnabled = true; },
+        "totalAssets": n => { accountBalanceSummary.totalAssets = n.getNumberValue(); },
+        "totalEquity": n => { accountBalanceSummary.totalEquity = n.getNumberValue(); },
+        "totalLiabilities": n => { accountBalanceSummary.totalLiabilities = n.getNumberValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param AccountBalanceSummaryApiResponse The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoAccountBalanceSummaryApiResponse(accountBalanceSummaryApiResponse: Partial<AccountBalanceSummaryApiResponse> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "backingStoreEnabled": n => { accountBalanceSummaryApiResponse.backingStoreEnabled = true; },
+        "data": n => { accountBalanceSummaryApiResponse.data = n.getObjectValue<AccountBalanceSummary>(createAccountBalanceSummaryFromDiscriminatorValue); },
+        "message": n => { accountBalanceSummaryApiResponse.message = n.getStringValue(); },
+        "success": n => { accountBalanceSummaryApiResponse.success = n.getBooleanValue(); },
     }
 }
 /**
@@ -1207,6 +1289,32 @@ export function serializeAccountBalance(writer: SerializationWriter, accountBala
     writer.writeStringValue("accountName", accountBalance.accountName);
     writer.writeStringValue("accountNumber", accountBalance.accountNumber);
     writer.writeNumberValue("balance", accountBalance.balance);
+}
+/**
+ * Serializes information the current object
+ * @param AccountBalanceSummary The instance to serialize from.
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeAccountBalanceSummary(writer: SerializationWriter, accountBalanceSummary: Partial<AccountBalanceSummary> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!accountBalanceSummary || isSerializingDerivedType) { return; }
+    writer.writeNumberValue("totalAssets", accountBalanceSummary.totalAssets);
+    writer.writeNumberValue("totalEquity", accountBalanceSummary.totalEquity);
+    writer.writeNumberValue("totalLiabilities", accountBalanceSummary.totalLiabilities);
+}
+/**
+ * Serializes information the current object
+ * @param AccountBalanceSummaryApiResponse The instance to serialize from.
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeAccountBalanceSummaryApiResponse(writer: SerializationWriter, accountBalanceSummaryApiResponse: Partial<AccountBalanceSummaryApiResponse> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!accountBalanceSummaryApiResponse || isSerializingDerivedType) { return; }
+    writer.writeObjectValue<AccountBalanceSummary>("data", accountBalanceSummaryApiResponse.data, serializeAccountBalanceSummary);
+    writer.writeStringValue("message", accountBalanceSummaryApiResponse.message);
+    writer.writeBooleanValue("success", accountBalanceSummaryApiResponse.success);
 }
 /**
  * Serializes information the current object

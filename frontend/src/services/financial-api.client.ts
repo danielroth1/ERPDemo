@@ -69,6 +69,21 @@ class FinancialApiClient {
     return this.getAccountById(id);
   }
 
+  async getAccountBalanceSummary(): Promise<{ totalAssets: number; totalLiabilities: number; totalEquity: number }> {
+    try {
+      const response = await this.client.api.v1.accounts.summary.balances.get();
+      
+      return {
+        totalAssets: response?.data?.totalAssets || 0,
+        totalLiabilities: response?.data?.totalLiabilities || 0,
+        totalEquity: response?.data?.totalEquity || 0,
+      };
+    } catch (error: any) {
+      console.error('Failed to get account balance summary:', error);
+      return { totalAssets: 0, totalLiabilities: 0, totalEquity: 0 };
+    }
+  }
+
   async createUserAccounts(userId: string, userName: string): Promise<{ assetAccount: AccountResponse; expenseAccount: AccountResponse }> {
     try {
       const response = await this.client.api.v1.accounts.user.post({
@@ -78,7 +93,8 @@ class FinancialApiClient {
       if (!response?.data) {
         throw new Error('Failed to create user accounts');
       }
-      return response.data as { assetAccount: AccountResponse; expenseAccount: AccountResponse };
+      // Use unknown as intermediate type to avoid TypeScript error
+      return response.data as unknown as { assetAccount: AccountResponse; expenseAccount: AccountResponse };
     } catch (error: any) {
       throw new Error(extractErrorMessage(error, 'Failed to create user accounts'));
     }

@@ -10,6 +10,10 @@ import { NameRequestBuilderNavigationMetadata, type NameRequestBuilder } from '.
 // @ts-ignore
 import { NumberRequestBuilderNavigationMetadata, type NumberRequestBuilder } from './number/index.js';
 // @ts-ignore
+import { SummaryRequestBuilderNavigationMetadata, type SummaryRequestBuilder } from './summary/index.js';
+// @ts-ignore
+import { SystemRequestBuilderNavigationMetadata, type SystemRequestBuilder } from './system/index.js';
+// @ts-ignore
 import { type TypeRequestBuilder, TypeRequestBuilderNavigationMetadata } from './type/index.js';
 // @ts-ignore
 import { type UserRequestBuilder, UserRequestBuilderNavigationMetadata, UserRequestBuilderRequestsMetadata } from './user/index.js';
@@ -28,6 +32,14 @@ export interface AccountsRequestBuilder extends BaseRequestBuilder<AccountsReque
      * The number property
      */
     get number(): NumberRequestBuilder;
+    /**
+     * The summary property
+     */
+    get summary(): SummaryRequestBuilder;
+    /**
+     * The system property
+     */
+    get system(): SystemRequestBuilder;
     /**
      * The type property
      */
@@ -87,6 +99,12 @@ export const AccountsRequestBuilderNavigationMetadata: Record<Exclude<keyof Acco
     },
     number: {
         navigationMetadata: NumberRequestBuilderNavigationMetadata,
+    },
+    summary: {
+        navigationMetadata: SummaryRequestBuilderNavigationMetadata,
+    },
+    system: {
+        navigationMetadata: SystemRequestBuilderNavigationMetadata,
     },
     type: {
         navigationMetadata: TypeRequestBuilderNavigationMetadata,

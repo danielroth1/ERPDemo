@@ -20,6 +20,8 @@ public interface IAccountService
     Task<bool> DeleteAccountAsync(string id);
     Task<decimal> GetAccountBalanceAsync(string id);
     Task<AccountResponse?> AdjustBalanceAsync(string id, decimal amount);
+    Task<List<Account>> GetSystemAccountsAsync();
+    Task<AccountBalanceSummary> GetAccountBalanceSummaryAsync();
 }
 
 public class AccountService : IAccountService
@@ -260,6 +262,48 @@ public class AccountService : IAccountService
             account.AccountNumber, amount, account.Balance);
 
         return MapToResponse(account);
+    }
+
+    public async Task<List<Account>> GetSystemAccountsAsync()
+    {
+        var systemAccountNames = new[]
+        {
+            "Company Operating Account",
+            "Sales Tax Payable",
+            "Product Inventory",
+            "Cost of Goods Sold",
+            "Product Sales Revenue"
+        };
+
+        var systemAccounts = await _dbContext.Accounts
+            .Where(a => systemAccountNames.Contains(a.Name) && a.IsActive)
+            .ToListAsync();
+
+        return systemAccounts;
+    }
+
+    public async Task<AccountBalanceSummary> GetAccountBalanceSummaryAsync()
+    {
+        var systemAccounts = await GetSystemAccountsAsync();
+
+        var totalAssets = systemAccounts
+            .Where(a => a.Type == AccountType.Asset)
+            .Sum(a => a.Balance);
+
+        var totalLiabilities = systemAccounts
+            .Where(a => a.Type == AccountType.Liability)
+            .Sum(a => a.Balance);
+
+        var totalEquity = systemAccounts
+            .Where(a => a.Type == AccountType.Equity)
+            .Sum(a => a.Balance);
+
+        return new AccountBalanceSummary
+        {
+            TotalAssets = totalAssets,
+            TotalLiabilities = totalLiabilities,
+            TotalEquity = totalEquity
+        };
     }
 
     private static AccountResponse MapToResponse(Account account)

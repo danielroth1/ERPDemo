@@ -13,6 +13,8 @@ import {
   Bars3Icon,
   XMarkIcon,
   ShoppingBagIcon,
+  ChartPieIcon,
+  PresentationChartLineIcon,
 } from "@heroicons/react/24/outline";
 import toast from "react-hot-toast";
 
@@ -25,6 +27,19 @@ const navigation = [
   { name: "Financial", href: "/financial", icon: CurrencyDollarIcon },
   { name: "Analytics", href: "/analytics", icon: ChartBarIcon }, // Hidden for now
   { name: "Database", href: "/database", icon: CircleStackIcon },
+];
+
+const externalLinks = [
+  {
+    name: "Prometheus",
+    href: "http://localhost:9090",
+    icon: ChartPieIcon,
+  },
+  {
+    name: "Grafana",
+    href: "http://localhost:3000",
+    icon: PresentationChartLineIcon,
+  },
 ];
 
 export const MainLayout: React.FC = () => {
@@ -79,6 +94,23 @@ export const MainLayout: React.FC = () => {
                 {item.name}
               </Link>
             ))}
+            <div className="border-t pt-2 mt-2">
+              <p className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                Monitoring
+              </p>
+              {externalLinks.map((item) => (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100"
+                >
+                  <item.icon className="mr-3 h-6 w-6" />
+                  {item.name}
+                </a>
+              ))}
+            </div>
           </nav>
         </div>
       </div>
@@ -102,6 +134,23 @@ export const MainLayout: React.FC = () => {
                 {item.name}
               </Link>
             ))}
+            <div className="border-t pt-2 mt-2">
+              <p className="px-2 text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
+                Monitoring
+              </p>
+              {externalLinks.map((item) => (
+                <a
+                  key={item.name}
+                  href={item.href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="group flex items-center px-2 py-2 text-sm font-medium rounded-md text-gray-700 hover:bg-gray-100"
+                >
+                  <item.icon className="mr-3 h-6 w-6" />
+                  {item.name}
+                </a>
+              ))}
+            </div>
           </nav>
           <div className="flex-shrink-0 flex border-t p-4">
             <div className="flex items-center w-full">

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useAppDispatch, useAppSelector } from "../../store/hooks";
 import {
   fetchAccounts,
@@ -9,17 +9,37 @@ import { LoadingSpinner } from "../../components/common/LoadingSpinner";
 import { CurrencyDollarIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { AccountType, TransactionType } from "../../types";
 import toast from "react-hot-toast";
+import { financialApiClient } from "../../services/financial-api.client";
 
 export const FinancialPage: React.FC = () => {
   const dispatch = useAppDispatch();
   const { accounts, transactions, isLoading, totalTransactions } =
     useAppSelector((state) => state.financial);
+  const [balanceSummary, setBalanceSummary] = useState({
+    totalAssets: 0,
+    totalLiabilities: 0,
+    totalEquity: 0,
+  });
   const pageSize = 10;
 
   useEffect(() => {
     dispatch(fetchAccounts());
     dispatch(fetchTransactions({ page: 1, pageSize }));
+    loadBalanceSummary();
   }, [dispatch]);
+
+  const loadBalanceSummary = async () => {
+    try {
+      const summary = await financialApiClient.getAccountBalanceSummary();
+      setBalanceSummary({
+        totalAssets: summary.totalAssets || 0,
+        totalLiabilities: summary.totalLiabilities || 0,
+        totalEquity: summary.totalEquity || 0,
+      });
+    } catch (error) {
+      console.error("Failed to load balance summary:", error);
+    }
+  };
 
   const handleDelete = async (id: string) => {
     if (confirm("Are you sure you want to delete this transaction?")) {
@@ -49,15 +69,6 @@ export const FinancialPage: React.FC = () => {
     }
   };
 
-  const calculateAccountBalance = (accountType: string) => {
-    const operatingAccounts = accounts.filter(
-      (a) => a.name === "Company Operating Account",
-    );
-    const opeartingAccount =
-      operatingAccounts.length > 0 ? operatingAccounts[0] : null;
-    return opeartingAccount?.balance;
-  };
-
   if (isLoading && transactions.length === 0) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -84,7 +95,7 @@ export const FinancialPage: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm text-gray-600">Total Assets</p>
               <p className="text-2xl font-bold text-green-600">
-                ${calculateAccountBalance(AccountType.Asset)}
+                ${balanceSummary.totalAssets.toFixed(2)}
               </p>
             </div>
           </div>
@@ -92,13 +103,13 @@ export const FinancialPage: React.FC = () => {
         <div className="card">
           <p className="text-sm text-gray-600">Total Liabilities</p>
           <p className="text-2xl font-bold text-red-600">
-            ${calculateAccountBalance(AccountType.Liability)}
+            ${balanceSummary.totalLiabilities.toFixed(2)}
           </p>
         </div>
         <div className="card">
           <p className="text-sm text-gray-600">Equity</p>
           <p className="text-2xl font-bold text-purple-600">
-            ${calculateAccountBalance(AccountType.Equity)}
+            ${balanceSummary.totalEquity.toFixed(2)}
           </p>
         </div>
         <div className="card">

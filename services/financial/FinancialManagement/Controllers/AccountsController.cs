@@ -128,14 +128,33 @@ public class AccountsController : ControllerBase
                 $"Unknown system account purpose: {purpose}. Valid values: company-operating, sales-tax, inventory, cogs, revenue"));
         }
 
-        var account = await _accountService.GetAccountByNameAsync(accountName);
+        var systemAccounts = await _accountService.GetSystemAccountsAsync();
+        var account = systemAccounts.FirstOrDefault(a => a.Name == accountName);
+        
         if (account == null)
         {
             return NotFound(ApiResponse<AccountResponse>.ErrorResponse(
                 $"System account '{accountName}' not found. Please ensure default accounts are initialized."));
         }
 
-        return Ok(ApiResponse<AccountResponse>.SuccessResponse(account));
+        var accountResponse = new AccountResponse
+        {
+            Id = account.Id,
+            AccountNumber = account.AccountNumber,
+            Name = account.Name,
+            Type = account.Type.ToString(),
+            Category = account.Category.ToString(),
+            Balance = account.Balance,
+            Currency = account.Currency,
+            IsActive = account.IsActive,
+            ParentAccountId = account.ParentAccountId,
+            UserId = account.UserId,
+            Description = account.Description,
+            CreatedAt = account.CreatedAt,
+            UpdatedAt = account.UpdatedAt
+        };
+
+        return Ok(ApiResponse<AccountResponse>.SuccessResponse(accountResponse));
     }
 
     [HttpGet]
@@ -167,6 +186,13 @@ public class AccountsController : ControllerBase
     {
         var balance = await _accountService.GetAccountBalanceAsync(id);
         return Ok(ApiResponse<object>.SuccessResponse(new { accountId = id, balance }));
+    }
+
+    [HttpGet("summary/balances")]
+    public async Task<ActionResult<ApiResponse<AccountBalanceSummary>>> GetAccountBalanceSummary()
+    {
+        var summary = await _accountService.GetAccountBalanceSummaryAsync();
+        return Ok(ApiResponse<AccountBalanceSummary>.SuccessResponse(summary));
     }
 
     [HttpPut("{id}")]

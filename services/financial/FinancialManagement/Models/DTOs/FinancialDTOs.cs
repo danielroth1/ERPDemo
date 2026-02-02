@@ -25,6 +25,13 @@ public class UpdateAccountRequest
     public bool? IsActive { get; set; }
 }
 
+public class AccountBalanceSummary
+{
+    public decimal TotalAssets { get; set; }
+    public decimal TotalLiabilities { get; set; }
+    public decimal TotalEquity { get; set; }
+}
+
 public class AccountResponse
 {
     public string Id { get; set; } = string.Empty;
