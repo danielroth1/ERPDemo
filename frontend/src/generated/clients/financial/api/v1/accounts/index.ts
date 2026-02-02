@@ -6,11 +6,13 @@ import { createAccountResponseApiResponseFromDiscriminatorValue, createAccountRe
 // @ts-ignore
 import { AccountsItemRequestBuilderNavigationMetadata, AccountsItemRequestBuilderRequestsMetadata, type AccountsItemRequestBuilder } from './item/index.js';
 // @ts-ignore
+import { NameRequestBuilderNavigationMetadata, type NameRequestBuilder } from './name/index.js';
+// @ts-ignore
 import { NumberRequestBuilderNavigationMetadata, type NumberRequestBuilder } from './number/index.js';
 // @ts-ignore
 import { type TypeRequestBuilder, TypeRequestBuilderNavigationMetadata } from './type/index.js';
 // @ts-ignore
-import { type UserRequestBuilder, UserRequestBuilderNavigationMetadata } from './user/index.js';
+import { type UserRequestBuilder, UserRequestBuilderNavigationMetadata, UserRequestBuilderRequestsMetadata } from './user/index.js';
 // @ts-ignore
 import { type BaseRequestBuilder, type KeysToExcludeForNavigationMetadata, type NavigationMetadata, type Parsable, type ParsableFactory, type RequestConfiguration, type RequestInformation, type RequestsMetadata } from '@microsoft/kiota-abstractions';
 
@@ -18,6 +20,10 @@ import { type BaseRequestBuilder, type KeysToExcludeForNavigationMetadata, type 
  * Builds and executes requests for operations under /api/v1/Accounts
  */
 export interface AccountsRequestBuilder extends BaseRequestBuilder<AccountsRequestBuilder> {
+    /**
+     * The name property
+     */
+    get name(): NameRequestBuilder;
     /**
      * The number property
      */
@@ -76,6 +82,9 @@ export const AccountsRequestBuilderNavigationMetadata: Record<Exclude<keyof Acco
         navigationMetadata: AccountsItemRequestBuilderNavigationMetadata,
         pathParametersMappings: ["id"],
     },
+    name: {
+        navigationMetadata: NameRequestBuilderNavigationMetadata,
+    },
     number: {
         navigationMetadata: NumberRequestBuilderNavigationMetadata,
     },
@@ -83,6 +92,7 @@ export const AccountsRequestBuilderNavigationMetadata: Record<Exclude<keyof Acco
         navigationMetadata: TypeRequestBuilderNavigationMetadata,
     },
     user: {
+        requestsMetadata: UserRequestBuilderRequestsMetadata,
         navigationMetadata: UserRequestBuilderNavigationMetadata,
     },
 };

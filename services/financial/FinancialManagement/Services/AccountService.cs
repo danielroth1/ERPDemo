@@ -8,9 +8,12 @@ namespace FinancialManagement.Services;
 public interface IAccountService
 {
     Task<AccountResponse> CreateAccountAsync(CreateAccountRequest request);
+    Task<(AccountResponse AssetAccount, AccountResponse ExpenseAccount)> CreateUserAccountsAsync(string userId, string userName);
     Task<AccountResponse?> GetAccountByIdAsync(string id);
     Task<AccountResponse?> GetAccountByNumberAsync(string accountNumber);
     Task<AccountResponse?> GetAccountByUserIdAsync(string userId);
+    Task<AccountResponse?> GetAccountByUserIdAndTypeAsync(string userId, AccountType type);
+    Task<AccountResponse?> GetAccountByNameAsync(string name);
     Task<List<AccountResponse>> GetAllAccountsAsync(int skip = 0, int limit = 100);
     Task<List<AccountResponse>> GetAccountsByTypeAsync(AccountType type, int skip = 0, int limit = 100);
     Task<AccountResponse?> UpdateAccountAsync(string id, UpdateAccountRequest request);
@@ -30,6 +33,47 @@ public class AccountService : IAccountService
         _logger = logger;
     }
 
+    public async Task<(AccountResponse AssetAccount, AccountResponse ExpenseAccount)> CreateUserAccountsAsync(string userId, string userName)
+    {
+        // Check if user already has accounts
+        var existingAssetAccount = await _dbContext.Accounts
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.Type == AccountType.Asset && a.IsActive);
+        var existingExpenseAccount = await _dbContext.Accounts
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.Type == AccountType.Expense && a.IsActive);
+
+        if (existingAssetAccount != null || existingExpenseAccount != null)
+        {
+            throw new ArgumentException($"User already has accounts. Asset: {existingAssetAccount?.AccountNumber}, Expense: {existingExpenseAccount?.AccountNumber}");
+        }
+
+        // Create Asset account
+        var assetAccount = await CreateAccountAsync(new CreateAccountRequest
+        {
+            Name = $"{userName} - Personal Account",
+            Type = "Asset",
+            Category = "CurrentAssets",
+            Currency = "USD",
+            UserId = userId,
+            Description = $"Personal asset account for user {userId}"
+        });
+
+        // Create Expense account
+        var expenseAccount = await CreateAccountAsync(new CreateAccountRequest
+        {
+            Name = $"{userName} - Expense Account",
+            Type = "Expense",
+            Category = "OperatingExpenses",
+            Currency = "USD",
+            UserId = userId,
+            Description = $"Expense account for user {userId}"
+        });
+
+        _logger.LogInformation("Created user accounts for {UserId}: Asset={AssetAccountNumber}, Expense={ExpenseAccountNumber}",
+            userId, assetAccount.AccountNumber, expenseAccount.AccountNumber);
+
+        return (assetAccount, expenseAccount);
+    }
+
     public async Task<AccountResponse> CreateAccountAsync(CreateAccountRequest request)
     {
         if (!Enum.TryParse<AccountType>(request.Type, true, out var accountType))
@@ -44,15 +88,16 @@ public class AccountService : IAccountService
             throw new ArgumentException($"Invalid account category: '{request.Category}'. Valid categories are: {validCategories}");
         }
 
-        // Check if user already has an account (1:1 relationship)
+        // Check if user already has an account of the same type
+        // Users can have multiple accounts (Asset, Expense), but only one of each type
         if (!string.IsNullOrEmpty(request.UserId))
         {
             var existingAccount = await _dbContext.Accounts
-                .FirstOrDefaultAsync(a => a.UserId == request.UserId && a.IsActive);
-            
+                .FirstOrDefaultAsync(a => a.UserId == request.UserId && a.Type == accountType && a.IsActive);
+
             if (existingAccount != null)
             {
-                throw new ArgumentException($"User already has an account: {existingAccount.AccountNumber}");
+                throw new ArgumentException($"User already has a {accountType} account: {existingAccount.AccountNumber}");
             }
         }
 
@@ -76,7 +121,7 @@ public class AccountService : IAccountService
         _dbContext.Accounts.Add(account);
         await _dbContext.SaveChangesAsync();
 
-        _logger.LogInformation("Created account {AccountNumber} - {Name} for user {UserId}", 
+        _logger.LogInformation("Created account {AccountNumber} - {Name} for user {UserId}",
             accountNumber, request.Name, request.UserId ?? "(system)");
 
         return MapToResponse(account);
@@ -97,7 +142,21 @@ public class AccountService : IAccountService
     public async Task<AccountResponse?> GetAccountByUserIdAsync(string userId)
     {
         var account = await _dbContext.Accounts
-            .FirstOrDefaultAsync(a => a.UserId == userId && a.IsActive);
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.Type == AccountType.Asset && a.IsActive);
+        return account != null ? MapToResponse(account) : null;
+    }
+
+    public async Task<AccountResponse?> GetAccountByUserIdAndTypeAsync(string userId, AccountType type)
+    {
+        var account = await _dbContext.Accounts
+            .FirstOrDefaultAsync(a => a.UserId == userId && a.Type == type && a.IsActive);
+        return account != null ? MapToResponse(account) : null;
+    }
+
+    public async Task<AccountResponse?> GetAccountByNameAsync(string name)
+    {
+        var account = await _dbContext.Accounts
+            .FirstOrDefaultAsync(a => a.Name == name && a.IsActive);
         return account != null ? MapToResponse(account) : null;
     }
 

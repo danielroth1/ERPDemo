@@ -1,16 +1,19 @@
-import React, { useEffect } from 'react';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { fetchAccounts, fetchTransactions, deleteTransaction } from './financialSlice';
-import { LoadingSpinner } from '../../components/common/LoadingSpinner';
-import { CurrencyDollarIcon, TrashIcon } from '@heroicons/react/24/outline';
-import { AccountType, TransactionType } from '../../types';
-import toast from 'react-hot-toast';
+import React, { useEffect } from "react";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import {
+  fetchAccounts,
+  fetchTransactions,
+  deleteTransaction,
+} from "./financialSlice";
+import { LoadingSpinner } from "../../components/common/LoadingSpinner";
+import { CurrencyDollarIcon, TrashIcon } from "@heroicons/react/24/outline";
+import { AccountType, TransactionType } from "../../types";
+import toast from "react-hot-toast";
 
 export const FinancialPage: React.FC = () => {
   const dispatch = useAppDispatch();
-  const { accounts, transactions, isLoading, totalTransactions } = useAppSelector(
-    (state) => state.financial
-  );
+  const { accounts, transactions, isLoading, totalTransactions } =
+    useAppSelector((state) => state.financial);
   const pageSize = 10;
 
   useEffect(() => {
@@ -19,12 +22,12 @@ export const FinancialPage: React.FC = () => {
   }, [dispatch]);
 
   const handleDelete = async (id: string) => {
-    if (confirm('Are you sure you want to delete this transaction?')) {
+    if (confirm("Are you sure you want to delete this transaction?")) {
       try {
         await dispatch(deleteTransaction(id)).unwrap();
-        toast.success('Transaction deleted successfully');
+        toast.success("Transaction deleted successfully");
       } catch (error: any) {
-        toast.error(error || 'Failed to delete transaction');
+        toast.error(error || "Failed to delete transaction");
       }
     }
   };
@@ -33,34 +36,26 @@ export const FinancialPage: React.FC = () => {
     switch (type) {
       case TransactionType.Sale:
       case TransactionType.Receipt:
-        return 'text-green-600';
+        return "text-green-600";
       case TransactionType.Purchase:
       case TransactionType.Payment:
-        return 'text-red-600';
+        return "text-red-600";
       case TransactionType.Transfer:
-        return 'text-blue-600';
+        return "text-blue-600";
       case TransactionType.Adjustment:
-        return 'text-orange-600';
+        return "text-orange-600";
       default:
-        return 'text-gray-600';
+        return "text-gray-600";
     }
   };
 
   const calculateAccountBalance = (accountType: string) => {
-    const accountIds = accounts
-      .filter((a) => a.type === accountType)
-      .map((a) => a.id);
-
-    return transactions
-      .filter((t) => accountIds.includes(t.debitAccountId) || accountIds.includes(t.creditAccountId))
-      .reduce((sum, t) => {
-        if (t.type === TransactionType.Sale || t.type === TransactionType.Receipt) {
-          return sum + t.amount;
-        } else if (t.type === TransactionType.Purchase || t.type === TransactionType.Payment) {
-          return sum - t.amount;
-        }
-        return sum;
-      }, 0);
+    const operatingAccounts = accounts.filter(
+      (a) => a.name === "Company Operating Account",
+    );
+    const opeartingAccount =
+      operatingAccounts.length > 0 ? operatingAccounts[0] : null;
+    return opeartingAccount?.balance;
   };
 
   if (isLoading && transactions.length === 0) {
@@ -74,7 +69,9 @@ export const FinancialPage: React.FC = () => {
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Financial Management</h1>
+        <h1 className="text-2xl font-bold text-gray-900">
+          Financial Management
+        </h1>
       </div>
 
       {/* Account Balances */}
@@ -87,7 +84,7 @@ export const FinancialPage: React.FC = () => {
             <div className="ml-4">
               <p className="text-sm text-gray-600">Total Assets</p>
               <p className="text-2xl font-bold text-green-600">
-                ${calculateAccountBalance(AccountType.Asset).toFixed(2)}
+                ${calculateAccountBalance(AccountType.Asset)}
               </p>
             </div>
           </div>
@@ -95,18 +92,20 @@ export const FinancialPage: React.FC = () => {
         <div className="card">
           <p className="text-sm text-gray-600">Total Liabilities</p>
           <p className="text-2xl font-bold text-red-600">
-            ${calculateAccountBalance(AccountType.Liability).toFixed(2)}
+            ${calculateAccountBalance(AccountType.Liability)}
           </p>
         </div>
         <div className="card">
           <p className="text-sm text-gray-600">Equity</p>
           <p className="text-2xl font-bold text-purple-600">
-            ${calculateAccountBalance(AccountType.Equity).toFixed(2)}
+            ${calculateAccountBalance(AccountType.Equity)}
           </p>
         </div>
         <div className="card">
           <p className="text-sm text-gray-600">Total Transactions</p>
-          <p className="text-2xl font-bold text-gray-900">{totalTransactions}</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {totalTransactions}
+          </p>
         </div>
       </div>
 
@@ -149,12 +148,17 @@ export const FinancialPage: React.FC = () => {
                     {transaction.description}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`text-xs font-semibold ${getTransactionTypeColor(transaction.type)}`}>
+                    <span
+                      className={`text-xs font-semibold ${getTransactionTypeColor(transaction.type)}`}
+                    >
                       {transaction.type}
                     </span>
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm font-semibold text-right ${getTransactionTypeColor(transaction.type)}`}>
-                    {transaction.type === TransactionType.Purchase || transaction.type === TransactionType.Payment
+                  <td
+                    className={`px-6 py-4 whitespace-nowrap text-sm font-semibold text-right ${getTransactionTypeColor(transaction.type)}`}
+                  >
+                    {transaction.type === TransactionType.Purchase ||
+                    transaction.type === TransactionType.Payment
                       ? `-$${transaction.amount.toFixed(2)}`
                       : `$${transaction.amount.toFixed(2)}`}
                   </td>

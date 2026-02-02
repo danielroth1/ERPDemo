@@ -4,18 +4,12 @@
 // @ts-ignore
 import { createAccountResponseApiResponseFromDiscriminatorValue, type AccountResponseApiResponse } from '../../../../../models/index.js';
 // @ts-ignore
-import { ExpenseRequestBuilderRequestsMetadata, type ExpenseRequestBuilder } from './expense/index.js';
-// @ts-ignore
-import { type BaseRequestBuilder, type KeysToExcludeForNavigationMetadata, type NavigationMetadata, type Parsable, type ParsableFactory, type RequestConfiguration, type RequestInformation, type RequestsMetadata } from '@microsoft/kiota-abstractions';
+import { type BaseRequestBuilder, type Parsable, type ParsableFactory, type RequestConfiguration, type RequestInformation, type RequestsMetadata } from '@microsoft/kiota-abstractions';
 
 /**
- * Builds and executes requests for operations under /api/v1/Accounts/user/{userId}
+ * Builds and executes requests for operations under /api/v1/Accounts/name/{accountName}
  */
-export interface WithUserItemRequestBuilder extends BaseRequestBuilder<WithUserItemRequestBuilder> {
-    /**
-     * The expense property
-     */
-    get expense(): ExpenseRequestBuilder;
+export interface WithAccountNameItemRequestBuilder extends BaseRequestBuilder<WithAccountNameItemRequestBuilder> {
     /**
      * @param requestConfiguration Configuration for the request such as headers, query parameters, and middleware options.
      * @returns {Promise<AccountResponseApiResponse>}
@@ -30,21 +24,13 @@ export interface WithUserItemRequestBuilder extends BaseRequestBuilder<WithUserI
 /**
  * Uri template for the request builder.
  */
-export const WithUserItemRequestBuilderUriTemplate = "{+baseurl}/api/v1/Accounts/user/{userId}";
-/**
- * Metadata for all the navigation properties in the request builder.
- */
-export const WithUserItemRequestBuilderNavigationMetadata: Record<Exclude<keyof WithUserItemRequestBuilder, KeysToExcludeForNavigationMetadata>, NavigationMetadata> = {
-    expense: {
-        requestsMetadata: ExpenseRequestBuilderRequestsMetadata,
-    },
-};
+export const WithAccountNameItemRequestBuilderUriTemplate = "{+baseurl}/api/v1/Accounts/name/{accountName}";
 /**
  * Metadata for all the requests in the request builder.
  */
-export const WithUserItemRequestBuilderRequestsMetadata: RequestsMetadata = {
+export const WithAccountNameItemRequestBuilderRequestsMetadata: RequestsMetadata = {
     get: {
-        uriTemplate: WithUserItemRequestBuilderUriTemplate,
+        uriTemplate: WithAccountNameItemRequestBuilderUriTemplate,
         responseBodyContentType: "application/json, text/plain;q=0.9",
         adapterMethodName: "send",
         responseBodyFactory:  createAccountResponseApiResponseFromDiscriminatorValue,

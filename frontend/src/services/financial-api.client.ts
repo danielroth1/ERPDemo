@@ -69,6 +69,21 @@ class FinancialApiClient {
     return this.getAccountById(id);
   }
 
+  async createUserAccounts(userId: string, userName: string): Promise<{ assetAccount: AccountResponse; expenseAccount: AccountResponse }> {
+    try {
+      const response = await this.client.api.v1.accounts.user.post({
+        userId,
+        userName,
+      });
+      if (!response?.data) {
+        throw new Error('Failed to create user accounts');
+      }
+      return response.data as { assetAccount: AccountResponse; expenseAccount: AccountResponse };
+    } catch (error: any) {
+      throw new Error(extractErrorMessage(error, 'Failed to create user accounts'));
+    }
+  }
+
   async createAccount(request: CreateAccountRequest): Promise<AccountResponse> {
     try {
       const response = await this.client.api.v1.accounts.post(request);

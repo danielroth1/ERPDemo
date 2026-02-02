@@ -108,16 +108,9 @@ class FinancialService {
   }
 
   async createUserAccount(userId: string, userName: string): Promise<Account> {
-    const accountName = `${userName} - Personal Account`;
-    const response = await financialApiClient.createAccount({
-      name: accountName,
-      type: 'Asset',
-      category: 'CurrentAssets',
-      currency: 'USD',
-      userId: userId,
-      description: `Personal account for user ${userId}`,
-    });
-    return mapAccountResponse(response);
+    // Call the backend endpoint that creates both Asset and Expense accounts
+    const { assetAccount } = await financialApiClient.createUserAccounts(userId, userName);
+    return mapAccountResponse(assetAccount);
   }
 
   async deleteUserAccount(accountId: string): Promise<void> {

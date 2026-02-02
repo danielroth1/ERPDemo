@@ -10,8 +10,11 @@ namespace InventoryManagement.Services;
 public interface IFinancialServiceClient
 {
     Task<string?> GetUserAccountIdAsync(string userId, string authToken);
+    Task<string?> GetUserExpenseAccountIdAsync(string userId, string authToken);
     Task<string?> GetAccountIdByNumberAsync(string accountNumber, string authToken);
+    Task<string?> GetAccountIdByNameAsync(string accountName, string authToken);
     Task<string?> GetRevenueAccountIdAsync(string authToken);
+    Task<string?> GetSystemAccountIdAsync(string purpose, string authToken);
     Task<bool> CreateTransactionAsync(CreateFinancialTransactionRequest request, string authToken);
 }
 
@@ -31,24 +34,63 @@ public class FinancialServiceClient : IFinancialServiceClient
         _baseUrl = configuration["Services:Financial"] ?? "http://financial:8080";
     }
 
-    public async Task<string?> GetUserAccountIdAsync(string userId, string authToken)
+    public async Task<string?> GetUserExpenseAccountIdAsync(string userId, string authToken)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/user/{userId}");
-            
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/user/{userId}/expense");
+
             if (!string.IsNullOrEmpty(authToken))
             {
                 request.Headers.Add("Authorization", authToken);
             }
 
             var response = await _httpClient.SendAsync(request);
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
                 var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
-                
+
+                if (accountResponse.TryGetProperty("data", out var data) &&
+                    data.TryGetProperty("id", out var accountId))
+                {
+                    return accountId.GetString();
+                }
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Failed to get user expense account. UserId: {UserId}, Status: {StatusCode}",
+                    userId, response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception while getting user expense account for UserId: {UserId}", userId);
+        }
+
+        return null;
+    }
+
+    public async Task<string?> GetUserAccountIdAsync(string userId, string authToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/user/{userId}");
+
+            if (!string.IsNullOrEmpty(authToken))
+            {
+                request.Headers.Add("Authorization", authToken);
+            }
+
+            var response = await _httpClient.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
+
                 if (accountResponse.TryGetProperty("data", out var data) &&
                     data.TryGetProperty("id", out var accountId))
                 {
@@ -66,7 +108,7 @@ public class FinancialServiceClient : IFinancialServiceClient
         {
             _logger.LogError(ex, "Exception while getting user account for UserId: {UserId}", userId);
         }
-        
+
         return null;
     }
 
@@ -75,19 +117,19 @@ public class FinancialServiceClient : IFinancialServiceClient
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/number/{accountNumber}");
-            
+
             if (!string.IsNullOrEmpty(authToken))
             {
                 request.Headers.Add("Authorization", authToken);
             }
 
             var response = await _httpClient.SendAsync(request);
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
                 var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
-                
+
                 if (accountResponse.TryGetProperty("data", out var data) &&
                     data.TryGetProperty("id", out var accountId))
                 {
@@ -105,7 +147,46 @@ public class FinancialServiceClient : IFinancialServiceClient
         {
             _logger.LogError(ex, "Exception while getting account by number: {AccountNumber}", accountNumber);
         }
-        
+
+        return null;
+    }
+
+    public async Task<string?> GetAccountIdByNameAsync(string accountName, string authToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/name/{Uri.EscapeDataString(accountName)}");
+
+            if (!string.IsNullOrEmpty(authToken))
+            {
+                request.Headers.Add("Authorization", authToken);
+            }
+
+            var response = await _httpClient.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
+
+                if (accountResponse.TryGetProperty("data", out var data) &&
+                    data.TryGetProperty("id", out var accountId))
+                {
+                    return accountId.GetString();
+                }
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Failed to get account by name. AccountName: {AccountName}, Status: {StatusCode}",
+                    accountName, response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception while getting account by name: {AccountName}", accountName);
+        }
+
         return null;
     }
 
@@ -114,19 +195,19 @@ public class FinancialServiceClient : IFinancialServiceClient
         try
         {
             using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts");
-            
+
             if (!string.IsNullOrEmpty(authToken))
             {
                 request.Headers.Add("Authorization", authToken);
             }
 
             var response = await _httpClient.SendAsync(request);
-            
+
             if (response.IsSuccessStatusCode)
             {
                 var content = await response.Content.ReadAsStringAsync();
                 var accountsResponse = JsonSerializer.Deserialize<JsonElement>(content);
-                
+
                 if (accountsResponse.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
                 {
                     // Look for revenue account with name "Product Sales Revenue"
@@ -156,7 +237,46 @@ public class FinancialServiceClient : IFinancialServiceClient
         {
             _logger.LogError(ex, "Exception while getting revenue account");
         }
-        
+
+        return null;
+    }
+
+    public async Task<string?> GetSystemAccountIdAsync(string purpose, string authToken)
+    {
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/system/{purpose}");
+
+            if (!string.IsNullOrEmpty(authToken))
+            {
+                request.Headers.Add("Authorization", authToken);
+            }
+
+            var response = await _httpClient.SendAsync(request);
+
+            if (response.IsSuccessStatusCode)
+            {
+                var content = await response.Content.ReadAsStringAsync();
+                var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
+
+                if (accountResponse.TryGetProperty("data", out var data) &&
+                    data.TryGetProperty("id", out var accountId))
+                {
+                    return accountId.GetString();
+                }
+            }
+            else
+            {
+                _logger.LogWarning(
+                    "Failed to get system account. Purpose: {Purpose}, Status: {StatusCode}",
+                    purpose, response.StatusCode);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Exception while getting system account: {Purpose}", purpose);
+        }
+
         return null;
     }
 

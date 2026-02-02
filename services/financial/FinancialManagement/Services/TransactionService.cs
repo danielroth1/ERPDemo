@@ -119,7 +119,7 @@ public class TransactionService : ITransactionService
 
             await dbTransaction.CommitAsync();
 
-            _logger.LogInformation("Created transaction {TransactionNumber}: {Description}", 
+            _logger.LogInformation("Created transaction {TransactionNumber}: {Description}",
                 transactionNumber, request.Description);
 
             // Publish event
@@ -235,7 +235,7 @@ public class TransactionService : ITransactionService
     private async Task UpdateAccountBalanceAsync(string accountId, decimal debit, decimal credit)
     {
         var account = await _dbContext.Accounts.FindAsync(accountId);
-            
+
         if (account == null)
         {
             throw new InvalidOperationException($"Account {accountId} not found");
@@ -246,7 +246,7 @@ public class TransactionService : ITransactionService
         // Liabilities, Equity, and Revenue increase with credits
         var balanceChange = account.Type switch
         {
-            AccountType.Asset => credit - debit, // hack, should be: debit - credit
+            AccountType.Asset => debit - credit,
             AccountType.Expense => debit - credit,
             AccountType.Liability => credit - debit,
             AccountType.Equity => credit - debit,
@@ -270,9 +270,9 @@ public class TransactionService : ITransactionService
     {
         // Look up revenue account by name and type
         var revenueAccount = await _dbContext.Accounts
-            .FirstOrDefaultAsync(a => 
-                a.Name == "Product Sales Revenue" && 
-                a.Type == AccountType.Revenue &&
+            .FirstOrDefaultAsync(a =>
+                a.Name == "Product Sales Revenue" &&
+                a.Type == AccountType.Asset &&
                 a.Category == AccountCategory.CurrentAssets &&
                 a.IsActive);
 

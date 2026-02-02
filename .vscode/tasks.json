@@ -295,7 +295,7 @@
     // ============================================================
     {
       "label": "infra: dev-infrastructure",
-      "command": "nerdctl",
+      "command": "docker",
       "type": "shell",
       "args": ["compose", "-f", "docker-compose.dev.yml", "up", "-d"],
       "problemMatcher": [],
@@ -304,7 +304,7 @@
     },
     {
       "label": "infra: dev-infrastructure-offline",
-      "command": "nerdctl",
+      "command": "docker",
       "type": "shell",
       "args": ["compose", "-f", "docker-compose.dev.yml", "up", "-d", "--pull", "never"],
       "problemMatcher": [],
@@ -313,7 +313,7 @@
     },
     {
       "label": "infra: stop-dev-infrastructure",
-      "command": "nerdctl",
+      "command": "docker",
       "type": "shell",
       "args": ["compose", "-f", "docker-compose.dev.yml", "down"],
       "problemMatcher": [],
@@ -322,7 +322,7 @@
     },
     {
       "label": "infra: docker-compose-up",
-      "command": "nerdctl",
+      "command": "docker",
       "type": "shell",
       "args": ["compose", "up", "-d"],
       "problemMatcher": [],
@@ -331,7 +331,7 @@
     },
     {
       "label": "infra: docker-compose-down",
-      "command": "nerdctl",
+      "command": "docker",
       "type": "shell",
       "args": ["compose", "down"],
       "problemMatcher": [],
@@ -340,7 +340,7 @@
     },
     {
       "label": "infra: logs",
-      "command": "nerdctl",
+      "command": "docker",
       "type": "shell",
       "args": ["compose", "logs", "-f"],
       "problemMatcher": [],
@@ -350,7 +350,7 @@
     },
     {
       "label": "infra: mongodb-shell",
-      "command": "nerdctl",
+      "command": "docker",
       "type": "shell",
       "args": ["exec", "-it", "erp-mongodb", "mongosh", "-u", "admin", "-p", "admin123"],
       "problemMatcher": [],
@@ -358,7 +358,7 @@
     },
     {
       "label": "infra: kafka-topics-list",
-      "command": "nerdctl",
+      "command": "docker",
       "type": "shell",
       "args": ["exec", "erp-kafka", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"],
       "problemMatcher": [],

@@ -203,9 +203,17 @@
       "type": "chrome",
       "request": "attach",
       "port": 9222,
-      "webRoot": "${workspaceFolder}/frontend",
+      "urlFilter": "http://localhost:5173/*",
+      "webRoot": "${workspaceFolder}/frontend/src",
       "sourceMaps": true,
-      "sourceMapPathOverrides": { "webpack:///./src/*": "${webRoot}/src/*" }
+      "sourceMapPathOverrides": {
+        "webpack:///./src/*": "${webRoot}/*",
+        "webpack:///*": "${webRoot}/*",
+        "/./*": "${webRoot}/*",
+        "/src/*": "${webRoot}/*",
+        "/*": "*",
+        "/./~/*": "${webRoot}/node_modules/*"
+      }
     },
     {
       "name": "Frontend: Launch (Firefox)",

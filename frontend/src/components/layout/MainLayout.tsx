@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
-import { Outlet, Link, useNavigate } from 'react-router-dom';
-import { useAppDispatch, useAppSelector } from '../../store/hooks';
-import { logout } from '../../features/auth/authSlice';
+import React, { useState } from "react";
+import { Outlet, Link, useNavigate } from "react-router-dom";
+import { useAppDispatch, useAppSelector } from "../../store/hooks";
+import { logout } from "../../features/auth/authSlice";
 import {
   HomeIcon,
   UserGroupIcon,
@@ -13,18 +13,18 @@ import {
   Bars3Icon,
   XMarkIcon,
   ShoppingBagIcon,
-} from '@heroicons/react/24/outline';
-import toast from 'react-hot-toast';
+} from "@heroicons/react/24/outline";
+import toast from "react-hot-toast";
 
 const navigation = [
-  // { name: 'Dashboard', href: '/dashboard', icon: HomeIcon }, // Hidden for now
-  { name: 'Users', href: '/users', icon: UserGroupIcon },
-  { name: 'Inventory', href: '/inventory', icon: CubeIcon },
-  { name: 'Shop', href: '/shop', icon: ShoppingBagIcon },
-  { name: 'Sales', href: '/sales', icon: ShoppingCartIcon }, // Hidden for now
-  { name: 'Financial', href: '/financial', icon: CurrencyDollarIcon },
-  // { name: 'Analytics', href: '/analytics', icon: ChartBarIcon }, // Hidden for now
-  { name: 'Database', href: '/database', icon: CircleStackIcon },
+  { name: "Dashboard", href: "/dashboard", icon: HomeIcon }, // Hidden for now
+  { name: "Users", href: "/users", icon: UserGroupIcon },
+  { name: "Inventory", href: "/inventory", icon: CubeIcon },
+  { name: "Shop", href: "/shop", icon: ShoppingBagIcon },
+  { name: "Sales", href: "/sales", icon: ShoppingCartIcon }, // Hidden for now
+  { name: "Financial", href: "/financial", icon: CurrencyDollarIcon },
+  { name: "Analytics", href: "/analytics", icon: ChartBarIcon }, // Hidden for now
+  { name: "Database", href: "/database", icon: CircleStackIcon },
 ];
 
 export const MainLayout: React.FC = () => {
@@ -36,10 +36,10 @@ export const MainLayout: React.FC = () => {
   const handleLogout = async () => {
     try {
       await dispatch(logout()).unwrap();
-      toast.success('Logged out successfully');
-      navigate('/login');
+      toast.success("Logged out successfully");
+      navigate("/login");
     } catch (error) {
-      toast.error('Logout failed');
+      toast.error("Logout failed");
     }
   };
 
@@ -48,13 +48,18 @@ export const MainLayout: React.FC = () => {
       {/* Mobile sidebar */}
       <div
         className={`fixed inset-0 z-40 lg:hidden ${
-          sidebarOpen ? 'block' : 'hidden'
+          sidebarOpen ? "block" : "hidden"
         }`}
       >
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-75" onClick={() => setSidebarOpen(false)} />
+        <div
+          className="fixed inset-0 bg-gray-600 bg-opacity-75"
+          onClick={() => setSidebarOpen(false)}
+        />
         <div className="fixed inset-y-0 left-0 flex flex-col w-64 bg-white">
           <div className="flex items-center justify-between h-16 px-4 border-b">
-            <span className="text-xl font-bold text-primary-600">ERP System</span>
+            <span className="text-xl font-bold text-primary-600">
+              ERP System
+            </span>
             <button
               onClick={() => setSidebarOpen(false)}
               className="text-gray-500 hover:text-gray-700"
@@ -82,7 +87,9 @@ export const MainLayout: React.FC = () => {
       <div className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
         <div className="flex flex-col flex-grow bg-white border-r overflow-y-auto">
           <div className="flex items-center h-16 px-4 border-b">
-            <span className="text-xl font-bold text-primary-600">ERP System</span>
+            <span className="text-xl font-bold text-primary-600">
+              ERP System
+            </span>
           </div>
           <nav className="flex-1 px-2 py-4 space-y-1">
             {navigation.map((item) => (
@@ -99,8 +106,16 @@ export const MainLayout: React.FC = () => {
           <div className="flex-shrink-0 flex border-t p-4">
             <div className="flex items-center w-full">
               <div className="flex-1">
-                <p className="text-sm font-medium text-gray-700">{user?.firstName} {user?.lastName}</p>
-                <p className="text-xs text-gray-500">{user?.roles?.[0] === 2 ? 'Admin' : user?.roles?.[0] === 1 ? 'Manager' : 'User'}</p>
+                <p className="text-sm font-medium text-gray-700">
+                  {user?.firstName} {user?.lastName}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {user?.roles?.[0] === 2
+                    ? "Admin"
+                    : user?.roles?.[0] === 1
+                      ? "Manager"
+                      : "User"}
+                </p>
               </div>
               <button
                 onClick={handleLogout}
@@ -125,7 +140,9 @@ export const MainLayout: React.FC = () => {
           </button>
           <div className="flex-1 flex justify-between px-4">
             <div className="flex-1 flex items-center">
-              <span className="text-lg font-bold text-primary-600">ERP System</span>
+              <span className="text-lg font-bold text-primary-600">
+                ERP System
+              </span>
             </div>
           </div>
         </div>

@@ -88,12 +88,11 @@ builder.Services.UseHttpClientMetrics();
 
 var app = builder.Build();
 
-// Apply migrations on startup in development
-if (app.Environment.IsDevelopment())
+// Apply migrations on startup
+using (var scope = app.Services.CreateScope())
 {
-    using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.EnsureCreated();
+    dbContext.Database.Migrate();
 }
 
 // Configure the HTTP request pipeline
@@ -151,50 +150,61 @@ static async Task InitializeDefaultAccountsAsync(IServiceProvider services)
 {
     using var scope = services.CreateScope();
     var accountService = scope.ServiceProvider.GetRequiredService<IAccountService>();
-    var configuration = scope.ServiceProvider.GetRequiredService<IConfiguration>();
     var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+    var systemAccounts = new[]
+    {
+        new { Name = "Company Operating Account", Type = "Asset", Category = "CurrentAssets", Description = "Main company operating account" },
+        new { Name = "Sales Tax Payable", Type = "Liability", Category = "CurrentLiabilities", Description = "Sales tax collected from customers" },
+        new { Name = "Product Inventory", Type = "Asset", Category = "Inventory", Description = "Value of products in stock" },
+        new { Name = "Cost of Goods Sold", Type = "Expense", Category = "CostOfGoodsSold", Description = "Cost of products sold to customers" },
+        new { Name = "Product Sales Revenue", Type = "Revenue", Category = "OperatingRevenue", Description = "Revenue from product sales" }
+    };
+
+    Console.WriteLine("\n" + new string('-', 80));
+    Console.WriteLine("Initializing System Accounts");
+    Console.WriteLine(new string('-', 80));
 
     try
     {
-        var revenueAccountNumber = configuration["DefaultAccounts:RevenueAccountNumber"] ?? "4000-REVENUE";
-        var revenueAccountName = configuration["DefaultAccounts:RevenueAccountName"] ?? "Product Sales Revenue";
-
-        // Check if revenue account already exists
-        var existingAccount = await accountService.GetAccountByNumberAsync(revenueAccountNumber);
-        if (existingAccount == null)
+        foreach (var account in systemAccounts)
         {
-            // Create default revenue account
-            var revenueAccount = await accountService.CreateAccountAsync(new CreateAccountRequest
+            var existingAccount = await accountService.GetAccountByNameAsync(account.Name);
+
+            if (existingAccount == null)
             {
-                Name = revenueAccountName,
-                Type = "Revenue",
-                Category = "CurrentAssets",
-                Currency = "USD",
-                Description = "Revenue from product sales"
-            });
+                var createdAccount = await accountService.CreateAccountAsync(new CreateAccountRequest
+                {
+                    Name = account.Name,
+                    Type = account.Type,
+                    Category = account.Category,
+                    Currency = "USD",
+                    Description = account.Description
+                });
 
-            logger.LogInformation("Created default revenue account: {AccountNumber} - {AccountName} (ID: {AccountId})",
-                revenueAccount.AccountNumber, revenueAccount.Name, revenueAccount.Id);
+                logger.LogInformation("Created system account: {AccountNumber} - {AccountName} (ID: {AccountId})",
+                    createdAccount.AccountNumber, createdAccount.Name, createdAccount.Id);
 
-            Console.WriteLine($"\n✅ Default revenue account created successfully!");
-            Console.WriteLine($"   Account Number: {revenueAccount.AccountNumber}");
-            Console.WriteLine($"   Account ID:     {revenueAccount.Id}");
-            Console.WriteLine($"   Account Name:   {revenueAccount.Name}\n");
+                Console.WriteLine($"✅ Created: {account.Name}");
+                Console.WriteLine($"   Number: {createdAccount.AccountNumber} | ID: {createdAccount.Id}");
+            }
+            else
+            {
+                logger.LogInformation("System account already exists: {AccountNumber} - {AccountName} (ID: {AccountId})",
+                    existingAccount.AccountNumber, existingAccount.Name, existingAccount.Id);
+
+                Console.WriteLine($"✓  Exists: {account.Name}");
+                Console.WriteLine($"   Number: {existingAccount.AccountNumber} | ID: {existingAccount.Id}");
+            }
         }
-        else
-        {
-            logger.LogInformation("Default revenue account already exists: {AccountNumber} (ID: {AccountId})",
-                existingAccount.AccountNumber, existingAccount.Id);
-            
-            Console.WriteLine($"\n✅ Default revenue account exists:");
-            Console.WriteLine($"   Account Number: {existingAccount.AccountNumber}");
-            Console.WriteLine($"   Account ID:     {existingAccount.Id}");
-            Console.WriteLine($"   Account Name:   {existingAccount.Name}\n");
-        }
+
+        Console.WriteLine(new string('-', 80));
+        Console.WriteLine("System Accounts Initialization Complete");
+        Console.WriteLine(new string('-', 80) + "\n");
     }
     catch (Exception ex)
     {
-        logger.LogError(ex, "Failed to initialize default accounts");
-        Console.WriteLine($"\n❌ Failed to create default revenue account: {ex.Message}\n");
+        logger.LogError(ex, "Failed to initialize system accounts");
+        Console.WriteLine($"\n❌ Failed to initialize system accounts: {ex.Message}\n");
     }
 }

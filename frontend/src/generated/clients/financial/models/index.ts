@@ -472,6 +472,15 @@ export function createCreateTransactionRequestFromDiscriminatorValue(parseNode: 
 /**
  * Creates a new instance of the appropriate class based on discriminator value
  * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {CreateUserAccountRequest}
+ */
+// @ts-ignore
+export function createCreateUserAccountRequestFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoCreateUserAccountRequest;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
  * @returns {EquitySection}
  */
 // @ts-ignore
@@ -606,6 +615,20 @@ export function createUpdateAccountRequestFromDiscriminatorValue(parseNode: Pars
 // @ts-ignore
 export function createUpdateBudgetRequestFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
     return deserializeIntoUpdateBudgetRequest;
+}
+export interface CreateUserAccountRequest extends BackedModel, Parsable {
+    /**
+     * Stores model information.
+     */
+    backingStoreEnabled?: boolean | null;
+    /**
+     * The userId property
+     */
+    userId?: string | null;
+    /**
+     * The userName property
+     */
+    userName?: string | null;
 }
 /**
  * The deserialization information for the current model
@@ -823,6 +846,19 @@ export function deserializeIntoCreateTransactionRequest(createTransactionRequest
         "referenceId": n => { createTransactionRequest.referenceId = n.getStringValue(); },
         "referenceType": n => { createTransactionRequest.referenceType = n.getStringValue(); },
         "type": n => { createTransactionRequest.type = n.getStringValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param CreateUserAccountRequest The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoCreateUserAccountRequest(createUserAccountRequest: Partial<CreateUserAccountRequest> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "backingStoreEnabled": n => { createUserAccountRequest.backingStoreEnabled = true; },
+        "userId": n => { createUserAccountRequest.userId = n.getStringValue(); },
+        "userName": n => { createUserAccountRequest.userName = n.getStringValue(); },
     }
 }
 /**
@@ -1362,6 +1398,18 @@ export function serializeCreateTransactionRequest(writer: SerializationWriter, c
     writer.writeStringValue("referenceId", createTransactionRequest.referenceId);
     writer.writeStringValue("referenceType", createTransactionRequest.referenceType);
     writer.writeStringValue("type", createTransactionRequest.type);
+}
+/**
+ * Serializes information the current object
+ * @param CreateUserAccountRequest The instance to serialize from.
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeCreateUserAccountRequest(writer: SerializationWriter, createUserAccountRequest: Partial<CreateUserAccountRequest> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!createUserAccountRequest || isSerializingDerivedType) { return; }
+    writer.writeStringValue("userId", createUserAccountRequest.userId);
+    writer.writeStringValue("userName", createUserAccountRequest.userName);
 }
 /**
  * Serializes information the current object

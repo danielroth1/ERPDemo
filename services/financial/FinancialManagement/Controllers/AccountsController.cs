@@ -20,6 +20,25 @@ public class AccountsController : ControllerBase
         _logger = logger;
     }
 
+    [HttpPost("user")]
+    public async Task<ActionResult<ApiResponse<object>>> CreateUserAccounts([FromBody] CreateUserAccountRequest request)
+    {
+        try
+        {
+            var (assetAccount, expenseAccount) = await _accountService.CreateUserAccountsAsync(request.UserId, request.UserName);
+            return CreatedAtAction(nameof(GetAccountByUserId), new { userId = request.UserId },
+                ApiResponse<object>.SuccessResponse(new
+                {
+                    assetAccount,
+                    expenseAccount
+                }, "User accounts created successfully"));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(ApiResponse<object>.ErrorResponse(ex.Message));
+        }
+    }
+
     [HttpPost]
     [Authorize(Roles = "Manager,Admin")]
     public async Task<ActionResult<ApiResponse<AccountResponse>>> CreateAccount([FromBody] CreateAccountRequest request)
@@ -65,6 +84,57 @@ public class AccountsController : ControllerBase
         {
             return NotFound(ApiResponse<AccountResponse>.ErrorResponse("No account found for this user"));
         }
+        return Ok(ApiResponse<AccountResponse>.SuccessResponse(account));
+    }
+
+    [HttpGet("user/{userId}/expense")]
+    public async Task<ActionResult<ApiResponse<AccountResponse>>> GetUserExpenseAccount(string userId)
+    {
+        var account = await _accountService.GetAccountByUserIdAndTypeAsync(userId, AccountType.Expense);
+        if (account == null)
+        {
+            return NotFound(ApiResponse<AccountResponse>.ErrorResponse("No expense account found for this user"));
+        }
+        return Ok(ApiResponse<AccountResponse>.SuccessResponse(account));
+    }
+
+    [HttpGet("name/{accountName}")]
+    public async Task<ActionResult<ApiResponse<AccountResponse>>> GetAccountByName(string accountName)
+    {
+        var account = await _accountService.GetAccountByNameAsync(accountName);
+        if (account == null)
+        {
+            return NotFound(ApiResponse<AccountResponse>.ErrorResponse("Account not found"));
+        }
+        return Ok(ApiResponse<AccountResponse>.SuccessResponse(account));
+    }
+
+    [HttpGet("system/{purpose}")]
+    public async Task<ActionResult<ApiResponse<AccountResponse>>> GetSystemAccount(string purpose)
+    {
+        var accountName = purpose.ToLower() switch
+        {
+            "company-operating" => "Company Operating Account",
+            "sales-tax" => "Sales Tax Payable",
+            "inventory" => "Product Inventory",
+            "cogs" => "Cost of Goods Sold",
+            "revenue" => "Product Sales Revenue",
+            _ => null
+        };
+
+        if (accountName == null)
+        {
+            return BadRequest(ApiResponse<AccountResponse>.ErrorResponse(
+                $"Unknown system account purpose: {purpose}. Valid values: company-operating, sales-tax, inventory, cogs, revenue"));
+        }
+
+        var account = await _accountService.GetAccountByNameAsync(accountName);
+        if (account == null)
+        {
+            return NotFound(ApiResponse<AccountResponse>.ErrorResponse(
+                $"System account '{accountName}' not found. Please ensure default accounts are initialized."));
+        }
+
         return Ok(ApiResponse<AccountResponse>.SuccessResponse(account));
     }
 
@@ -148,7 +218,7 @@ public class AccountsController : ControllerBase
 
         var oldBalance = await _accountService.GetAccountBalanceAsync(id);
         var account = await _accountService.AdjustBalanceAsync(id, amount);
-        
+
         if (account == null)
         {
             return NotFound(ApiResponse<AccountResponse>.ErrorResponse("Account not found"));
@@ -159,7 +229,7 @@ public class AccountsController : ControllerBase
             "Admin {User} adjusted account {AccountNumber} balance from {OldBalance} to {NewBalance}",
             userName, account.AccountNumber, oldBalance, account.Balance);
 
-        return Ok(ApiResponse<AccountResponse>.SuccessResponse(account, 
+        return Ok(ApiResponse<AccountResponse>.SuccessResponse(account,
             $"Balance adjusted by {amount:C}. New balance: {account.Balance:C}"));
     }
 }

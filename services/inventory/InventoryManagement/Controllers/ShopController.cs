@@ -126,10 +126,15 @@ public class ShopController : ControllerBase
         var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? "system";
         var totalCost = product.Price * quantity;
 
+        // Calculate tax and revenue (assuming 10% tax rate)
+        const decimal taxRate = 0.10m;
+        var totalTax = totalCost * taxRate;
+        var totalRevenue = totalCost - totalTax;
+
         // Step 1: Create financial transaction
         try
         {
-            var transactionCreated = await CreateFinancialTransactionAsync(userId, productId, product.Name, quantity, totalCost);
+            var transactionCreated = await CreateFinancialTransactionAsync(userId, productId, product.Name, quantity, totalCost, totalTax, totalRevenue);
             if (!transactionCreated)
             {
                 return StatusCode(500, ApiResponse<PurchaseResponse>.ErrorResponse("Failed to create financial transaction"));
@@ -165,14 +170,14 @@ public class ShopController : ControllerBase
     /// <summary>
     /// Create a financial transaction for the purchase
     /// </summary>
-    private async Task<bool> CreateFinancialTransactionAsync(string userId, string productId, string productName, int quantity, decimal totalCost)
+    private async Task<bool> CreateFinancialTransactionAsync(string userId, string productId, string productName, int quantity, decimal totalCost, decimal totalTax, decimal totalRevenue)
     {
         try
         {
             // Get JWT token from current request
             var token = Request.Headers["Authorization"].ToString();
 
-            // First, get user account
+            // Get all required account IDs
             var userAccountId = await _financialClient.GetUserAccountIdAsync(userId, token);
             if (string.IsNullOrEmpty(userAccountId))
             {
@@ -180,16 +185,57 @@ public class ShopController : ControllerBase
                 return false;
             }
 
-            // Create transaction request with double-entry bookkeeping
-            // Debit: User's account (asset decrease)
-            // Credit: Revenue account (income increase)
-            var revenueAccountId = await _accountInitializer.GetOrCreateRevenueAccountIdAsync();
+            var userExpenseId = await _financialClient.GetUserExpenseAccountIdAsync(userId, token);
+            if (string.IsNullOrEmpty(userExpenseId))
+            {
+                _logger.LogError("Failed to get user expense account for user {UserId}", userId);
+                return false;
+            }
+
+            var companyAccountId = await _accountInitializer.GetOrCreateCompanyAccountIdAsync(token);
+            if (string.IsNullOrEmpty(companyAccountId))
+            {
+                _logger.LogError("Failed to get company account ID");
+                return false;
+            }
+
+            var taxAccountId = await _accountInitializer.GetOrCreateTaxAccountIdAsync(token);
+            if (string.IsNullOrEmpty(taxAccountId))
+            {
+                _logger.LogError("Failed to get tax account ID");
+                return false;
+            }
+
+            var revenueAccountId = await _accountInitializer.GetOrCreateRevenueAccountIdAsync(token);
             if (string.IsNullOrEmpty(revenueAccountId))
             {
                 _logger.LogError("Failed to get revenue account ID");
                 return false;
             }
 
+            var inventoryId = await _accountInitializer.GetOrCreateInventoryAccountIdAsync(token);
+            if (string.IsNullOrEmpty(inventoryId))
+            {
+                _logger.LogError("Failed to get inventory account ID");
+                return false;
+            }
+
+            var productExpenseId = await _accountInitializer.GetOrCreateProductExpenseAccountIdAsync(token);
+            if (string.IsNullOrEmpty(productExpenseId))
+            {
+                _logger.LogError("Failed to get product expense account ID");
+                return false;
+            }
+
+            // Create transaction request with double-entry bookkeeping
+            // Transaction flow:
+            // 1. User Account (Asset) - Credit (decrease): User pays cash
+            // 2. User Expense Account (Expense) - Debit (increase): User records expense
+            // 3. Company Account (Asset) - Debit (increase): Company receives cash
+            // 4. Tax Account (Liability) - Credit (increase): Company owes tax
+            // 5. Revenue Account (Revenue) - Credit (increase): Company records revenue
+            // 6. Inventory Account (Asset) - Credit (decrease): Product leaves inventory
+            // 7. Product Expense Account (COGS) - Debit (increase): Cost of goods sold
             var transactionRequest = new CreateFinancialTransactionRequest
             {
                 Description = $"Purchase of {productName} (Qty: {quantity})",
@@ -198,20 +244,58 @@ public class ShopController : ControllerBase
                 ReferenceType = "Product",
                 Entries = new List<FinancialJournalEntry>
                 {
+                    // Transaction on User Account / Expenses
                     new FinancialJournalEntry
                     {
                         AccountId = userAccountId,
+                        Debit = 0m,
+                        Credit = totalCost,
+                        Memo = $"Payment for {productName}"
+                    },
+                    new FinancialJournalEntry
+                    {
+                        AccountId = userExpenseId,
                         Debit = totalCost,
                         Credit = 0m,
-                        Memo = $"Payment for {productName}"
+                        Memo = $"Expense for {productName}"
+                    },
+                    // Transaction on Company Accounts / Revenue / Taxes
+                    new FinancialJournalEntry
+                    {
+                        AccountId = companyAccountId,
+                        Debit = totalCost,
+                        Credit = 0m,
+                        Memo = $"Payment received for {productName}"
+                    },
+                    new FinancialJournalEntry
+                    {
+                        AccountId = taxAccountId,
+                        Debit = 0m,
+                        Credit = totalTax,
+                        Memo = $"Sales tax collected for {productName}"
                     },
                     new FinancialJournalEntry
                     {
                         AccountId = revenueAccountId,
                         Debit = 0m,
-                        Credit = totalCost,
-                        Memo = $"Sale of {productName}"
-                    }
+                        Credit = totalRevenue,
+                        Memo = $"Revenue from sale of {productName}"
+                    },
+                    // Transaction on Product Inventory Account
+                    new FinancialJournalEntry
+                    {
+                        AccountId = inventoryId,
+                        Debit = 0m,
+                        Credit = totalCost * quantity,
+                        Memo = $"Product leaving inventory: {productName}"
+                    },
+                    new FinancialJournalEntry
+                    {
+                        AccountId = productExpenseId,
+                        Debit = totalCost * quantity,
+                        Credit = 0m,
+                        Memo = $"Cost of goods sold: {productName}"
+                    },
                 }
             };
 
@@ -309,7 +393,7 @@ public class ShopController : ControllerBase
             // Create refund transaction with double-entry bookkeeping
             // Credit: User's account (asset increase - refund)
             // Debit: Revenue account (income decrease - reversal)
-            var revenueAccountId = await _accountInitializer.GetOrCreateRevenueAccountIdAsync();
+            var revenueAccountId = await _accountInitializer.GetOrCreateRevenueAccountIdAsync(token);
             if (string.IsNullOrEmpty(revenueAccountId))
             {
                 _logger.LogError("Failed to get revenue account ID");
@@ -327,15 +411,15 @@ public class ShopController : ControllerBase
                     new FinancialJournalEntry
                     {
                         AccountId = userAccountId,
-                        Debit = 0m,
-                        Credit = refundAmount,
+                        Debit = refundAmount,
+                        Credit = 0m,
                         Memo = $"Refund for {productName}"
                     },
                     new FinancialJournalEntry
                     {
                         AccountId = revenueAccountId,
-                        Debit = refundAmount,
-                        Credit = 0m,
+                        Debit = 0m,
+                        Credit = refundAmount,
                         Memo = $"Revenue reversal for {productName} return"
                     }
                 }

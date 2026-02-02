@@ -1,6 +1,12 @@
 namespace FinancialManagement.Models.DTOs;
 
 // Account DTOs
+public class CreateUserAccountRequest
+{
+    public string UserId { get; set; } = string.Empty;
+    public string UserName { get; set; } = string.Empty;
+}
+
 public class CreateAccountRequest
 {
     public string Name { get; set; } = string.Empty;
