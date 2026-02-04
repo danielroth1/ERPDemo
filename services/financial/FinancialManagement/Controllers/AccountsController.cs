@@ -130,7 +130,7 @@ public class AccountsController : ControllerBase
 
         var systemAccounts = await _accountService.GetSystemAccountsAsync();
         var account = systemAccounts.FirstOrDefault(a => a.Name == accountName);
-        
+
         if (account == null)
         {
             return NotFound(ApiResponse<AccountResponse>.ErrorResponse(

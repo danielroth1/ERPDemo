@@ -1,11 +1,13 @@
-using System.Text;
-using System.Text.Json;
+using Microsoft.Kiota.Http.HttpClientLibrary;
+using Microsoft.Kiota.Abstractions.Authentication;
+using Microsoft.Kiota.Abstractions;
 using InventoryManagement.Models.DTOs;
+using GeneratedFinancialClient = InventoryManagement.Generated.Clients.Financial.FinancialServiceClient;
 
 namespace InventoryManagement.Services;
 
 /// <summary>
-/// Client for communicating with the Financial Management service
+/// Client for communicating with the Financial Management service using Kiota-generated API client
 /// </summary>
 public interface IFinancialServiceClient
 {
@@ -18,302 +20,182 @@ public interface IFinancialServiceClient
     Task<bool> CreateTransactionAsync(CreateFinancialTransactionRequest request, string authToken);
 }
 
-public class FinancialServiceClient : IFinancialServiceClient
+public class FinancialServiceClientWrapper : IFinancialServiceClient
 {
-    private readonly HttpClient _httpClient;
-    private readonly ILogger<FinancialServiceClient> _logger;
+    private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILogger<FinancialServiceClientWrapper> _logger;
+    private readonly IConfiguration _configuration;
     private readonly string _baseUrl;
 
-    public FinancialServiceClient(
-        HttpClient httpClient,
+    public FinancialServiceClientWrapper(
+        IHttpClientFactory httpClientFactory,
         IConfiguration configuration,
-        ILogger<FinancialServiceClient> logger)
+        ILogger<FinancialServiceClientWrapper> logger)
     {
-        _httpClient = httpClient;
+        _httpClientFactory = httpClientFactory;
+        _configuration = configuration;
         _logger = logger;
         _baseUrl = configuration["Services:Financial"] ?? "http://financial:8080";
+    }
+
+    /// <summary>
+    /// Create Kiota request adapter with authentication
+    /// </summary>
+    private GeneratedFinancialClient CreateKiotaClient(string? authToken = null)
+    {
+        var httpClient = _httpClientFactory.CreateClient("FinancialService");
+        httpClient.BaseAddress = new Uri(_baseUrl);
+        
+        if (!string.IsNullOrEmpty(authToken))
+        {
+            httpClient.DefaultRequestHeaders.Add("Authorization", authToken);
+        }
+
+        // Create anonymous auth provider (services trust each other in internal network)
+        var authProvider = new AnonymousAuthenticationProvider();
+        var adapter = new HttpClientRequestAdapter(authProvider, httpClient: httpClient);
+        adapter.BaseUrl = _baseUrl;
+
+        return new GeneratedFinancialClient(adapter);
     }
 
     public async Task<string?> GetUserExpenseAccountIdAsync(string userId, string authToken)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/user/{userId}/expense");
+            var client = CreateKiotaClient(authToken);
+            var response = await client.Api.V1.Accounts.User[userId].Expense.GetAsync();
 
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                request.Headers.Add("Authorization", authToken);
-            }
-
-            var response = await _httpClient.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
-
-                if (accountResponse.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("id", out var accountId))
-                {
-                    return accountId.GetString();
-                }
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Failed to get user expense account. UserId: {UserId}, Status: {StatusCode}",
-                    userId, response.StatusCode);
-            }
+            return response?.Data?.Id;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception while getting user expense account for UserId: {UserId}", userId);
+            return null;
         }
-
-        return null;
     }
 
     public async Task<string?> GetUserAccountIdAsync(string userId, string authToken)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/user/{userId}");
+            var client = CreateKiotaClient(authToken);
+            var response = await client.Api.V1.Accounts.User[userId].GetAsync();
 
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                request.Headers.Add("Authorization", authToken);
-            }
-
-            var response = await _httpClient.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
-
-                if (accountResponse.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("id", out var accountId))
-                {
-                    return accountId.GetString();
-                }
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Failed to get user account. UserId: {UserId}, Status: {StatusCode}",
-                    userId, response.StatusCode);
-            }
+            return response?.Data?.Id;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception while getting user account for UserId: {UserId}", userId);
+            return null;
         }
-
-        return null;
     }
 
     public async Task<string?> GetAccountIdByNumberAsync(string accountNumber, string authToken)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/number/{accountNumber}");
+            var client = CreateKiotaClient(authToken);
+            var response = await client.Api.V1.Accounts.Number[accountNumber].GetAsync();
 
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                request.Headers.Add("Authorization", authToken);
-            }
-
-            var response = await _httpClient.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
-
-                if (accountResponse.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("id", out var accountId))
-                {
-                    return accountId.GetString();
-                }
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Failed to get account by number. AccountNumber: {AccountNumber}, Status: {StatusCode}",
-                    accountNumber, response.StatusCode);
-            }
+            return response?.Data?.Id;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception while getting account by number: {AccountNumber}", accountNumber);
+            return null;
         }
-
-        return null;
     }
 
     public async Task<string?> GetAccountIdByNameAsync(string accountName, string authToken)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/name/{Uri.EscapeDataString(accountName)}");
+            var client = CreateKiotaClient(authToken);
+            var response = await client.Api.V1.Accounts.Name[Uri.EscapeDataString(accountName)].GetAsync();
 
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                request.Headers.Add("Authorization", authToken);
-            }
-
-            var response = await _httpClient.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
-
-                if (accountResponse.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("id", out var accountId))
-                {
-                    return accountId.GetString();
-                }
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Failed to get account by name. AccountName: {AccountName}, Status: {StatusCode}",
-                    accountName, response.StatusCode);
-            }
+            return response?.Data?.Id;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception while getting account by name: {AccountName}", accountName);
+            return null;
         }
-
-        return null;
     }
 
     public async Task<string?> GetRevenueAccountIdAsync(string authToken)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts");
+            var client = CreateKiotaClient(authToken);
+            var response = await client.Api.V1.Accounts.GetAsync();
 
-            if (!string.IsNullOrEmpty(authToken))
+            if (response?.Data != null)
             {
-                request.Headers.Add("Authorization", authToken);
+                // Look for revenue account with name "Product Sales Revenue"
+                var revenueAccount = response.Data.FirstOrDefault(a =>
+                    a.Type == "Revenue" &&
+                    a.Category == "Operating" &&
+                    a.Name == "Product Sales Revenue");
+
+                return revenueAccount?.Id;
             }
 
-            var response = await _httpClient.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                var accountsResponse = JsonSerializer.Deserialize<JsonElement>(content);
-
-                if (accountsResponse.TryGetProperty("data", out var data) && data.ValueKind == JsonValueKind.Array)
-                {
-                    // Look for revenue account with name "Product Sales Revenue"
-                    foreach (var account in data.EnumerateArray())
-                    {
-                        if (account.TryGetProperty("type", out var type) &&
-                            type.GetString() == "Revenue" &&
-                            account.TryGetProperty("category", out var category) &&
-                            category.GetString() == "Operating" &&
-                            account.TryGetProperty("name", out var name) &&
-                            name.GetString() == "Product Sales Revenue" &&
-                            account.TryGetProperty("id", out var accountId))
-                        {
-                            return accountId.GetString();
-                        }
-                    }
-                }
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Failed to get accounts list. Status: {StatusCode}",
-                    response.StatusCode);
-            }
+            return null;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception while getting revenue account");
+            return null;
         }
-
-        return null;
     }
 
     public async Task<string?> GetSystemAccountIdAsync(string purpose, string authToken)
     {
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, $"{_baseUrl}/api/v1/accounts/system/{purpose}");
+            var client = CreateKiotaClient(authToken);
+            var response = await client.Api.V1.Accounts.System[purpose].GetAsync();
 
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                request.Headers.Add("Authorization", authToken);
-            }
-
-            var response = await _httpClient.SendAsync(request);
-
-            if (response.IsSuccessStatusCode)
-            {
-                var content = await response.Content.ReadAsStringAsync();
-                var accountResponse = JsonSerializer.Deserialize<JsonElement>(content);
-
-                if (accountResponse.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("id", out var accountId))
-                {
-                    return accountId.GetString();
-                }
-            }
-            else
-            {
-                _logger.LogWarning(
-                    "Failed to get system account. Purpose: {Purpose}, Status: {StatusCode}",
-                    purpose, response.StatusCode);
-            }
+            return response?.Data?.Id;
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Exception while getting system account: {Purpose}", purpose);
+            return null;
         }
-
-        return null;
     }
 
     public async Task<bool> CreateTransactionAsync(CreateFinancialTransactionRequest request, string authToken)
     {
         try
         {
-            var jsonContent = JsonSerializer.Serialize(request, new JsonSerializerOptions
+            var client = CreateKiotaClient(authToken);
+            
+            // Map to Kiota-generated request model
+            var kiotaRequest = new Generated.Clients.Financial.Models.CreateTransactionRequest
             {
-                PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-            });
-
-            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, $"{_baseUrl}/api/v1/transactions")
-            {
-                Content = new StringContent(jsonContent, Encoding.UTF8, "application/json")
+                Description = request.Description,
+                Date = DateTimeOffset.UtcNow,
+                Entries = request.Entries.Select(e => new Generated.Clients.Financial.Models.JournalEntryRequest
+                {
+                    AccountId = e.AccountId,
+                    Debit = (double)e.Debit,
+                    Credit = (double)e.Credit,
+                    Memo = e.Memo
+                }).ToList()
             };
 
-            if (!string.IsNullOrEmpty(authToken))
-            {
-                httpRequest.Headers.Add("Authorization", authToken);
-            }
+            var response = await client.Api.V1.Transactions.PostAsync(kiotaRequest);
 
-            var response = await _httpClient.SendAsync(httpRequest);
-
-            if (response.IsSuccessStatusCode)
+            if (response?.Success == true)
             {
                 _logger.LogInformation("Financial transaction created successfully");
                 return true;
             }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                _logger.LogError(
-                    "Failed to create financial transaction. Status: {StatusCode}, Error: {Error}",
-                    response.StatusCode, errorContent);
-                return false;
-            }
+
+            _logger.LogWarning("Failed to create financial transaction: {Message}", response?.Message);
+            return false;
         }
         catch (Exception ex)
         {

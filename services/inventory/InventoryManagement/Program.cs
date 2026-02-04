@@ -44,8 +44,20 @@ builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<StockMovementService>();
 builder.Services.AddSingleton<IFinancialAccountInitializer, FinancialAccountInitializer>();
 
-// Add HttpClient for service-to-service communication
-builder.Services.AddHttpClient<IFinancialServiceClient, FinancialServiceClient>();
+// Add HttpClient factory for inter-service communication
+builder.Services.AddHttpClient("FinancialService", client =>
+{
+    var baseUrl = builder.Configuration["Services:Financial"] ?? "http://financial:8080";
+    client.BaseAddress = new Uri(baseUrl);
+    client.Timeout = TimeSpan.FromSeconds(30);
+})
+.ConfigurePrimaryHttpMessageHandler(() => new HttpClientHandler
+{
+    ServerCertificateCustomValidationCallback = HttpClientHandler.DangerousAcceptAnyServerCertificateValidator
+});
+
+// Register Kiota-based Financial Service client
+builder.Services.AddScoped<IFinancialServiceClient, FinancialServiceClientWrapper>();
 
 // Configure JWT authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -223,6 +223,55 @@
     },
 
     // ============================================================
+    // BACKEND API CLIENT GENERATION (Kiota)
+    // ============================================================
+    {
+      "label": "backend: generate-all-api-clients",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--service", "all"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "group": "kiota" },
+      "options": { "cwd": "${workspaceFolder}" }
+    },
+    {
+      "label": "backend: generate-inventory-api-clients",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--service", "inventory"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "group": "kiota" },
+      "options": { "cwd": "${workspaceFolder}" }
+    },
+    {
+      "label": "backend: generate-sales-api-clients",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--service", "sales"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "group": "kiota" },
+      "options": { "cwd": "${workspaceFolder}" }
+    },
+    {
+      "label": "backend: generate-dashboard-api-clients",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--service", "dashboard"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "group": "kiota" },
+      "options": { "cwd": "${workspaceFolder}" }
+    },
+    {
+      "label": "backend: check-all-service-dependencies",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--check"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "kiota" },
+      "options": { "cwd": "${workspaceFolder}" }
+    },
+
+    // ============================================================
     // FRONTEND TASKS
     // ============================================================
     {
