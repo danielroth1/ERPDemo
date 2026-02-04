@@ -17,17 +17,18 @@ Added Microsoft.Kiota packages to all services that need inter-service communica
 - `Microsoft.Kiota.Serialization.Form` (v1.17.3)
 
 **Services Updated:**
+
 - ✅ Inventory Management
 - ✅ Sales Management
 - ✅ Dashboard Analytics
 
 ### 2. Generated Kiota Clients
 
-| Consumer Service | Generated Clients | Location |
-|-----------------|-------------------|----------|
-| **Inventory** | Financial Service | `services/inventory/InventoryManagement/Generated/Clients/Financial/` |
-| **Sales** | Inventory Service<br>Financial Service | `services/sales/SalesManagement/Generated/Clients/Inventory/`<br>`services/sales/SalesManagement/Generated/Clients/Financial/` |
-| **Dashboard** | User Management<br>Inventory Service<br>Sales Service<br>Financial Service | `services/dashboard/DashboardAnalytics/Generated/Clients/UserManagement/`<br>`services/dashboard/DashboardAnalytics/Generated/Clients/Inventory/`<br>`services/dashboard/DashboardAnalytics/Generated/Clients/Sales/`<br>`services/dashboard/DashboardAnalytics/Generated/Clients/Financial/` |
+| Consumer Service | Generated Clients                                                          | Location                                                                                                                                                                                                                                                                                      |
+| ---------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Inventory**    | Financial Service                                                          | `services/inventory/InventoryManagement/Generated/Clients/Financial/`                                                                                                                                                                                                                         |
+| **Sales**        | Inventory Service<br>Financial Service                                     | `services/sales/SalesManagement/Generated/Clients/Inventory/`<br>`services/sales/SalesManagement/Generated/Clients/Financial/`                                                                                                                                                                |
+| **Dashboard**    | User Management<br>Inventory Service<br>Sales Service<br>Financial Service | `services/dashboard/DashboardAnalytics/Generated/Clients/UserManagement/`<br>`services/dashboard/DashboardAnalytics/Generated/Clients/Inventory/`<br>`services/dashboard/DashboardAnalytics/Generated/Clients/Sales/`<br>`services/dashboard/DashboardAnalytics/Generated/Clients/Financial/` |
 
 ### 3. Generation Scripts Created
 
@@ -43,16 +44,19 @@ PowerShell scripts for regenerating clients when APIs change:
 Added tasks to `.vscode/tasks.json` for easy client regeneration:
 
 **Individual Service Tasks:**
+
 - `backend: generate-inventory-api-clients`
 - `backend: generate-sales-api-clients`
 - `backend: generate-dashboard-api-clients`
 
 **Dependency Check Tasks:**
+
 - `backend: check-inventory-dependencies`
 - `backend: check-sales-dependencies`
 - `backend: check-dashboard-dependencies`
 
 **Master Task:**
+
 - `backend: generate-all-api-clients` (generates all at once)
 
 **Usage:** Terminal → Run Task → `backend: generate-inventory-api-clients`
@@ -60,6 +64,7 @@ Added tasks to `.vscode/tasks.json` for easy client regeneration:
 ### 5. .gitignore Files Updated
 
 Added to each service's `.gitignore`:
+
 ```
 # Kiota Generated Files
 Generated/
@@ -78,6 +83,7 @@ kiota-lock.json
 **File:** [services/inventory/InventoryManagement/Services/FinancialServiceClient.cs](services/inventory/InventoryManagement/Services/FinancialServiceClient.cs)
 
 **Example Pattern:**
+
 ```csharp
 using Microsoft.Kiota.Http.HttpClientLibrary;
 using Microsoft.Kiota.Abstractions.Authentication;
@@ -87,23 +93,23 @@ public class FinancialServiceClient : IFinancialServiceClient
 {
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly string _baseUrl;
-    
+
     public FinancialServiceClient(IHttpClientFactory httpClientFactory, IConfiguration config)
     {
         _httpClientFactory = httpClientFactory;
         _baseUrl = config["Services:Financial"] ?? "http://financial:8080";
     }
-    
+
     private FinancialServiceClient CreateClient()
     {
         var httpClient = _httpClientFactory.CreateClient("FinancialService");
         var authProvider = new AnonymousAuthenticationProvider();
         var adapter = new HttpClientRequestAdapter(authProvider, httpClient: httpClient);
         adapter.BaseUrl = _baseUrl;
-        
+
         return new FinancialServiceClient(adapter);
     }
-    
+
     public async Task<string?> GetUserAccountIdAsync(string userId, string authToken)
     {
         var client = CreateClient();
@@ -131,6 +137,7 @@ After updating service implementations:
 ### When to Regenerate
 
 Regenerate clients whenever:
+
 - Backend API endpoints change (new endpoints, changed signatures)
 - DTOs/response models are modified
 - Route patterns change
@@ -138,17 +145,20 @@ Regenerate clients whenever:
 ### How to Regenerate
 
 **Option 1: VS Code Task (Recommended)**
+
 ```
 Terminal → Run Task → backend: generate-inventory-api-clients
 ```
 
 **Option 2: Command Line**
+
 ```powershell
 cd services/inventory/InventoryManagement
 .\generate-api-clients.ps1
 ```
 
 **Option 3: Regenerate All**
+
 ```powershell
 .\scripts\generate-all-backend-api-clients.ps1
 ```

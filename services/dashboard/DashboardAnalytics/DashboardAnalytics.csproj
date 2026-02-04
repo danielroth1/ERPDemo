@@ -27,7 +27,7 @@
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
-    
+
     <!-- Kiota Dependencies for Generated API Clients -->
     <PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.17.3" />
     <PackageReference Include="Microsoft.Kiota.Http.HttpClientLibrary" Version="1.17.3" />

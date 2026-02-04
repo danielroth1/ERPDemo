@@ -32,9 +32,11 @@ All backend microservices now use **Kiota-generated API clients** for inter-serv
 **Dependencies**: Financial Service
 
 **Generated Clients**:
+
 - `InventoryManagement.Generated.Clients.Financial.FinancialServiceClient`
 
 **Implementation**:
+
 - ✅ `Services/FinancialServiceClient.cs` - Complete Kiota implementation
 - ✅ `Program.cs` - Registered with DI container
 - ✅ All methods migrated:
@@ -49,9 +51,10 @@ All backend microservices now use **Kiota-generated API clients** for inter-serv
 **Service Port**: 5002
 
 **Example Usage**:
+
 ```csharp
 // Old way (direct HttpClient)
-var request = new HttpRequestMessage(HttpMethod.Get, 
+var request = new HttpRequestMessage(HttpMethod.Get,
     $"{_baseUrl}/api/v1/Accounts/user/{userId}");
 var response = await _httpClient.SendAsync(request);
 var json = await response.Content.ReadAsStringAsync();
@@ -70,10 +73,12 @@ return response?.Data?.Id;
 **Dependencies**: Inventory Service, Financial Service
 
 **Generated Clients**:
+
 - `SalesManagement.Generated.Clients.Inventory.InventoryServiceClient`
 - `SalesManagement.Generated.Clients.Financial.FinancialServiceClient`
 
 **Implementation**:
+
 - ✅ No inter-service calls currently implemented
 - ✅ Clients generated and ready for future use
 - ✅ Kiota packages installed
@@ -81,6 +86,7 @@ return response?.Data?.Id;
 **Service Port**: 5003
 
 **Ready for**:
+
 - Product availability checks via Inventory client
 - Payment transaction creation via Financial client
 - Order fulfillment coordination
@@ -92,12 +98,14 @@ return response?.Data?.Id;
 **Dependencies**: User Management, Inventory, Sales, Financial
 
 **Generated Clients**:
+
 - `DashboardAnalytics.Generated.Clients.UserManagement.UserManagementServiceClient`
 - `DashboardAnalytics.Generated.Clients.Inventory.InventoryServiceClient`
 - `DashboardAnalytics.Generated.Clients.Sales.SalesServiceClient`
 - `DashboardAnalytics.Generated.Clients.Financial.FinancialServiceClient`
 
 **Implementation**:
+
 - ✅ No inter-service calls currently implemented
 - ✅ All clients generated and ready
 - ✅ Kiota packages installed
@@ -105,6 +113,7 @@ return response?.Data?.Id;
 **Service Port**: 5005 (when running)
 
 **Ready for**:
+
 - User analytics via UserManagement client
 - Inventory metrics via Inventory client
 - Sales data via Sales client
@@ -114,14 +123,14 @@ return response?.Data?.Id;
 
 ## Service Port Mapping (VERIFIED)
 
-| Service          | Port | Status  |
-|------------------|------|---------|
-| UserManagement   | 5001 | Running |
-| Inventory        | 5002 | Running |
-| Sales            | 5003 | Running |
-| Financial        | 5004 | Running |
-| Dashboard        | 5005 | Stopped |
-| Gateway          | 5000 | -       |
+| Service        | Port | Status  |
+| -------------- | ---- | ------- |
+| UserManagement | 5001 | Running |
+| Inventory      | 5002 | Running |
+| Sales          | 5003 | Running |
+| Financial      | 5004 | Running |
+| Dashboard      | 5005 | Stopped |
+| Gateway        | 5000 | -       |
 
 ---
 
@@ -144,6 +153,7 @@ All services have these packages (version 1.17.3):
 **Location**: `tools/ApiClientGenerator/`
 
 **Usage**:
+
 ```bash
 # Generate all clients
 dotnet run --project tools/ApiClientGenerator/ApiClientGenerator.csproj -- --service all
@@ -156,6 +166,7 @@ dotnet run --project tools/ApiClientGenerator/ApiClientGenerator.csproj -- --che
 ```
 
 **VS Code Tasks**:
+
 - `backend: generate-all-api-clients` - Generate all backend API clients
 - `backend: generate-inventory-api-clients` - Generate Inventory service clients
 - `backend: generate-sales-api-clients` - Generate Sales service clients
@@ -197,7 +208,7 @@ private GeneratedFinancialClient CreateKiotaClient(string? authToken = null)
 {
     var httpClient = _httpClientFactory.CreateClient("FinancialService");
     httpClient.BaseAddress = new Uri(_baseUrl);
-    
+
     if (!string.IsNullOrEmpty(authToken))
     {
         httpClient.DefaultRequestHeaders.Add("Authorization", authToken);
@@ -254,7 +265,7 @@ else
 
 ```csharp
 // Manual JSON handling
-var request = new HttpRequestMessage(HttpMethod.Get, 
+var request = new HttpRequestMessage(HttpMethod.Get,
     $"{_baseUrl}/api/v1/Accounts/user/{userId}");
 request.Headers.Add("Authorization", authToken);
 var response = await _httpClient.SendAsync(request);
@@ -268,6 +279,7 @@ if (response.IsSuccessStatusCode)
 ```
 
 **Problems**:
+
 - ❌ No compile-time type checking
 - ❌ Manual URL construction (error-prone)
 - ❌ Manual JSON serialization/deserialization
@@ -285,6 +297,7 @@ return response?.Data?.Id;
 ```
 
 **Benefits**:
+
 - ✅ Compile-time type safety
 - ✅ IntelliSense auto-completion
 - ✅ Automatic JSON handling
@@ -302,7 +315,7 @@ return response?.Data?.Id;
 // Register HTTP client for Financial service
 builder.Services.AddHttpClient("FinancialService", client =>
 {
-    var baseUrl = builder.Configuration["Services:Financial"] 
+    var baseUrl = builder.Configuration["Services:Financial"]
         ?? "http://financial:8080";
     client.BaseAddress = new Uri(baseUrl);
     client.Timeout = TimeSpan.FromSeconds(30);
@@ -360,13 +373,15 @@ When a service's API changes:
 1. Make changes to the service's controllers/DTOs
 2. Restart the service (Swagger updates automatically)
 3. Regenerate clients:
+
    ```bash
    # Via VS Code Task
    Terminal → Run Task → backend: generate-all-api-clients
-   
+
    # Or via CLI
    dotnet run --project tools/ApiClientGenerator/ApiClientGenerator.csproj -- --service all
    ```
+
 4. Fix any compilation errors (breaking changes)
 5. Run tests
 
@@ -382,7 +397,7 @@ When a service's API changes:
    public class MyServiceClient
    {
        private readonly GeneratedClient _client;
-       
+
        public async Task<string?> GetDataAsync(string id)
        {
            var response = await _client.Api.V1.Resource[id].GetAsync();
@@ -402,6 +417,7 @@ When a service's API changes:
 **Cause**: Service isn't running or is on wrong port
 
 **Solution**:
+
 ```bash
 # Check which services are running
 dotnet run --project tools/ApiClientGenerator/ApiClientGenerator.csproj -- --check
@@ -415,6 +431,7 @@ Terminal → Run Task → backend: watch-all-services
 **Cause**: Generated client namespace or types changed
 
 **Solution**:
+
 ```bash
 # Delete old generated clients
 rm -rf services/{service}/Generated/Clients
@@ -428,6 +445,7 @@ dotnet run --project tools/ApiClientGenerator/ApiClientGenerator.csproj -- --ser
 **Cause**: Auth token not passed or invalid
 
 **Solution**:
+
 ```csharp
 // Ensure token is passed when creating client
 var client = CreateKiotaClient(authToken); // ✅ Pass token
@@ -462,6 +480,7 @@ While the Kiota implementation is complete, here are potential enhancements:
 ✅ **All backend microservices now use Kiota-generated API clients for type-safe inter-service communication.**
 
 This provides a solid foundation for:
+
 - Reliable service-to-service communication
 - Early detection of breaking changes
 - Better developer experience with IntelliSense

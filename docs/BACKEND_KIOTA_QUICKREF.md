@@ -31,7 +31,7 @@ private GeneratedClient CreateClient(string? authToken = null)
 {
     var httpClient = _httpClientFactory.CreateClient("ServiceName");
     httpClient.BaseAddress = new Uri(_baseUrl);
-    
+
     if (!string.IsNullOrEmpty(authToken))
         httpClient.DefaultRequestHeaders.Add("Authorization", authToken);
 
@@ -51,7 +51,7 @@ return response?.Data?.Value;
 ## Service Ports (VERIFIED)
 
 | Service        | Port |
-|----------------|------|
+| -------------- | ---- |
 | UserManagement | 5001 |
 | Inventory      | 5002 |
 | Sales          | 5003 |

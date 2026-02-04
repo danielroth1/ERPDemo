@@ -149,7 +149,7 @@ try
     // Display startup information
     var urls = app.Configuration["ASPNETCORE_URLS"] ?? "http://localhost:5002";
     var environment = app.Environment.EnvironmentName;
-    
+
     Console.WriteLine("\n" + new string('=', 80));
     Console.WriteLine("INVENTORY MANAGEMENT SERVICE - Enterprise Resource Planning System");
     Console.WriteLine(new string('=', 80));
@@ -164,7 +164,7 @@ try
     Console.WriteLine($"Database:           PostgreSQL - {postgresSettings.ConnectionString.Split(';').FirstOrDefault(s => s.Contains("Host="))?.Replace("Host=", "") ?? "configured"}");
     Console.WriteLine($"Started at:         {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss} UTC");
     Console.WriteLine(new string('=', 80) + "\n");
-    
+
     Log.Information("Inventory Management Service started successfully");
     app.Run();
 }

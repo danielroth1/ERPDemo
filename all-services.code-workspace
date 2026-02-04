@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "services/dashboard/DashboardAnalytics"
+		},
+		{
+			"path": "services/financial/FinancialManagement"
+		},
+		{
+			"path": "services/gateway/ApiGateway"
+		},
+		{
+			"path": "services/inventory/InventoryManagement"
+		},
+		{
+			"path": "services/sales/SalesManagement"
+		},
+		{
+			"path": "services/user-management/UserManagement"
+		}
+	],
+	"settings": {}
+}
