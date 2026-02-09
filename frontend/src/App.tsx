@@ -1,23 +1,23 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { Provider } from 'react-redux';
-import { ApolloProvider } from '@apollo/client/react';
-import { Toaster } from 'react-hot-toast';
-import { useEffect } from 'react';
-import { store } from './store';
-import { apolloClient } from './services/apollo.client';
-import { authService } from './services/auth.service';
-import { LoginPage } from './features/auth/LoginPage';
-import { RegisterPage } from './features/auth/RegisterPage';
-import { ProtectedRoute } from './features/auth/ProtectedRoute';
-import { MainLayout } from './components/layout/MainLayout';
-import { DashboardPage } from './features/dashboard/DashboardPage';
-import { InventoryPage } from './features/inventory/InventoryPage';
-import { UsersPage } from './features/users/UsersPage';
-import { SalesPage } from './features/sales/SalesPage';
-import { FinancialPage } from './features/financial/FinancialPage';
-import { AnalyticsPage } from './features/analytics/AnalyticsPage';
-import { DatabaseOverviewPage } from './features/database/components/DatabaseOverviewPage';
-import { ShopPage } from './features/shop';
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { Provider } from "react-redux";
+import { ApolloProvider } from "@apollo/client/react";
+import { Toaster } from "react-hot-toast";
+import { useEffect } from "react";
+import { store } from "./store";
+import { createApolloClient } from "./services/apollo.client";
+import { authService } from "./services/auth.service";
+import { LoginPage } from "./features/auth/LoginPage";
+import { RegisterPage } from "./features/auth/RegisterPage";
+import { ProtectedRoute } from "./features/auth/ProtectedRoute";
+import { MainLayout } from "./components/layout/MainLayout";
+import { DashboardPage } from "./features/dashboard/DashboardPage";
+import { InventoryPage } from "./features/inventory/InventoryPage";
+import { UsersPage } from "./features/users/UsersPage";
+import { SalesPage } from "./features/sales/SalesPage";
+import { FinancialPage } from "./features/financial/FinancialPage";
+import { AnalyticsPage } from "./features/analytics/AnalyticsPage";
+import { DatabaseOverviewPage } from "./features/database/components/DatabaseOverviewPage";
+import { ShopPage } from "./features/shop";
 
 function App() {
   useEffect(() => {
@@ -25,9 +25,16 @@ function App() {
     authService.initializeAutoRefresh();
   }, []);
 
+  const dashboardClient = createApolloClient("dashboard");
+  const salesClient = createApolloClient("sales");
+  const clients = {
+    dashboard: dashboardClient,
+    sales: salesClient,
+  };
+
   return (
     <Provider store={store}>
-      <ApolloProvider client={apolloClient}>
+      <ApolloProvider client={salesClient} clients={clients}>
         <BrowserRouter>
           <Toaster position="top-right" />
           <Routes>
@@ -42,7 +49,8 @@ function App() {
               }
             >
               <Route index element={<Navigate to="/inventory" replace />} />
-              <Route path="dashboard" element={<DashboardPage />} /> {/* Hidden from nav but route kept */}
+              <Route path="dashboard" element={<DashboardPage />} />{" "}
+              {/* Hidden from nav but route kept */}
               <Route path="users" element={<UsersPage />} />
               <Route path="inventory" element={<InventoryPage />} />
               <Route path="shop" element={<ShopPage />} />

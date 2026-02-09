@@ -17,6 +17,12 @@
 		},
 		{
 			"path": "services/user-management/UserManagement"
+		},
+		{
+			"path": "frontend"
+		},
+		{
+			"path": "instruction_files"
 		}
 	],
 	"settings": {}
