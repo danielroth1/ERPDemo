@@ -42,7 +42,7 @@ builder.Services.AddSingleton<KafkaProducer>();
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<StockMovementService>();
-builder.Services.AddSingleton<IFinancialAccountInitializer, FinancialAccountInitializer>();
+builder.Services.AddScoped<IFinancialAccountInitializer, FinancialAccountInitializer>();
 
 // Add HttpClient factory for inter-service communication
 builder.Services.AddHttpClient("FinancialService", client =>

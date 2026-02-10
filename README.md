@@ -11,9 +11,12 @@ A comprehensive microservices-based ERP system demonstrating modern cloud-native
 
 ### Local Development
 
+- install some docker environment, e.g. Kiota, Podman, or Docker Desktop
 - run some tasks with: ctrl + p -> `Task: Run Task`
   - `infra: dev-infrastructure`
   - `backend: watch-all-services`
+  - `backend: generate-all-api-clients`
+  - `frontend: dev`
 
 - close any local VS Code instance connecting to remote via ssh -> might block 8080 port
 

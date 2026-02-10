@@ -176,7 +176,10 @@ public class FinancialServiceClientWrapper : IFinancialServiceClient
             var kiotaRequest = new Generated.Clients.Financial.Models.CreateTransactionRequest
             {
                 Description = request.Description,
-                Date = DateTimeOffset.UtcNow,
+                Type = request.Type,  // IMPORTANT: Must include transaction type
+                Date = DateTimeOffset.UtcNow,  // DateTimeOffset automatically preserves UTC
+                ReferenceId = request.ReferenceId,
+                ReferenceType = request.ReferenceType,
                 Entries = request.Entries.Select(e => new Generated.Clients.Financial.Models.JournalEntryRequest
                 {
                     AccountId = e.AccountId,
@@ -190,11 +193,25 @@ public class FinancialServiceClientWrapper : IFinancialServiceClient
 
             if (response?.Success == true)
             {
-                _logger.LogInformation("Financial transaction created successfully");
+                _logger.LogInformation("Financial transaction created successfully. Type: {Type}, Reference: {ReferenceId}", request.Type, request.ReferenceId);
                 return true;
             }
 
             _logger.LogWarning("Failed to create financial transaction: {Message}", response?.Message);
+            return false;
+        }
+        catch (Microsoft.Kiota.Abstractions.ApiException apiEx)
+        {
+            // Kiota doesn't expose the raw response body, only the status code and message
+            _logger.LogError(apiEx, 
+                "API error while creating financial transaction. " +
+                "Status: {StatusCode}, Message: {ErrorMessage}. " +
+                "Check Financial service logs for details. " +
+                "Transaction Type: {Type}, Description: {Description}", 
+                apiEx.ResponseStatusCode, 
+                apiEx.Message,
+                request.Type,
+                request.Description);
             return false;
         }
         catch (Exception ex)

@@ -90,7 +90,9 @@ public class TransactionService : ITransactionService
         {
             Id = Guid.NewGuid().ToString(),
             TransactionNumber = transactionNumber,
-            Date = request.Date ?? DateTime.UtcNow,
+            Date = request.Date.HasValue 
+                ? DateTime.SpecifyKind(request.Date.Value, DateTimeKind.Utc) 
+                : DateTime.UtcNow,
             Description = request.Description,
             Entries = entries,
             Type = transactionType,
