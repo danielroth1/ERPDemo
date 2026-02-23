@@ -1,34 +1,41 @@
-import { ApolloClient, InMemoryCache, HttpLink, split, ApolloLink } from '@apollo/client';
+import { ApolloClient, InMemoryCache, HttpLink, split, ApolloLink, type NormalizedCacheObject } from '@apollo/client';
 import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
-import { setContext } from '@apollo/client/link/context';
+import { SetContextLink } from '@apollo/client/link/context';
 
-// GraphQL endpoint via API Gateway for Dashboard service
-const httpLink = new HttpLink({
-  uri: `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5001'}/dashboard/graphql`,
-});
-
-function createHttpLink(target: string): HttpLink {
+/**
+ * Create an HTTP link for a specific GraphQL service
+ * @param service - The service name (e.g., 'dashboard', 'sales')
+ */
+function createHttpLink(service: string): HttpLink {
   return new HttpLink({
-    uri: `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5001'}/dashboard/${target}`,
+    uri: `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5001'}/${service}/graphql`,
   });
 }
 
-// WebSocket for GraphQL subscriptions (direct to Dashboard service)
-const wsLink = new GraphQLWsLink(
-  createClient({
-    url: `${import.meta.env.VITE_WS_URL || 'ws://localhost:5006'}/graphql`,
-    connectionParams: () => {
-      const token = localStorage.getItem('accessToken');
-      return {
-        authorization: token ? `Bearer ${token}` : '',
-      };
-    },
-  })
-);
+/**
+ * Create a WebSocket link for GraphQL subscriptions
+ * @param service - The service name (e.g., 'dashboard', 'sales')
+ */
+function createWsLink(service: string): GraphQLWsLink {
+  return new GraphQLWsLink(
+    createClient({
+      url: `${import.meta.env.VITE_WS_URL || 'ws://localhost:5006'}/${service}/graphql`,
+      connectionParams: () => {
+        const token = localStorage.getItem('accessToken');
+        return {
+          authorization: token ? `Bearer ${token}` : '',
+        };
+      },
+    })
+  );
+}
 
-const authLink = setContext((_, { headers }) => {
+/**
+ * Authentication link to add JWT token to requests
+ */
+const authLink = new SetContextLink(({ headers }, _) => {
   const token = localStorage.getItem('accessToken');
   return {
     headers: {
@@ -38,8 +45,15 @@ const authLink = setContext((_, { headers }) => {
   };
 });
 
-function createSplitLink(target: string) : ApolloLink {
-  return split(
+/**
+ * Create a split link that routes subscriptions to WebSocket and queries/mutations to HTTP
+ * @param service - The service name (e.g., 'dashboard', 'sales')
+ */
+function createSplitLink(service: string): ApolloLink {
+  const wsLink = createWsLink(service);
+  const httpLink = createHttpLink(service);
+
+  return ApolloLink.split(
     ({ query }) => {
       const definition = getMainDefinition(query);
       return (
@@ -48,34 +62,22 @@ function createSplitLink(target: string) : ApolloLink {
       );
     },
     wsLink,
-    authLink.concat(createHttpLink(target)));
+    authLink.concat(httpLink)
+  );
 }
 
-const splitLink = split(
-  ({ query }) => {
-    const definition = getMainDefinition(query);
-    return (
-      definition.kind === 'OperationDefinition' &&
-      definition.operation === 'subscription'
-    );
-  },
-  wsLink,
-  authLink.concat(httpLink)
-);
-
-export const apolloClient = new ApolloClient({
-  link: splitLink,
-  cache: new InMemoryCache(),
-  defaultOptions: {
-    watchQuery: {
-      fetchPolicy: 'cache-and-network',
-    },
-  },
-});
-
-export function createApolloClient(target: string) : ApolloClient {
+/**
+ * Create an Apollo Client for a specific GraphQL service
+ * @param service - The service name (e.g., 'dashboard', 'sales')
+ * @returns Configured Apollo Client instance
+ * 
+ * @example
+ * const dashboardClient = createApolloClient('dashboard');
+ * const { data } = useQuery(MY_QUERY, { client: dashboardClient });
+ */
+export function createApolloClient(service: string) {
   return new ApolloClient({
-    link: createSplitLink(target),
+    link: createSplitLink(service),
     cache: new InMemoryCache(),
     defaultOptions: {
       watchQuery: {

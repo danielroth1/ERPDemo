@@ -16,6 +16,7 @@ A comprehensive microservices-based ERP system demonstrating modern cloud-native
   - `infra: dev-infrastructure`
   - `backend: watch-all-services`
   - `backend: generate-all-api-clients`
+  - let all services build successfully `backend: generate-all-api-clients` again
   - `frontend: dev`
 
 - close any local VS Code instance connecting to remote via ssh -> might block 8080 port

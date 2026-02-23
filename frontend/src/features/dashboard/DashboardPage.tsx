@@ -4,13 +4,49 @@ import { useQuery } from "@apollo/client/react";
 import { signalRService } from "../../services/signalr.service";
 import apiService from "../../services/api.service";
 import { LoadingSpinner } from "../../components/common/LoadingSpinner";
+import { useApolloClients } from "../../hooks/useApolloClients";
 import type { DashboardMetrics, Alert as AlertType } from "../../types";
 import toast from "react-hot-toast";
+
+// GraphQL Response Types
+interface KPI {
+  id: string;
+  name: string;
+  description: string;
+  currentValue: number;
+  targetValue: number;
+  previousValue: number;
+  percentageChange: number;
+  status: "OnTrack" | "AtRisk" | "Critical";
+  lastUpdated: string;
+}
+
+interface Alert {
+  id: string;
+  title: string;
+  message: string;
+  severity: "Critical" | "Warning" | "Info";
+  source: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+interface GetAllKPIsData {
+  allKPIs: KPI[];
+}
+
+interface GetUnreadAlertsData {
+  unreadAlerts: Alert[];
+}
+
+interface GetReadAlertsData {
+  readAlerts: Alert[];
+}
 
 // GraphQL Query Example - fetches KPIs from Dashboard service
 const GET_KPIS = gql`
   query GetAllKPIs {
-    getAllKPIs {
+    allKPIs {
       id
       name
       description
@@ -27,7 +63,7 @@ const GET_KPIS = gql`
 // GraphQL Query Example - fetches unread alerts
 const GET_UNREAD_ALERTS = gql`
   query GetUnreadAlerts {
-    getUnreadAlerts {
+    unreadAlerts {
       id
       title
       message
@@ -39,26 +75,52 @@ const GET_UNREAD_ALERTS = gql`
   }
 `;
 
+const GET_READ_ALERTS = gql`
+  query GetReadAlerts {
+    unreadAlerts {
+      id
+      title
+      message
+      severity
+      source
+      data
+      createdAt
+    }
+  }
+`;
+
 export const DashboardPage: React.FC = () => {
   const [metrics, setMetrics] = useState<DashboardMetrics | null>(null);
   const [alerts, setAlerts] = useState<AlertType[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // GraphQL Example: Fetch KPIs using Apollo Client
+  // Get Apollo clients for different GraphQL endpoints
+  const clients = useApolloClients();
+
+  // GraphQL Example: Fetch KPIs using Apollo Client with Dashboard endpoint
   const {
     data: kpiData,
     loading: kpiLoading,
     error: kpiError,
-  } = useQuery(GET_KPIS, {
-    // Poll every 30 seconds for updates
-    pollInterval: 30000,
-    // This would work if the apollo client was configured for /dashboard/graphql
-    // Currently it's configured for /sales/graphql in apollo.client.ts
+  } = useQuery<GetAllKPIsData>(GET_KPIS, {
+    client: clients.dashboard, // Use dashboard client
+    pollInterval: 30000, // Poll every 30 seconds for updates
   });
 
-  // GraphQL Example: Fetch unread alerts using Apollo Client
-  const { data: alertData, loading: alertLoading } =
-    useQuery(GET_UNREAD_ALERTS);
+  // GraphQL Example: Fetch unread alerts using Apollo Client with Dashboard endpoint
+  const { data: alertData, loading: alertLoading } = useQuery<GetUnreadAlertsData>(
+    GET_UNREAD_ALERTS,
+    {
+      client: clients.dashboard, // Use dashboard client
+    }
+  );
+
+  const readAlertsResponse = useQuery<GetReadAlertsData>(
+    GET_READ_ALERTS,
+    {
+      client: clients.dashboard
+    }
+  )
 
   useEffect(() => {
     loadDashboardData();
@@ -137,17 +199,15 @@ export const DashboardPage: React.FC = () => {
               <div className="text-sm text-red-600">
                 <p className="font-medium">GraphQL Error:</p>
                 <p className="text-xs mt-1">
-                  Note: Apollo client is configured for /sales/graphql, but this
-                  query needs /dashboard/graphql. Update apollo.client.ts to fix
-                  this.
+                  Failed to fetch KPIs from /dashboard/graphql endpoint.
                 </p>
                 <p className="text-xs mt-1 font-mono bg-red-50 p-2 rounded">
                   {kpiError.message}
                 </p>
               </div>
-            ) : kpiData?.getAllKPIs ? (
+            ) : kpiData?.allKPIs ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {kpiData.getAllKPIs.slice(0, 4).map((kpi: any) => (
+                {kpiData.allKPIs.slice(0, 4).map((kpi: any) => (
                   <div
                     key={kpi.id}
                     className="border border-gray-200 p-3 rounded"
@@ -200,11 +260,25 @@ export const DashboardPage: React.FC = () => {
             <h3 className="font-medium text-gray-700 mb-2">
               Unread Alerts (via GraphQL)
             </h3>
+            {readAlertsResponse.loading ? (
+              <p className="text-sm text-gray-500">Loading read alerts</p>
+            ) : readAlertsResponse.data?.readAlerts ?
+            (
+              <div>
+                {readAlertsResponse.data.readAlerts.map((alert: GetReadAlertsData) => (
+                  <div></div>
+                ))}
+              </div>
+            ) :
+            (
+              <div></div>
+            )
+            }
             {alertLoading ? (
               <p className="text-sm text-gray-500">Loading alerts...</p>
-            ) : alertData?.getUnreadAlerts ? (
+            ) : alertData?.unreadAlerts ? (
               <div className="space-y-2">
-                {alertData.getUnreadAlerts.slice(0, 3).map((alert: any) => (
+                {alertData.unreadAlerts.slice(0, 3).map((alert: any) => (
                   <div
                     key={alert.id}
                     className={`p-2 rounded text-xs ${
@@ -219,7 +293,7 @@ export const DashboardPage: React.FC = () => {
                     <p className="text-xs opacity-75">{alert.message}</p>
                   </div>
                 ))}
-                {alertData.getUnreadAlerts.length === 0 && (
+                {alertData.unreadAlerts.length === 0 && (
                   <p className="text-sm text-gray-500">No unread alerts</p>
                 )}
               </div>
@@ -233,17 +307,29 @@ export const DashboardPage: React.FC = () => {
             <ul className="list-disc list-inside space-y-1 ml-2">
               <li>
                 Uses <code className="bg-white px-1 rounded">useQuery</code>{" "}
-                from @apollo/client
+                from @apollo/client with the{" "}
+                <code className="bg-white px-1 rounded">client</code> option
+              </li>
+              <li>
+                Each query specifies which client to use:{" "}
+                <code className="bg-white px-1 rounded">
+                  client: clients.dashboard
+                </code>
               </li>
               <li>
                 Queries Dashboard GraphQL endpoint at{" "}
-                <code className="bg-white px-1 rounded">/graphql</code>
+                <code className="bg-white px-1 rounded">
+                  /dashboard/graphql
+                </code>
               </li>
               <li>Auto-updates every 30 seconds (pollInterval)</li>
-              <li>Works with the ApolloProvider in App.tsx</li>
               <li>
-                Currently will error because apollo.client.ts points to
-                /sales/graphql instead of /dashboard/graphql
+                Multiple Apollo clients supported without ApolloProvider nesting
+              </li>
+              <li>
+                Other pages can use{" "}
+                <code className="bg-white px-1 rounded">clients.sales</code> for
+                /sales/graphql
               </li>
             </ul>
           </div>

@@ -1,10 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { Provider } from "react-redux";
-import { ApolloProvider } from "@apollo/client/react";
 import { Toaster } from "react-hot-toast";
 import { useEffect } from "react";
 import { store } from "./store";
-import { createApolloClient } from "./services/apollo.client";
 import { authService } from "./services/auth.service";
 import { LoginPage } from "./features/auth/LoginPage";
 import { RegisterPage } from "./features/auth/RegisterPage";
@@ -25,18 +23,10 @@ function App() {
     authService.initializeAutoRefresh();
   }, []);
 
-  const dashboardClient = createApolloClient("dashboard");
-  const salesClient = createApolloClient("sales");
-  const clients = {
-    dashboard: dashboardClient,
-    sales: salesClient,
-  };
-
   return (
     <Provider store={store}>
-      <ApolloProvider client={salesClient} clients={clients}>
-        <BrowserRouter>
-          <Toaster position="top-right" />
+      <BrowserRouter>
+        <Toaster position="top-right" />
           <Routes>
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
@@ -62,9 +52,8 @@ function App() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </BrowserRouter>
-      </ApolloProvider>
-    </Provider>
-  );
-}
+      </Provider>
+    );
+  }
 
 export default App;

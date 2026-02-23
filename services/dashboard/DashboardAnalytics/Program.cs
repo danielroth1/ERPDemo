@@ -9,6 +9,9 @@ using DashboardAnalytics.Infrastructure;
 using DashboardAnalytics.Services;
 using DashboardAnalytics.Hubs;
 using DashboardAnalytics.GraphQL;
+using Query = DashboardAnalytics.GraphQL.Query;
+using Mutation = DashboardAnalytics.GraphQL.Mutation;
+using Subscription = DashboardAnalytics.GraphQL.Subscription;
 using Prometheus;
 
 // Configure Serilog
@@ -71,14 +74,11 @@ try
     // Add GraphQL
     builder.Services
         .AddGraphQLServer()
-        .AddQueryType(d => d.Name("Query"))
-            .AddTypeExtension<Query>()
+        .AddQueryType<Query>()
             .AddTypeExtension<DatabaseQuery>()
-        .AddMutationType(d => d.Name("Mutation"))
-            .AddTypeExtension<Mutation>()
+        .AddMutationType<Mutation>()
             .AddTypeExtension<DatabaseMutation>()
-        .AddSubscriptionType(d => d.Name("Subscription"))
-            .AddTypeExtension<Subscription>()
+        .AddSubscriptionType<Subscription>()
             .AddTypeExtension<DatabaseSubscription>()
         .AddInMemorySubscriptions();
 

@@ -10,6 +10,8 @@ public interface IAlertService
     Task<Alert?> GetAlertByIdAsync(string id);
     Task<List<Alert>> GetAllAlertsAsync(int page = 1, int pageSize = 50);
     Task<List<Alert>> GetUnreadAlertsAsync();
+    Task<List<Alert>> GetReadAlertsAsync();
+    Task<List<Alert>> GetReadAlertsAsync(int page = 1, int pageSize = 50);
     Task<bool> MarkAsReadAsync(string id);
     Task<bool> DeleteAlertAsync(string id);
 }
@@ -44,6 +46,24 @@ public class AlertService : IAlertService
         return await _dbContext.Alerts
             .Where(a => !a.IsRead)
             .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<List<Alert>> GetReadAlertsAsync()
+    {
+        return await _dbContext.Alerts
+            .Where(a => a.IsRead)
+            .OrderByDescending(a => a.CreatedAt)
+            .ToListAsync();
+    }
+
+    public async Task<List<Alert>> GetReadAlertsAsync(int page, int pageSize)
+    {
+        return await _dbContext.Alerts
+            .Where(a => a.IsRead)
+            .OrderByDescending(a => a.CreatedAt)
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
             .ToListAsync();
     }
 

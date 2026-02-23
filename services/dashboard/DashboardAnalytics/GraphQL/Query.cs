@@ -99,4 +99,24 @@ public class Query
             a.CreatedAt
         )).ToList();
     }
+
+    public async Task<List<AlertResponse>> GetReadAlerts(
+        [Service] IAlertService alertService,
+        int page,
+        int pageSize)
+    {
+        var alerts = await alertService.GetReadAlertsAsync(page, pageSize);
+        return alerts.Select(alert =>
+            new AlertResponse(
+                Id: alert.Id,
+                Title: alert.Title,
+                Message: alert.Message,
+                Severity: alert.Severity.ToString(),
+                Source: alert.Source,
+                Data: alert.Data,
+                IsRead: alert.IsRead,
+                CreatedAt: alert.CreatedAt
+            )
+        ).ToList();
+    }
 }
