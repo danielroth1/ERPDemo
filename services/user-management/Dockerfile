@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
-# Build stage
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# Build stage – run natively on the host (ARM64 Mac) and cross-compile for linux-x64
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 ARG BUILD_CONFIGURATION=Release
@@ -11,27 +11,28 @@ ENV NUGET_PACKAGES=/root/.nuget/packages \
 
 # Copy csproj and restore dependencies
 COPY UserManagement/*.csproj ./UserManagement/
-RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
-  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
-  dotnet restore UserManagement/UserManagement.csproj
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
+  dotnet restore -r linux-x64 UserManagement/UserManagement.csproj
 
 # Copy source code and build
 COPY UserManagement/. ./UserManagement/
 WORKDIR /src/UserManagement
-RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
-  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
-  dotnet build -c $BUILD_CONFIGURATION -o /app/build --no-restore \
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
+  dotnet build UserManagement.csproj -c $BUILD_CONFIGURATION -r linux-x64 -o /app/build --no-restore \
   /p:DebugType=portable /p:DebugSymbols=true /p:EmbedAllSources=true
 
 # Publish stage
 FROM build AS publish
-RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
-  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
-  dotnet publish -c $BUILD_CONFIGURATION -o /app/publish --no-restore \
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
+  dotnet publish UserManagement.csproj -c $BUILD_CONFIGURATION -r linux-x64 --self-contained false -o /app/publish --no-restore \
   /p:DebugType=portable /p:DebugSymbols=true /p:EmbedAllSources=true
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
+LABEL org.opencontainers.image.source=https://github.com/danielroth1/ERPDemo
 WORKDIR /app
 EXPOSE 8080
 

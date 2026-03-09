@@ -265,7 +265,7 @@ export const DashboardPage: React.FC = () => {
             ) : readAlertsResponse.data?.readAlerts ?
             (
               <div>
-                {readAlertsResponse.data.readAlerts.map((alert: GetReadAlertsData) => (
+                {readAlertsResponse.data.readAlerts.map((alert: Alert) => (
                   <div></div>
                 ))}
               </div>

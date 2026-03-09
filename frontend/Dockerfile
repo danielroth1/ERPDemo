@@ -1,5 +1,5 @@
-# Build stage
-FROM node:20-alpine AS builder
+# Build stage – run natively on the host (ARM64 Mac) so esbuild doesn't crash under QEMU
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -21,6 +21,7 @@ RUN npm run build
 
 # Production stage
 FROM nginx:alpine
+LABEL org.opencontainers.image.source=https://github.com/danielroth1/ERPDemo
 
 # Copy custom nginx config
 COPY nginx.conf /etc/nginx/conf.d/default.conf

@@ -5,9 +5,21 @@
 
 set -e
 
+# ── Load local deploy config ─────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ENV_FILE="$SCRIPT_DIR/.env.deploy"
+if [ ! -f "$ENV_FILE" ]; then
+    echo "❌ Missing $ENV_FILE"
+    echo "   Copy the example and fill in your values:"
+    echo "   cp .env.deploy.example .env.deploy"
+    exit 1
+fi
+# shellcheck source=.env.deploy
+source "$ENV_FILE"
+
 SERVER="${DEPLOY_SERVER}"
-REMOTE_DIR="/home/daniel/ERPDemo"
-LOCAL_DIR="/Users/daniel/Projects/ERPDemo"
+REMOTE_DIR="${DEPLOY_REMOTE_DIR}"
+LOCAL_DIR="${DEPLOY_LOCAL_DIR}"
 
 # Parse services to deploy
 SERVICES=""
@@ -83,8 +95,9 @@ setup_environment() {
     echo ""
     echo "⚙️  Setting up environment on server..."
     
-    ssh "$SERVER" << 'ENDSSH'
-cd /home/daniel/ERPDemo
+    ssh "$SERVER" bash -s -- "$REMOTE_DIR" << 'ENDSSH'
+REMOTE_DIR="$1"
+cd "$REMOTE_DIR"
 
 # Stop any existing containers
 echo "Stopping existing containers..."
@@ -107,7 +120,7 @@ start_containers() {
     
     if [ -n "$SERVICES" ]; then
         ssh "$SERVER" bash << ENDSSH
-cd /home/daniel/ERPDemo
+cd "$REMOTE_DIR"
 
 # Build and start specific services
 docker-compose up -d --build $SERVICES
@@ -124,8 +137,9 @@ echo ""
 echo "✅ Services started: $SERVICES"
 ENDSSH
     else
-        ssh "$SERVER" << 'ENDSSH'
-cd /home/daniel/ERPDemo
+        ssh "$SERVER" bash -s -- "$REMOTE_DIR" << 'ENDSSH'
+REMOTE_DIR="$1"
+cd "$REMOTE_DIR"
 
 # Build and start all containers
 docker-compose up -d --build
@@ -149,8 +163,9 @@ check_deployment() {
     echo ""
     echo "🔍 Checking deployment..."
     
-    ssh "$SERVER" << 'ENDSSH'
-cd /home/daniel/ERPDemo
+    ssh "$SERVER" bash -s -- "$REMOTE_DIR" << 'ENDSSH'
+REMOTE_DIR="$1"
+cd "$REMOTE_DIR"
 
 # Check which containers are running
 RUNNING=$(docker-compose ps --filter "status=running" --services | wc -l)

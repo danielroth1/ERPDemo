@@ -1,0 +1,87 @@
+# -----------------------------------------------------------------------------
+# Traefik Ingress for ERP System - Production (k3s server: <k3s-server-ip>)
+# -----------------------------------------------------------------------------
+#
+# k3s ships Traefik v2 as its built-in ingress controller - no installation
+# needed. Traefik listens on host ports 80 and 443 automatically.
+#
+# Traffic flow:
+#   Browser -> Traefik (port 80/443)
+#             -> frontend-service (nginx pod)
+#                 |-- /* -------------------> React SPA (static files)
+#                 |-- /api/* ---------------> gateway-service (ClusterIP, in-cluster)
+#                 +-- /dashboardHub --------> dashboard-service (WebSocket)
+#
+# Traefik handles WebSocket upgrades natively - no extra annotations needed.
+#
+# No host: field = matches ALL hostnames, so the app works via bare IP
+# (<k3s-server-ip>) and any domain pointing to it.
+# Add a `host:` entry once you have a domain name.
+#
+# TLS with Let's Encrypt: uncomment the tls section and install cert-manager
+# (run infrastructure/cert-manager/install.sh), then ensure the ClusterIssuer
+# annotation is added.
+# -----------------------------------------------------------------------------
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: erp-ingress
+  namespace: erp-prod
+  annotations:
+    # Traefik-specific tuning
+    traefik.ingress.kubernetes.io/router.entrypoints: "web,websecure"
+    # cert-manager: automatically issue/renew Let's Encrypt certificate
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: traefik
+  # -- TLS: cert-manager will create/manage the 'erp-tls-cert' Secret ----------
+  tls:
+    - hosts:
+        - shopping-now.net
+        - www.shopping-now.net
+      secretName: erp-tls-cert
+  rules:
+    - host: shopping-now.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+    - host: www.shopping-now.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: frontend-service
+                port:
+                  number: 80
+---
+# -----------------------------------------------------------------------------
+# Optional: expose Grafana under /grafana (enable when needed)
+# Requires GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana on the deployment
+# -----------------------------------------------------------------------------
+# apiVersion: networking.k8s.io/v1
+# kind: Ingress
+# metadata:
+#   name: erp-grafana-ingress
+#   namespace: erp-prod
+#   annotations:
+#     traefik.ingress.kubernetes.io/router.entrypoints: "web"
+# spec:
+#   ingressClassName: traefik
+#   rules:
+#     - http:
+#         paths:
+#           - path: /grafana(/|$)(.*)
+#             pathType: ImplementationSpecific
+#             backend:
+#               service:
+#                 name: grafana-service
+#                 port:
+#                   number: 80

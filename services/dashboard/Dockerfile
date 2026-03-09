@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1.7
 
-# Build stage
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# Build stage – run natively on the host (ARM64 Mac) and cross-compile for linux-x64
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 ENV NUGET_PACKAGES=/root/.nuget/packages \
@@ -9,25 +9,26 @@ ENV NUGET_PACKAGES=/root/.nuget/packages \
 
 # Copy csproj and restore dependencies
 COPY DashboardAnalytics/*.csproj ./DashboardAnalytics/
-RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
-  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
-  dotnet restore DashboardAnalytics/DashboardAnalytics.csproj
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
+  dotnet restore -r linux-x64 DashboardAnalytics/DashboardAnalytics.csproj
 
 # Copy source code and build
 COPY DashboardAnalytics/. ./DashboardAnalytics/
 WORKDIR /src/DashboardAnalytics
-RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
-  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
-  dotnet build -c Release -o /app/build --no-restore
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
+  dotnet build DashboardAnalytics.csproj -c Release -r linux-x64 -o /app/build --no-restore
 
 # Publish stage
 FROM build AS publish
-RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=locked \
-  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=locked \
-  dotnet publish -c Release -o /app/publish --no-restore
+RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
+  --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
+  dotnet publish DashboardAnalytics.csproj -c Release -r linux-x64 --self-contained false -o /app/publish --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
+LABEL org.opencontainers.image.source=https://github.com/danielroth1/ERPDemo
 
 WORKDIR /app
 EXPOSE 8080

@@ -39,6 +39,18 @@
       "type": "promptString",
       "description": "Kubernetes namespace",
       "default": "erp-local"
+    },
+    {
+      "id": "prodRegistry",
+      "type": "promptString",
+      "description": "Container registry prefix (e.g. ghcr.io/daniel)",
+      "default": "ghcr.io/YOURUSER"
+    },
+    {
+      "id": "prodTag",
+      "type": "promptString",
+      "description": "Image tag (e.g. latest or a git SHA)",
+      "default": "latest"
     }
   ],
   "tasks": [
@@ -544,6 +556,108 @@
         "$pod = kubectl -n ${input:k8sNamespace} get pods -l app=${input:service} -o jsonpath='{.items[0].metadata.name}'; $pod; Set-Clipboard -Value $pod; Write-Host ''; Write-Host 'Copied pod name to clipboard.'; Write-Host 'Use in: Run and Debug -> K8s: Attach'"
       ],
       "problemMatcher": []
+    },
+
+    // ============================================================
+    // PRODUCTION / K3S TASKS  (server: ${K3S_SERVER})
+    // ============================================================
+    {
+      // One-time: installs cert-manager on the k3s cluster and creates
+      // Let's Encrypt ClusterIssuers (prod + staging) for shopping-now.net.
+      // Run before 'prod: deploy' when setting up TLS for the first time.
+      // Requires: KUBECONFIG=~/.kube/k3s-erp.yaml (set by prod: setup-server)
+      "label": "prod: install-cert-manager",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml bash infrastructure/cert-manager/install.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "prod" }
+    },
+    {
+      // One-time: copies the k3s kubeconfig to ~/.kube/k3s-erp.yaml so
+      // that kubectl can talk to the remote cluster from your Mac.
+      "label": "prod: setup-server",
+      "type": "shell",
+      "command": "bash scripts/k3s-setup-server.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "prod" }
+    },
+    {
+      // Builds all Docker images for linux/amd64 and pushes them to the registry.
+      // Prompts for REGISTRY (e.g. ghcr.io/daniel) and TAG (e.g. latest).
+      "label": "prod: build-push",
+      "type": "shell",
+      "command": "bash scripts/k3s-build-push.sh",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "REGISTRY": "${input:prodRegistry}",
+          "TAG": "${input:prodTag}"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "prod" }
+    },
+    {
+      // Deploys the already-pushed images to the k3s server via kubectl.
+      // Uses ~/.kube/k3s-erp.yaml – run 'prod: setup-server' first if missing.
+      "label": "prod: deploy",
+      "type": "shell",
+      "command": "bash scripts/k3s-deploy.sh",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "REGISTRY": "${input:prodRegistry}",
+          "TAG": "${input:prodTag}"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "prod" }
+    },
+    {
+      // Convenience: build + push + deploy in one go.
+      // Both steps share the same REGISTRY/TAG prompt answers.
+      "label": "prod: build-push-deploy",
+      "type": "shell",
+      "command": "bash scripts/k3s-build-push.sh && bash scripts/k3s-deploy.sh",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": {
+          "REGISTRY": "${input:prodRegistry}",
+          "TAG": "${input:prodTag}"
+        }
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "prod" }
+    },
+    {
+      // Show all pod statuses in the production namespace.
+      "label": "prod: status",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml kubectl get pods,ingress,svc -n erp-prod -o wide",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "prod" }
+    },
+    {
+      // Stream logs for a specific service in production.
+      "label": "prod: logs",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml kubectl logs -n erp-prod -f deploy/${input:service}",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "prod" }
+    },
+    {
+      // Force-restart a deployment in production (re-pulls the image).
+      "label": "prod: rollout-restart",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml kubectl rollout restart deploy/${input:service} -n erp-prod",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "prod" }
     },
 
     // ============================================================

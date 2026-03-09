@@ -89,6 +89,7 @@ kiota-lock.json
 .env
 .env*.local
 .env.production
+.env.deploy
 
 ## macOS
 .DS_Store
@@ -200,3 +201,4 @@ test-results/
 *.bak
 *.tmp
 *.temp
+infrastructure/k8s/_deploy-tmp/

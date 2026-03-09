@@ -1,0 +1,149 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# -----------------------------------------------------------------------------
+# Production overlay for remote k3s server (${K3S_SERVER})
+# -----------------------------------------------------------------------------
+#
+# INITIAL SETUP (run once):
+#   1. Set your registry:    export REGISTRY=ghcr.io/YOURUSER
+#   2. Run setup script:     ./scripts/k3s-setup-server.sh
+#   3. Build & push images:  ./scripts/k3s-build-push.sh
+#   4. Deploy:               ./scripts/k3s-deploy.sh
+#
+# IMAGE NAMES: Edit the `images:` section below with your actual registry prefix.
+#   e.g. change `ghcr.io/YOURUSER` to `ghcr.io/daniel` or `docker.io/danielsmith`
+# -----------------------------------------------------------------------------
+
+namespace: erp-prod
+
+resources:
+  - namespace.yaml
+  - ../base
+  - ingress.yaml
+
+# -- Registry image overrides --------------------------------------------------
+# Set your registry prefix once here. The deploy script (k3s-deploy.sh)
+# generates a temporary overlay on top of this, so these act as fallback/default
+# values. Replace ghcr.io/YOURUSER before first deploy.
+images:
+  - name: erp/gateway
+    newName: ghcr.io/danielroth1/erp-gateway
+    newTag: latest
+  - name: erp/user-management
+    newName: ghcr.io/danielroth1/erp-user-management
+    newTag: latest
+  - name: erp/inventory
+    newName: ghcr.io/danielroth1/erp-inventory
+    newTag: latest
+  - name: erp/sales
+    newName: ghcr.io/danielroth1/erp-sales
+    newTag: latest
+  - name: erp/financial
+    newName: ghcr.io/danielroth1/erp-financial
+    newTag: latest
+  - name: erp/dashboard
+    newName: ghcr.io/danielroth1/erp-dashboard
+    newTag: latest
+  - name: erp/frontend
+    newName: ghcr.io/danielroth1/erp-frontend
+    newTag: latest
+
+# -- Patches -------------------------------------------------------------------
+patches:
+  # ── Private registry pull secret (applied to all Deployments) ──────────────
+  # The ghcr-secret is created by k3s-deploy.sh before kustomize apply runs.
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/imagePullSecrets
+        value:
+          - name: ghcr-secret
+
+  # ── Always pull images in production so re-deploys get fresh images ─────────
+  # (ERP services use the `latest` tag; IfNotPresent would skip re-pulls)
+  - target:
+      kind: Deployment
+      name: gateway
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+  - target:
+      kind: Deployment
+      name: user-management
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+  - target:
+      kind: Deployment
+      name: inventory
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+  - target:
+      kind: Deployment
+      name: sales
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+  - target:
+      kind: Deployment
+      name: financial
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+  - target:
+      kind: Deployment
+      name: dashboard
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+  - target:
+      kind: Deployment
+      name: frontend
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+
+  # ── Change public-facing LoadBalancer services to ClusterIP ─────────────────
+  # Traefik/nginx ingress handles external traffic.
+  - target:
+      kind: Service
+      name: gateway-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+  - target:
+      kind: Service
+      name: frontend-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+  - target:
+      kind: Service
+      name: grafana-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+  - target:
+      kind: Service
+      name: prometheus-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+
+# -- Common production labels --------------------------------------------------
+commonLabels:
+  environment: production
