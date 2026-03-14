@@ -187,7 +187,7 @@ public class BudgetService : IBudgetService
                     DetectedAt = DateTime.UtcNow
                 };
 
-                await _kafkaProducer.PublishAsync(FinancialTopic, budget.Id, budgetEvent);
+                await _kafkaProducer.PublishAsync(FinancialTopic, budget.Id, "BudgetExceeded", budgetEvent);
             }
         }
 

@@ -59,7 +59,7 @@ public class UserService
         _logger.LogInformation("User created: {UserId} - {Email}", user.Id, user.Email);
 
         // Publish event to Kafka
-        await _kafkaProducer.PublishEventAsync("UserCreated", new
+        await _kafkaProducer.PublishEventAsync(user.Id, "UserCreated", new
         {
             user.Id,
             user.Email,
@@ -88,7 +88,7 @@ public class UserService
 
         _logger.LogInformation("User updated: {UserId}", id);
 
-        await _kafkaProducer.PublishEventAsync("UserUpdated", new
+        await _kafkaProducer.PublishEventAsync(id, "UserUpdated", new
         {
             user.Id,
             user.Email,
@@ -110,7 +110,7 @@ public class UserService
 
         _logger.LogInformation("User deleted: {UserId}", id);
 
-        await _kafkaProducer.PublishEventAsync("UserDeleted", new { UserId = id });
+        await _kafkaProducer.PublishEventAsync(id, "UserDeleted", new { UserId = id });
 
         return true;
     }
@@ -140,7 +140,7 @@ public class UserService
 
         _logger.LogInformation("User deactivated: {UserId}", id);
 
-        await _kafkaProducer.PublishEventAsync("UserDeactivated", new { UserId = id });
+        await _kafkaProducer.PublishEventAsync(id, "UserDeactivated", new { UserId = id });
 
         return true;
     }

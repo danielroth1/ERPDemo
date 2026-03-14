@@ -100,7 +100,7 @@ public class InvoiceService : IInvoiceService
             CreatedAt = invoice.CreatedAt
         };
 
-        await _kafkaProducer.PublishAsync(InvoiceTopic, invoice.Id, invoiceEvent);
+        await _kafkaProducer.PublishAsync(InvoiceTopic, invoice.Id, "InvoiceCreated", invoiceEvent);
 
         return MapToResponse(invoice);
     }
@@ -253,7 +253,7 @@ public class InvoiceService : IInvoiceService
                 PaidAt = invoice.PaidAt ?? DateTime.UtcNow
             };
 
-            await _kafkaProducer.PublishAsync(InvoiceTopic, invoice.Id, paymentEvent);
+            await _kafkaProducer.PublishAsync(InvoiceTopic, invoice.Id, "InvoicePaid", paymentEvent);
         }
 
         return MapToResponse(invoice);

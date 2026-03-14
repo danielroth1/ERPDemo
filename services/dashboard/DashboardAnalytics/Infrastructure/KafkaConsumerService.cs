@@ -34,19 +34,13 @@ public class KafkaConsumerService : BackgroundService
             EnableAutoCommit = false
         };
 
-        // Create consumers for each topic
+        // One consumer per service topic — event type is identified from the message body
         var topics = new[]
         {
-            "users.user.created",
-            "users.user.updated",
-            "inventory.product.created",
-            "inventory.product.updated",
-            "inventory.stock.low",
-            "sales.order.created",
-            "sales.order.updated",
-            "sales.invoice.paid",
-            "financial.transaction.created",
-            "financial.budget.exceeded"
+            "user-events",
+            "inventory-events",
+            "sales-events",
+            "financial-events"
         };
 
         foreach (var topic in topics)
@@ -70,13 +64,14 @@ public class KafkaConsumerService : BackgroundService
                 var result = consumer.Consume(stoppingToken);
                 if (result != null)
                 {
-                    _logger.LogInformation("Received message from topic {Topic}: {Message}", topic, result.Message.Value);
+                    var eventType = ExtractEventType(result.Message.Value);
+                    _logger.LogInformation("Received event {EventType} from topic {Topic}", eventType, topic);
 
                     using var scope = _serviceProvider.CreateScope();
                     var analyticsService = scope.ServiceProvider.GetRequiredService<IAnalyticsService>();
 
-                    await ProcessMessage(topic, result.Message.Value, analyticsService);
-                    
+                    await ProcessMessage(eventType, result.Message.Value, analyticsService);
+
                     consumer.Commit(result);
                 }
             }
@@ -91,56 +86,73 @@ public class KafkaConsumerService : BackgroundService
         }
     }
 
-    private async Task ProcessMessage(string topic, string message, IAnalyticsService analyticsService)
+    private static string ExtractEventType(string message)
     {
         try
         {
-            switch (topic)
+            using var doc = JsonDocument.Parse(message);
+            if (doc.RootElement.TryGetProperty("EventType", out var prop))
+                return prop.GetString() ?? string.Empty;
+        }
+        catch { }
+        return string.Empty;
+    }
+
+    private async Task ProcessMessage(string eventType, string message, IAnalyticsService analyticsService)
+    {
+        try
+        {
+            switch (eventType)
             {
-                case "users.user.created":
-                case "users.user.updated":
+                case "UserCreated":
+                case "UserUpdated":
                     var userEvent = JsonSerializer.Deserialize<UserEventDTO>(message);
                     if (userEvent != null)
                         await analyticsService.ProcessUserEventAsync(userEvent);
                     break;
 
-                case "inventory.product.created":
-                case "inventory.product.updated":
+                case "ProductCreated":
+                case "ProductUpdated":
                     var productEvent = JsonSerializer.Deserialize<ProductEventDTO>(message);
                     if (productEvent != null)
                         await analyticsService.ProcessProductEventAsync(productEvent);
                     break;
 
-                case "inventory.stock.low":
+                case "LowStockAlert":
                     var lowStockEvent = JsonSerializer.Deserialize<ProductEventDTO>(message);
                     if (lowStockEvent != null)
                         await analyticsService.ProcessLowStockAlertAsync(lowStockEvent);
                     break;
 
-                case "sales.order.created":
-                case "sales.order.updated":
-                case "sales.invoice.paid":
+                case "OrderCreated":
+                case "OrderStatusChanged":
+                case "InvoiceCreated":
+                case "InvoicePaid":
                     var orderEvent = JsonSerializer.Deserialize<OrderEventDTO>(message);
                     if (orderEvent != null)
                         await analyticsService.ProcessOrderEventAsync(orderEvent);
                     break;
 
-                case "financial.transaction.created":
+                case "TransactionCreated":
                     var transactionEvent = JsonSerializer.Deserialize<TransactionEventDTO>(message);
                     if (transactionEvent != null)
                         await analyticsService.ProcessTransactionEventAsync(transactionEvent);
                     break;
 
-                case "financial.budget.exceeded":
+                case "BudgetExceeded":
                     var budgetEvent = JsonSerializer.Deserialize<BudgetEventDTO>(message);
                     if (budgetEvent != null)
                         await analyticsService.ProcessBudgetExceededAlertAsync(budgetEvent);
+                    break;
+
+                default:
+                    _logger.LogWarning("Unknown event type: {EventType}", eventType);
                     break;
             }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error processing message from topic {Topic}: {Message}", topic, message);
+            _logger.LogError(ex, "Error processing event {EventType}: {Message}", eventType, message);
         }
     }
 

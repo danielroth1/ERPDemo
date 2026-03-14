@@ -24,24 +24,30 @@ public class KafkaProducer
         _logger = logger;
     }
 
-    public async Task PublishAsync<T>(string topic, string key, T message)
+    public async Task PublishAsync<T>(string topic, string entityId, string eventType, T data)
     {
         try
         {
-            var json = JsonSerializer.Serialize(message);
+            var envelope = new
+            {
+                EventType = eventType,
+                Timestamp = DateTime.UtcNow,
+                Data = data
+            };
+            var json = JsonSerializer.Serialize(envelope);
             var result = await _producer.ProduceAsync(topic, new Message<string, string>
             {
-                Key = key,
+                Key = entityId,
                 Value = json,
                 Timestamp = new Timestamp(DateTime.UtcNow)
             });
 
-            _logger.LogInformation("Published message to {Topic} with key {Key} at offset {Offset}", 
-                topic, key, result.Offset);
+            _logger.LogInformation("Published event {EventType} to {Topic} with key {Key} at offset {Offset}",
+                eventType, topic, entityId, result.Offset);
         }
         catch (ProduceException<string, string> ex)
         {
-            _logger.LogError(ex, "Failed to publish message to {Topic} with key {Key}", topic, key);
+            _logger.LogError(ex, "Failed to publish event {EventType} to {Topic} with key {Key}", eventType, topic, entityId);
             throw;
         }
     }

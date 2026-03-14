@@ -115,7 +115,7 @@ public class OrderService : IOrderService
             CreatedAt = order.CreatedAt
         };
 
-        await _kafkaProducer.PublishAsync(OrderTopic, order.Id, orderEvent);
+        await _kafkaProducer.PublishAsync(OrderTopic, order.Id, "OrderCreated", orderEvent);
 
         return MapToResponse(order);
     }
@@ -256,7 +256,7 @@ public class OrderService : IOrderService
             ChangedAt = DateTime.UtcNow
         };
 
-        await _kafkaProducer.PublishAsync(OrderTopic, order.Id, statusEvent);
+        await _kafkaProducer.PublishAsync(OrderTopic, order.Id, "OrderStatusChanged", statusEvent);
 
         return MapToResponse(order);
     }

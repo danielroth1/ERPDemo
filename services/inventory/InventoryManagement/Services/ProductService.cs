@@ -101,7 +101,7 @@ public class ProductService
 
         _logger.LogInformation("Product created: {ProductId} - {ProductName}", product.Id, product.Name);
 
-        await _kafkaProducer.PublishEventAsync("ProductCreated", new
+        await _kafkaProducer.PublishEventAsync(product.Id, "ProductCreated", new
         {
             product.Id,
             product.Sku,
@@ -135,7 +135,7 @@ public class ProductService
 
         _logger.LogInformation("Product updated: {ProductId}", id);
 
-        await _kafkaProducer.PublishEventAsync("ProductUpdated", new
+        await _kafkaProducer.PublishEventAsync(id, "ProductUpdated", new
         {
             product.Id,
             product.Name,
@@ -159,7 +159,7 @@ public class ProductService
 
         _logger.LogInformation("Stock updated for product: {ProductId}, new quantity: {Quantity}", id, newQuantity);
 
-        await _kafkaProducer.PublishEventAsync("StockUpdated", new
+        await _kafkaProducer.PublishEventAsync(id, "StockUpdated", new
         {
             ProductId = id,
             NewQuantity = newQuantity,
@@ -170,7 +170,7 @@ public class ProductService
         // Check for low stock alert
         if (product.IsLowStock)
         {
-            await _kafkaProducer.PublishEventAsync("LowStockAlert", new
+            await _kafkaProducer.PublishEventAsync(product.Id, "LowStockAlert", new
             {
                 product.Id,
                 product.Name,
@@ -193,7 +193,7 @@ public class ProductService
 
         _logger.LogInformation("Product deleted: {ProductId}", id);
 
-        await _kafkaProducer.PublishEventAsync("ProductDeleted", new { ProductId = id });
+        await _kafkaProducer.PublishEventAsync(id, "ProductDeleted", new { ProductId = id });
 
         return true;
     }
@@ -274,7 +274,7 @@ public class ProductService
 
         _logger.LogInformation("Product created: {ProductId} - {ProductName}", product.Id, product.Name);
 
-        await _kafkaProducer.PublishEventAsync("ProductCreated", new
+        await _kafkaProducer.PublishEventAsync(product.Id, "ProductCreated", new
         {
             product.Id,
             product.Sku,

@@ -25,7 +25,7 @@ public class KafkaProducer : IDisposable
         _producer = new ProducerBuilder<string, string>(config).Build();
     }
 
-    public async Task PublishEventAsync<T>(string eventType, T data)
+    public async Task PublishEventAsync<T>(string entityId, string eventType, T data)
     {
         try
         {
@@ -42,7 +42,7 @@ public class KafkaProducer : IDisposable
                 _settings.Topic,
                 new Message<string, string>
                 {
-                    Key = eventType,
+                    Key = entityId,
                     Value = json
                 });
 

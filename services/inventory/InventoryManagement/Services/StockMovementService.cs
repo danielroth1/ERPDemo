@@ -77,7 +77,7 @@ public class StockMovementService
             "Stock movement created: {MovementId} for product {ProductId}, type: {Type}, quantity: {Quantity}",
             movement.Id, movement.ProductId, movement.MovementType, movement.Quantity);
 
-        await _kafkaProducer.PublishEventAsync("StockMovementCreated", new
+        await _kafkaProducer.PublishEventAsync(movement.Id, "StockMovementCreated", new
         {
             movement.Id,
             movement.ProductId,

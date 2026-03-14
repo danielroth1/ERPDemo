@@ -136,7 +136,7 @@ public class TransactionService : ITransactionService
                 CreatedAt = transaction.CreatedAt
             };
 
-            await _kafkaProducer.PublishAsync(FinancialTopic, transaction.Id, transactionEvent);
+            await _kafkaProducer.PublishAsync(FinancialTopic, transaction.Id, "TransactionCreated", transactionEvent);
 
             return MapToResponse(transaction);
         }
