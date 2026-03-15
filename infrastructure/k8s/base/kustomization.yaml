@@ -14,4 +14,6 @@ resources:
   - api-gateway.yaml
   - frontend.yaml
   - prometheus.yaml
+  - loki.yaml
+  - alloy.yaml
   - grafana.yaml

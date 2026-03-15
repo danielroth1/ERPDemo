@@ -539,13 +539,85 @@ Added comprehensive tests for User model including:
 
 ## 🐛 Debugging Tips
 
+### Using Grafana for Multi-Service Debugging
+
+The ERP system uses a full observability stack: **Grafana** (UI) + **Prometheus** (metrics) + **Loki** (logs) + **Grafana Alloy** (log collector).
+
+#### Local Development
+
+| Tool | URL | Credentials |
+|------|-----|-------------|
+| **Grafana** | http://localhost:3001 | admin / admin |
+| **Prometheus** | http://localhost:9090 | — |
+| **Loki** | http://localhost:3100 | — |
+| **Alloy UI** | http://localhost:12345 | — |
+| **Kafka UI** | http://localhost:9000 | — |
+
+Start the infra stack: `docker compose -f infrastructure/docker-compose.dev.yml up -d`
+
+#### How to Debug a Failing Request in Grafana
+
+1. Open **Grafana → Explore** (compass icon)
+2. Select **Loki** datasource
+3. Query by service: `{service="gateway"}` or `{service="inventory"}`
+4. Filter for errors: `{service=~".+"} |~ "(?i)(error|exception|fail)"`
+5. Click a log line → view its trace via structured JSON fields
+6. Switch to **Prometheus** datasource to correlate with `http_requests_received_total` metric
+
+The **ERP Overview** dashboard (Dashboards → ERP folder) provides:
+- HTTP request rate per service
+- 5xx error rate
+- P95 / P50 latency
+- Service UP/DOWN status
+- Live log viewer (searchable)
+
+#### Production
+
+Grafana is available at **https://monitoring.shopping-now.net** (requires DNS `monitoring.shopping-now.net → <k3s-server-ip>`).
+
+Before first deploy, create the Grafana admin secret on the cluster:
+```bash
+KUBECONFIG=~/.kube/k3s-erp.yaml kubectl create secret generic grafana-admin-secret \
+  --from-literal=admin-user=admin \
+  --from-literal=admin-password='STRONG_PASSWORD_HERE' \
+  -n erp-prod
+```
+
+### Observability Architecture
+
+```
+.NET services (host/pod)
+    │
+    ├── /metrics  ──────────────────► Prometheus (scrapes every 15s)
+    │                                          │
+    │                                          ▼
+    │                                       Grafana
+    │                                          ▲
+    └── Serilog GrafanaLoki sink ─► Loki  ────┘
+                                     ▲
+                         Grafana Alloy (Docker / K8s)
+                         (collects infra container/pod logs)
+```
+
+- **.NET services** push logs directly to Loki via `Serilog.Sinks.Grafana.Loki` (configured in `appsettings.Development.json`)
+- **Grafana Alloy** collects logs from infrastructure containers (postgres, kafka, redis) and all K8s pods
+- **Prometheus** scrapes `/metrics` from all services (local dev targets: `host.docker.internal:PORT`)
+
+#### Adding a New Service to the Observability Stack
+
+1. Add to `.csproj`: `<PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.3.0" />`
+2. Add to `appsettings.Development.json` Serilog WriteTo:
+   ```json
+   { "Name": "GrafanaLoki", "Args": { "uri": "http://localhost:3100", "labels": [{ "key": "service", "value": "YOUR-SERVICE-NAME" }] } }
+   ```
+3. Add a Prometheus scrape target to `infrastructure/monitoring/prometheus/prometheus.yml` (local) and `infrastructure/k8s/base/prometheus.yaml` (K8s ConfigMap)
+
 ### Backend Services
 
 1. **Check service health**: `http://localhost:500X/health/ready`
 2. **View Swagger docs**: `http://localhost:500X/swagger`
-3. **Check logs**: Services log to console in JSON format
-4. **MongoDB**: Connect with MongoDB Compass to `mongodb://localhost:27017`
-5. **Kafka**: Access Kafka UI at `http://localhost:8080`
+3. **Check logs**: Services log to console in JSON format (also shipped to Loki in development)
+4. **Kafka**: Access Kafka UI at `http://localhost:9000`
 
 ### Frontend
 
@@ -558,11 +630,13 @@ Added comprehensive tests for User model including:
 
 | Issue | Solution |
 |-------|----------|
-| Service won't start | Check MongoDB/Kafka are running (`docker-compose ps`) |
+| Service won't start | Check postgres/kafka are running (`docker compose -f infrastructure/docker-compose.dev.yml ps`) |
 | 401 Unauthorized | Verify JWT token is valid and not expired |
 | CORS errors | Ensure frontend origin is in Gateway CORS policy |
 | Database connection failed | Check connection string in `appsettings.json` |
 | Port already in use | Change port in `appsettings.json` or kill process |
+| Prometheus targets DOWN | Check service is running; verify port in `prometheus.yml` matches `launchSettings.json` |
+| Logs not in Loki | Ensure `appsettings.Development.json` has GrafanaLoki sink; check `ASPNETCORE_ENVIRONMENT=Development` |
 
 ## 🔧 Adding a New Service
 

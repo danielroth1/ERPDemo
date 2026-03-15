@@ -63,25 +63,31 @@ spec:
                   number: 80
 ---
 # -----------------------------------------------------------------------------
-# Optional: expose Grafana under /grafana (enable when needed)
-# Requires GF_SERVER_ROOT_URL=%(protocol)s://%(domain)s/grafana on the deployment
+# Grafana monitoring access via subdomain: monitoring.shopping-now.net
+# cert-manager automatically provisions a TLS certificate.
 # -----------------------------------------------------------------------------
-# apiVersion: networking.k8s.io/v1
-# kind: Ingress
-# metadata:
-#   name: erp-grafana-ingress
-#   namespace: erp-prod
-#   annotations:
-#     traefik.ingress.kubernetes.io/router.entrypoints: "web"
-# spec:
-#   ingressClassName: traefik
-#   rules:
-#     - http:
-#         paths:
-#           - path: /grafana(/|$)(.*)
-#             pathType: ImplementationSpecific
-#             backend:
-#               service:
-#                 name: grafana-service
-#                 port:
-#                   number: 80
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: erp-monitoring-ingress
+  namespace: erp-prod
+  annotations:
+    traefik.ingress.kubernetes.io/router.entrypoints: "web,websecure"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: traefik
+  tls:
+    - hosts:
+        - monitoring.shopping-now.net
+      secretName: monitoring-tls-cert
+  rules:
+    - host: monitoring.shopping-now.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana-service
+                port:
+                  number: 3000

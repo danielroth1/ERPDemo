@@ -76,6 +76,9 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+    # Allow Prometheus to reach host-running .NET services (macOS & Linux)
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - erp-dev-network
 
@@ -92,14 +95,16 @@ services:
     volumes:
       - grafana-data:/var/lib/grafana
       - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./monitoring/grafana/dashboards:/var/lib/grafana/dashboards:ro
     depends_on:
       - prometheus
+      - loki
     networks:
       - erp-dev-network
 
   # Loki for log aggregation
   loki:
-    image: grafana/loki:2.9.0
+    image: grafana/loki:3.4.1
     container_name: erp-dev-loki
     ports:
       - "3100:3100"
@@ -107,6 +112,26 @@ services:
       - ./logging/loki-config.yml:/etc/loki/local-config.yaml:ro
       - loki-data:/loki
     command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - erp-dev-network
+
+  # Grafana Alloy - collects logs from Docker containers and ships to Loki
+  alloy:
+    image: grafana/alloy:latest
+    container_name: erp-dev-alloy
+    volumes:
+      - ./monitoring/alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - alloy-data:/var/lib/alloy
+    command:
+      - run
+      - /etc/alloy/config.alloy
+      - --storage.path=/var/lib/alloy
+      - --server.http.listen-addr=0.0.0.0:12345
+    ports:
+      - "12345:12345"  # Alloy UI
+    depends_on:
+      - loki
     networks:
       - erp-dev-network
 
@@ -133,6 +158,7 @@ volumes:
   prometheus-data:
   grafana-data:
   loki-data:
+  alloy-data:
   redis-data:
 
 networks:

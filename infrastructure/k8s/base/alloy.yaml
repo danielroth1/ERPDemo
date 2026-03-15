@@ -1,0 +1,167 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: alloy
+  namespace: erp-local
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: alloy-log-reader
+rules:
+- apiGroups: [""]
+  resources: ["nodes", "nodes/proxy", "services", "endpoints", "pods", "namespaces"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: alloy-log-reader
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: alloy-log-reader
+subjects:
+- kind: ServiceAccount
+  name: alloy
+  namespace: erp-local
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: alloy-config
+  namespace: erp-local
+data:
+  config.alloy: |
+    // Discover all pods in the cluster
+    discovery.kubernetes "pods" {
+      role = "pod"
+    }
+
+    // Relabel pod metadata to useful Loki stream labels
+    discovery.relabel "pod_logs" {
+      targets = discovery.kubernetes.pods.targets
+
+      // Keep only running pods with a log stream
+      rule {
+        source_labels = ["__meta_kubernetes_pod_phase"]
+        regex         = "Pending|Running|Succeeded|Failed"
+        action        = "keep"
+      }
+
+      // Map namespace
+      rule {
+        source_labels = ["__meta_kubernetes_namespace"]
+        target_label  = "namespace"
+      }
+
+      // Map pod name
+      rule {
+        source_labels = ["__meta_kubernetes_pod_name"]
+        target_label  = "pod"
+      }
+
+      // Use app label as service name (falls back to pod name for infra pods)
+      rule {
+        source_labels = ["__meta_kubernetes_pod_label_app"]
+        target_label  = "service"
+      }
+
+      // Map container name
+      rule {
+        source_labels = ["__meta_kubernetes_pod_container_name"]
+        target_label  = "container"
+      }
+
+      // Path to the log file on the node
+      rule {
+        source_labels = [
+          "__meta_kubernetes_pod_uid",
+          "__meta_kubernetes_pod_container_name",
+        ]
+        separator    = "/"
+        target_label = "__path__"
+        replacement  = "/var/log/pods/*$1/*.log"
+      }
+    }
+
+    local.file_match "pod_logs" {
+      path_targets = discovery.relabel.pod_logs.output
+    }
+
+    loki.source.file "pod_logs" {
+      targets    = local.file_match.pod_logs.targets
+      forward_to = [loki.write.k8s.receiver]
+    }
+
+    loki.write "k8s" {
+      endpoint {
+        url = "http://loki-service:3100/loki/api/v1/push"
+      }
+    }
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: alloy
+  namespace: erp-local
+  labels:
+    app: alloy
+spec:
+  selector:
+    matchLabels:
+      app: alloy
+  template:
+    metadata:
+      labels:
+        app: alloy
+    spec:
+      serviceAccountName: alloy
+      tolerations:
+      - key: node-role.kubernetes.io/control-plane
+        effect: NoSchedule
+      containers:
+      - name: alloy
+        image: grafana/alloy:latest
+        imagePullPolicy: IfNotPresent
+        args:
+          - run
+          - /etc/alloy/config.alloy
+          - --storage.path=/var/lib/alloy
+          - --server.http.listen-addr=0.0.0.0:12345
+        ports:
+        - containerPort: 12345
+          name: http-metrics
+        volumeMounts:
+        - name: config
+          mountPath: /etc/alloy
+        - name: data
+          mountPath: /var/lib/alloy
+        - name: varlogpods
+          mountPath: /var/log/pods
+          readOnly: true
+        - name: varlibdockercontainers
+          mountPath: /var/lib/docker/containers
+          readOnly: true
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: config
+        configMap:
+          name: alloy-config
+      - name: data
+        emptyDir: {}
+      - name: varlogpods
+        hostPath:
+          path: /var/log/pods
+      - name: varlibdockercontainers
+        hostPath:
+          path: /var/lib/docker/containers
