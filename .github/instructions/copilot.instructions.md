@@ -195,12 +195,12 @@ ServiceName.Tests/
 
 | Service | Port | URL |
 |---------|------|-----|
-| API Gateway | 5001 | http://localhost:5001 |
-| User Management | 5002 | http://localhost:5002 |
-| Inventory Management | 5003 | http://localhost:5003 |
-| Sales & Orders | 5004 | http://localhost:5004 |
-| Financial Management | 5005 | http://localhost:5005 |
-| Dashboard & Analytics | 5006 | http://localhost:5006 |
+| API Gateway | 5000 | http://localhost:5000 |
+| User Management | 5001 | http://localhost:5001 |
+| Inventory Management | 5002 | http://localhost:5002 |
+| Sales & Orders | 5003 | http://localhost:5003 |
+| Financial Management | 5004 | http://localhost:5004 |
+| Dashboard & Analytics | 5005 | http://localhost:5005 |
 | Frontend (Dev) | 5173 | http://localhost:5173 |
 
 ### Frontend Structure

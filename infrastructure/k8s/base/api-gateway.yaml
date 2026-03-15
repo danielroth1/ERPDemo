@@ -24,7 +24,7 @@ spec:
         - name: ASPNETCORE_URLS
           value: "http://+:8080"
         - name: ASPNETCORE_ENVIRONMENT
-          value: "Development"
+          value: "Production"
         - name: Jwt__Secret
           value: "your-secret-key-change-in-production-min-32-chars"
         - name: Jwt__Issuer

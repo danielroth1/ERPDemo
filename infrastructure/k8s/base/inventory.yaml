@@ -24,7 +24,7 @@ spec:
         - name: ASPNETCORE_URLS
           value: "http://+:8080"
         - name: ASPNETCORE_ENVIRONMENT
-          value: "Development"
+          value: "Production"
         - name: PostgreSQL__ConnectionString
           valueFrom:
             secretKeyRef:
@@ -32,6 +32,8 @@ spec:
               key: connection-string-inventory
         - name: Kafka__BootstrapServers
           value: "kafka-service:9092"
+        - name: Services__Financial
+          value: "http://financial-service:8080"
         - name: Jwt__Secret
           value: "your-secret-key-change-in-production-min-32-chars"
         - name: Jwt__Issuer
