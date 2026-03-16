@@ -171,25 +171,4 @@ public class IncomeStatementResponse
     public decimal NetIncome { get; set; }
 }
 
-// Kafka Events
-public class TransactionCreatedEvent
-{
-    public string TransactionId { get; set; } = string.Empty;
-    public string TransactionNumber { get; set; } = string.Empty;
-    public DateTime Date { get; set; }
-    public string Description { get; set; } = string.Empty;
-    public string Type { get; set; } = string.Empty;
-    public decimal Amount { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
 
-public class BudgetExceededEvent
-{
-    public string BudgetId { get; set; } = string.Empty;
-    public string BudgetName { get; set; } = string.Empty;
-    public string AccountId { get; set; } = string.Empty;
-    public decimal BudgetAmount { get; set; }
-    public decimal Spent { get; set; }
-    public decimal ExceededBy { get; set; }
-    public DateTime DetectedAt { get; set; }
-}

@@ -11,9 +11,3 @@ public class JwtSettings
     public string Issuer { get; set; } = string.Empty;
     public string Audience { get; set; } = string.Empty;
 }
-
-public class KafkaSettings
-{
-    public string BootstrapServers { get; set; } = string.Empty;
-    public string ConsumerGroupId { get; set; } = string.Empty;
-}

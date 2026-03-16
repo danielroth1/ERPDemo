@@ -20,6 +20,88 @@ data:
   KAFKA_LOG_SEGMENT_BYTES: "104857600"
   CLUSTER_ID: "SIOelZD3O06P-hX-XIPBVg"
 ---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-init-topics
+  namespace: erp-local
+  annotations:
+    # Re-run this job when the ConfigMap changes (e.g. new topics added)
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  ttlSecondsAfterFinished: 300
+  template:
+    spec:
+      restartPolicy: OnFailure
+      initContainers:
+      - name: wait-for-kafka
+        image: confluentinc/cp-kafka:7.5.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Waiting for Kafka to be ready..."
+          until kafka-topics --bootstrap-server kafka-service:9092 --list > /dev/null 2>&1; do
+            echo "  Kafka not ready yet, retrying in 5s..."
+            sleep 5
+          done
+          echo "Kafka is ready."
+      containers:
+      - name: create-topics
+        image: confluentinc/cp-kafka:7.5.0
+        command:
+        - /bin/bash
+        - -c
+        - |
+          BOOTSTRAP=kafka-service:9092
+          TOPICS="
+            submit-purchase
+            submit-return
+            reserve-stock
+            deduct-stock
+            restore-stock
+            create-purchase-transaction
+            create-refund-transaction
+            stock-reserved
+            stock-reservation-failed
+            stock-deducted
+            stock-deduction-failed
+            purchase-transaction-created
+            purchase-transaction-failed
+            stock-restored
+            refund-transaction-created
+            refund-transaction-failed
+            purchase-completed
+            purchase-failed
+            return-completed
+            return-failed
+            product-created
+            product-updated
+            product-deleted
+            stock-updated
+            low-stock-alert
+            stock-movement-created
+            user-created
+            user-updated
+            user-deleted
+            user-deactivated
+            order-created
+            order-status-changed
+            invoice-created
+            invoice-paid
+            transaction-created
+            budget-exceeded
+          "
+          for topic in $TOPICS; do
+            kafka-topics --bootstrap-server $BOOTSTRAP \
+              --create --if-not-exists \
+              --topic "$topic" \
+              --partitions 1 \
+              --replication-factor 1
+            echo "  ✓ $topic"
+          done
+          echo "All topics ready."
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:

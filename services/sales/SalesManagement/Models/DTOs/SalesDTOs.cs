@@ -151,48 +151,4 @@ public class AddressRequest
     public string Country { get; set; } = string.Empty;
 }
 
-// Kafka Events
-public class OrderCreatedEvent
-{
-    public string OrderId { get; set; } = string.Empty;
-    public string CustomerId { get; set; } = string.Empty;
-    public string OrderNumber { get; set; } = string.Empty;
-    public decimal Total { get; set; }
-    public List<OrderItemEvent> Items { get; set; } = new();
-    public DateTime CreatedAt { get; set; }
-}
 
-public class OrderStatusChangedEvent
-{
-    public string OrderId { get; set; } = string.Empty;
-    public string OrderNumber { get; set; } = string.Empty;
-    public string OldStatus { get; set; } = string.Empty;
-    public string NewStatus { get; set; } = string.Empty;
-    public DateTime ChangedAt { get; set; }
-}
-
-public class OrderItemEvent
-{
-    public string ProductId { get; set; } = string.Empty;
-    public int Quantity { get; set; }
-    public decimal UnitPrice { get; set; }
-}
-
-public class InvoiceCreatedEvent
-{
-    public string InvoiceId { get; set; } = string.Empty;
-    public string InvoiceNumber { get; set; } = string.Empty;
-    public string OrderId { get; set; } = string.Empty;
-    public string CustomerId { get; set; } = string.Empty;
-    public decimal Total { get; set; }
-    public DateTime DueDate { get; set; }
-    public DateTime CreatedAt { get; set; }
-}
-
-public class InvoicePaidEvent
-{
-    public string InvoiceId { get; set; } = string.Empty;
-    public string InvoiceNumber { get; set; } = string.Empty;
-    public decimal AmountPaid { get; set; }
-    public DateTime PaidAt { get; set; }
-}

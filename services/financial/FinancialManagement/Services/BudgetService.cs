@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 using FinancialManagement.Infrastructure;
 using FinancialManagement.Models;
 using FinancialManagement.Models.DTOs;
+using ERP.Contracts.Events.Domain;
 
 namespace FinancialManagement.Services;
 
@@ -21,19 +23,18 @@ public class BudgetService : IBudgetService
 {
     private readonly AppDbContext _dbContext;
     private readonly IAccountService _accountService;
-    private readonly KafkaProducer _kafkaProducer;
+    private readonly ITopicProducer<BudgetExceeded> _budgetExceededProducer;
     private readonly ILogger<BudgetService> _logger;
-    private const string FinancialTopic = "financial-events";
 
     public BudgetService(
         AppDbContext dbContext,
         IAccountService accountService,
-        KafkaProducer kafkaProducer,
+        ITopicProducer<BudgetExceeded> budgetExceededProducer,
         ILogger<BudgetService> logger)
     {
         _dbContext = dbContext;
         _accountService = accountService;
-        _kafkaProducer = kafkaProducer;
+        _budgetExceededProducer = budgetExceededProducer;
         _logger = logger;
     }
 
@@ -176,18 +177,13 @@ public class BudgetService : IBudgetService
                     budget.Name, budget.Spent, budget.Amount);
 
                 // Publish budget exceeded event
-                var budgetEvent = new BudgetExceededEvent
+                await _budgetExceededProducer.Produce(new BudgetExceeded
                 {
                     BudgetId = budget.Id,
                     BudgetName = budget.Name,
-                    AccountId = budget.AccountId,
                     BudgetAmount = budget.Amount,
-                    Spent = budget.Spent,
-                    ExceededBy = budget.Spent - budget.Amount,
-                    DetectedAt = DateTime.UtcNow
-                };
-
-                await _kafkaProducer.PublishAsync(FinancialTopic, budget.Id, "BudgetExceeded", budgetEvent);
+                    CurrentSpending = budget.Spent
+                });
             }
         }
 

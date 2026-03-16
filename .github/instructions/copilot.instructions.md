@@ -541,7 +541,7 @@ Added comprehensive tests for User model including:
 
 ### Using Grafana for Multi-Service Debugging
 
-The ERP system uses a full observability stack: **Grafana** (UI) + **Prometheus** (metrics) + **Loki** (logs) + **Grafana Alloy** (log collector).
+The ERP system uses a full observability stack: **Grafana** (UI) + **Prometheus** (metrics) + **Loki** (logs) + **Grafana Alloy** (log collector) + **Grafana Tempo** (distributed tracing).
 
 #### Local Development
 
@@ -550,6 +550,7 @@ The ERP system uses a full observability stack: **Grafana** (UI) + **Prometheus*
 | **Grafana** | http://localhost:3001 | admin / admin |
 | **Prometheus** | http://localhost:9090 | — |
 | **Loki** | http://localhost:3100 | — |
+| **Tempo** | http://localhost:3200 | — |
 | **Alloy UI** | http://localhost:12345 | — |
 | **Kafka UI** | http://localhost:9000 | — |
 
@@ -593,15 +594,69 @@ KUBECONFIG=~/.kube/k3s-erp.yaml kubectl create secret generic grafana-admin-secr
     │                                          ▼
     │                                       Grafana
     │                                          ▲
-    └── Serilog GrafanaLoki sink ─► Loki  ────┘
-                                     ▲
-                         Grafana Alloy (Docker / K8s)
-                         (collects infra container/pod logs)
+    ├── Serilog GrafanaLoki sink ─► Loki  ────┘
+    │                                ▲         │
+    │                    Grafana Alloy          │ (trace→log correlation)
+    │                    (Docker/K8s logs)      │
+    │                                          ▼
+    └── OpenTelemetry OTLP ────────► Tempo ───┘
+                                   (distributed tracing)
 ```
 
-- **.NET services** push logs directly to Loki via `Serilog.Sinks.Grafana.Loki` (configured in `appsettings.Development.json`)
+- **.NET services** push logs directly to Loki via `Serilog.Sinks.Grafana.Loki`
 - **Grafana Alloy** collects logs from infrastructure containers (postgres, kafka, redis) and all K8s pods
-- **Prometheus** scrapes `/metrics` from all services (local dev targets: `host.docker.internal:PORT`)
+- **Prometheus** scrapes `/metrics` from all services
+- **Tempo** receives OTLP traces from all services via gRPC (port 4317)
+- **OpenTelemetry** auto-instruments ASP.NET Core, HttpClient, and MassTransit
+
+### MassTransit Saga Architecture
+
+The ERP system uses **MassTransit** with **Kafka transport** (Rider) for workflow orchestration via sagas.
+
+#### Shared Contracts
+All message types are defined in `services/shared/ERP.Contracts/`:
+- **Commands**: `SubmitPurchase`, `SubmitReturn`, `ReserveStock`, `DeductStock`, `RestoreStock`, `CreatePurchaseTransaction`, `CreateRefundTransaction`
+- **Saga Events**: `StockReserved`, `StockReservationFailed`, `PurchaseTransactionCreated`, etc.
+- **Domain Events**: `UserCreated`, `ProductUpdated`, `OrderCreated`, `TransactionCreated`, etc.
+- **KafkaTopics**: Static constants for all topic names
+
+#### Purchase Saga Flow
+```
+Gateway: SubmitPurchase → [ReserveStock] → Inventory
+Inventory: StockReserved → Gateway
+Gateway: [CreatePurchaseTransaction] → Financial
+Financial: PurchaseTransactionCreated → Gateway
+Gateway: [DeductStock] → Inventory
+Inventory: StockDeducted → Gateway
+Gateway: PurchaseCompleted → HTTP Response
+```
+Compensation: If financial transaction fails, Gateway sends `RestoreStock` to Inventory.
+
+#### Return Saga Flow
+```
+Gateway: SubmitReturn → [CreateRefundTransaction] → Financial
+Financial: RefundTransactionCreated → Gateway
+Gateway: [RestoreStock] → Inventory
+Inventory: StockRestored → Gateway
+Gateway: ReturnCompleted → HTTP Response
+```
+
+#### Service Roles
+| Service | Role | Key Files |
+|---------|------|-----------|
+| **Gateway** | Saga orchestrator + HTTP bridge | `Sagas/PurchaseStateMachine.cs`, `Services/PurchaseTracker.cs`, `Controllers/ShopController.cs` |
+| **Inventory** | Command consumer (reserve/deduct/restore stock) | `Consumers/ReserveStockConsumer.cs`, etc. |
+| **Financial** | Command consumer (create transactions) | `Consumers/CreatePurchaseTransactionConsumer.cs`, etc. |
+| **Dashboard** | Domain event consumer (analytics) | `Consumers/UserEventConsumers.cs`, etc. |
+| **UserMgmt** | Domain event producer | Uses `ITopicProducer<T>` |
+| **Sales** | Domain event producer | Uses `ITopicProducer<T>` |
+
+#### Adding a New MassTransit Consumer
+1. Define message types in `services/shared/ERP.Contracts/`
+2. Add topic name to `KafkaTopics.cs` if new
+3. Create consumer class implementing `IConsumer<T>`
+4. Register in `Program.cs`: `rider.AddConsumer<T>()` + `k.TopicEndpoint<TMessage>(...)`
+5. Add producer if the consumer publishes events: `rider.AddProducer<TEvent>(topic)`
 
 #### Adding a New Service to the Observability Stack
 

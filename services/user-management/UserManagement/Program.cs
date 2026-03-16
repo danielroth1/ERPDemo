@@ -4,9 +4,14 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Prometheus;
+using MassTransit;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using UserManagement.Configuration;
 using UserManagement.Infrastructure;
 using UserManagement.Services;
+using ERP.Contracts;
+using ERP.Contracts.Events.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -24,27 +29,60 @@ var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings not configured");
 var smtpSettings = builder.Configuration.GetSection("Smtp").Get<SmtpSettings>()
     ?? throw new InvalidOperationException("SMTP settings not configured");
-var kafkaSettings = builder.Configuration.GetSection("Kafka").Get<KafkaSettings>()
-    ?? throw new InvalidOperationException("Kafka settings not configured");
 
 // Register settings as singletons
 builder.Services.AddSingleton(postgresSettings);
 builder.Services.AddSingleton(jwtSettings);
 builder.Services.AddSingleton(smtpSettings);
-builder.Services.AddSingleton(kafkaSettings);
 
 // Register PostgreSQL DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(postgresSettings.ConnectionString)
         .UseSnakeCaseNamingConvention());
 
-// Register Kafka producer
-builder.Services.AddSingleton<KafkaProducer>();
-
 // Register services
 builder.Services.AddScoped<UserService>();
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<EmailService>();
+
+// Configure MassTransit with Kafka Rider (producer only)
+var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingInMemory((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+
+    x.AddRider(rider =>
+    {
+        rider.AddProducer<UserCreated>(KafkaTopics.UserCreatedEvent);
+        rider.AddProducer<UserUpdated>(KafkaTopics.UserUpdatedEvent);
+        rider.AddProducer<UserDeleted>(KafkaTopics.UserDeletedEvent);
+        rider.AddProducer<UserDeactivated>(KafkaTopics.UserDeactivatedEvent);
+
+        rider.UsingKafka((context, k) =>
+        {
+            k.Host(kafkaBootstrap);
+        });
+    });
+});
+
+// Configure OpenTelemetry tracing
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("user-management"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSource("MassTransit")
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
+            });
+    });
 
 // Configure JWT authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

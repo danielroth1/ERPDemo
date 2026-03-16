@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 using FinancialManagement.Infrastructure;
 using FinancialManagement.Models;
 using FinancialManagement.Models.DTOs;
+using ERP.Contracts.Events.Domain;
 
 namespace FinancialManagement.Services;
 
@@ -19,19 +21,18 @@ public class TransactionService : ITransactionService
 {
     private readonly AppDbContext _dbContext;
     private readonly IAccountService _accountService;
-    private readonly KafkaProducer _kafkaProducer;
+    private readonly ITopicProducer<TransactionCreated> _transactionCreatedProducer;
     private readonly ILogger<TransactionService> _logger;
-    private const string FinancialTopic = "financial-events";
 
     public TransactionService(
         AppDbContext dbContext,
         IAccountService accountService,
-        KafkaProducer kafkaProducer,
+        ITopicProducer<TransactionCreated> transactionCreatedProducer,
         ILogger<TransactionService> logger)
     {
         _dbContext = dbContext;
         _accountService = accountService;
-        _kafkaProducer = kafkaProducer;
+        _transactionCreatedProducer = transactionCreatedProducer;
         _logger = logger;
     }
 
@@ -124,19 +125,14 @@ public class TransactionService : ITransactionService
             _logger.LogInformation("Created transaction {TransactionNumber}: {Description}",
                 transactionNumber, request.Description);
 
-            // Publish event
-            var transactionEvent = new TransactionCreatedEvent
+            // Publish event via MassTransit
+            await _transactionCreatedProducer.Produce(new TransactionCreated
             {
                 TransactionId = transaction.Id,
-                TransactionNumber = transaction.TransactionNumber,
-                Date = transaction.Date,
                 Description = transaction.Description,
                 Type = transaction.Type.ToString(),
-                Amount = totalDebits, // or totalCredits, they're equal
-                CreatedAt = transaction.CreatedAt
-            };
-
-            await _kafkaProducer.PublishAsync(FinancialTopic, transaction.Id, "TransactionCreated", transactionEvent);
+                TotalAmount = totalDebits
+            });
 
             return MapToResponse(transaction);
         }

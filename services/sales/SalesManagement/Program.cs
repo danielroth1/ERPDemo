@@ -5,10 +5,15 @@ using Prometheus;
 using Serilog;
 using Serilog.Formatting.Compact;
 using System.Text;
+using MassTransit;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using SalesManagement.Configuration;
 using SalesManagement.GraphQL;
 using SalesManagement.Infrastructure;
 using SalesManagement.Services;
+using ERP.Contracts;
+using ERP.Contracts.Events.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,26 +30,58 @@ var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<Postgr
     ?? throw new InvalidOperationException("PostgreSQL configuration is missing");
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT configuration is missing");
-var kafkaSettings = builder.Configuration.GetSection("Kafka").Get<KafkaSettings>()
-    ?? throw new InvalidOperationException("Kafka configuration is missing");
-
 // Add services to the container
 builder.Services.AddSingleton(postgresSettings);
 builder.Services.AddSingleton(jwtSettings);
-builder.Services.AddSingleton(kafkaSettings);
 
 // Register PostgreSQL DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(postgresSettings.ConnectionString)
         .UseSnakeCaseNamingConvention());
 
-// Register Kafka producer
-builder.Services.AddSingleton<KafkaProducer>();
-
 // Register application services
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<ICustomerService, CustomerService>();
 builder.Services.AddScoped<IInvoiceService, InvoiceService>();
+
+// Configure MassTransit with Kafka Rider (producer only)
+var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingInMemory((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+
+    x.AddRider(rider =>
+    {
+        rider.AddProducer<OrderCreated>(KafkaTopics.OrderCreatedEvent);
+        rider.AddProducer<OrderStatusChanged>(KafkaTopics.OrderStatusChangedEvent);
+        rider.AddProducer<InvoiceCreated>(KafkaTopics.InvoiceCreatedEvent);
+        rider.AddProducer<InvoicePaid>(KafkaTopics.InvoicePaidEvent);
+
+        rider.UsingKafka((context, k) =>
+        {
+            k.Host(kafkaBootstrap);
+        });
+    });
+});
+
+// Configure OpenTelemetry tracing
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("sales"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSource("MassTransit")
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
+            });
+    });
 
 // Configure JWT authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

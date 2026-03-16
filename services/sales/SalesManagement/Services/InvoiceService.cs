@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 using SalesManagement.Infrastructure;
 using SalesManagement.Models;
 using SalesManagement.Models.DTOs;
+using ERP.Contracts.Events.Domain;
 
 namespace SalesManagement.Services;
 
@@ -23,19 +25,21 @@ public class InvoiceService : IInvoiceService
 {
     private readonly AppDbContext _dbContext;
     private readonly IOrderService _orderService;
-    private readonly KafkaProducer _kafkaProducer;
+    private readonly ITopicProducer<InvoiceCreated> _invoiceCreatedProducer;
+    private readonly ITopicProducer<InvoicePaid> _invoicePaidProducer;
     private readonly ILogger<InvoiceService> _logger;
-    private const string InvoiceTopic = "sales-events";
 
     public InvoiceService(
         AppDbContext dbContext,
         IOrderService orderService,
-        KafkaProducer kafkaProducer,
+        ITopicProducer<InvoiceCreated> invoiceCreatedProducer,
+        ITopicProducer<InvoicePaid> invoicePaidProducer,
         ILogger<InvoiceService> logger)
     {
         _dbContext = dbContext;
         _orderService = orderService;
-        _kafkaProducer = kafkaProducer;
+        _invoiceCreatedProducer = invoiceCreatedProducer;
+        _invoicePaidProducer = invoicePaidProducer;
         _logger = logger;
     }
 
@@ -88,19 +92,13 @@ public class InvoiceService : IInvoiceService
         _logger.LogInformation("Created invoice {InvoiceNumber} for order {OrderNumber}", 
             invoiceNumber, order.OrderNumber);
 
-        // Publish event
-        var invoiceEvent = new InvoiceCreatedEvent
+        // Publish event via MassTransit
+        await _invoiceCreatedProducer.Produce(new InvoiceCreated
         {
             InvoiceId = invoice.Id,
-            InvoiceNumber = invoice.InvoiceNumber,
             OrderId = invoice.OrderId,
-            CustomerId = invoice.CustomerId,
-            Total = invoice.Total,
-            DueDate = invoice.DueDate,
-            CreatedAt = invoice.CreatedAt
-        };
-
-        await _kafkaProducer.PublishAsync(InvoiceTopic, invoice.Id, "InvoiceCreated", invoiceEvent);
+            Amount = invoice.Total
+        });
 
         return MapToResponse(invoice);
     }
@@ -245,15 +243,12 @@ public class InvoiceService : IInvoiceService
         // Publish payment event if fully paid
         if (invoice.Status == InvoiceStatus.Paid)
         {
-            var paymentEvent = new InvoicePaidEvent
+            await _invoicePaidProducer.Produce(new InvoicePaid
             {
                 InvoiceId = invoice.Id,
-                InvoiceNumber = invoice.InvoiceNumber,
-                AmountPaid = invoice.AmountPaid,
-                PaidAt = invoice.PaidAt ?? DateTime.UtcNow
-            };
-
-            await _kafkaProducer.PublishAsync(InvoiceTopic, invoice.Id, "InvoicePaid", paymentEvent);
+                OrderId = invoice.OrderId ?? "",
+                Amount = invoice.AmountPaid
+            });
         }
 
         return MapToResponse(invoice);

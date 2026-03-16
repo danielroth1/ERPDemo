@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 using SalesManagement.Infrastructure;
 using SalesManagement.Models;
 using SalesManagement.Models.DTOs;
+using ERP.Contracts.Events.Domain;
 
 namespace SalesManagement.Services;
 
@@ -21,20 +23,22 @@ public class OrderService : IOrderService
 {
     private readonly AppDbContext _dbContext;
     private readonly ICustomerService _customerService;
-    private readonly KafkaProducer _kafkaProducer;
+    private readonly ITopicProducer<OrderCreated> _orderCreatedProducer;
+    private readonly ITopicProducer<OrderStatusChanged> _orderStatusChangedProducer;
     private readonly ILogger<OrderService> _logger;
-    private const string OrderTopic = "sales-events";
     private const decimal TaxRate = 0.1m; // 10% tax
 
     public OrderService(
         AppDbContext dbContext,
         ICustomerService customerService,
-        KafkaProducer kafkaProducer,
+        ITopicProducer<OrderCreated> orderCreatedProducer,
+        ITopicProducer<OrderStatusChanged> orderStatusChangedProducer,
         ILogger<OrderService> logger)
     {
         _dbContext = dbContext;
         _customerService = customerService;
-        _kafkaProducer = kafkaProducer;
+        _orderCreatedProducer = orderCreatedProducer;
+        _orderStatusChangedProducer = orderStatusChangedProducer;
         _logger = logger;
     }
 
@@ -99,23 +103,14 @@ public class OrderService : IOrderService
 
         _logger.LogInformation("Created order {OrderNumber} for customer {CustomerId}", orderNumber, request.CustomerId);
 
-        // Publish event
-        var orderEvent = new OrderCreatedEvent
+        // Publish event via MassTransit
+        await _orderCreatedProducer.Produce(new OrderCreated
         {
             OrderId = order.Id,
             CustomerId = order.CustomerId,
-            OrderNumber = order.OrderNumber,
-            Total = order.Total,
-            Items = order.Items.Select(i => new OrderItemEvent
-            {
-                ProductId = i.ProductId,
-                Quantity = i.Quantity,
-                UnitPrice = i.UnitPrice
-            }).ToList(),
-            CreatedAt = order.CreatedAt
-        };
-
-        await _kafkaProducer.PublishAsync(OrderTopic, order.Id, "OrderCreated", orderEvent);
+            TotalAmount = order.Total,
+            Status = order.Status.ToString()
+        });
 
         return MapToResponse(order);
     }
@@ -247,16 +242,12 @@ public class OrderService : IOrderService
             order.OrderNumber, oldStatus, status);
 
         // Publish status change event
-        var statusEvent = new OrderStatusChangedEvent
+        await _orderStatusChangedProducer.Produce(new OrderStatusChanged
         {
             OrderId = order.Id,
-            OrderNumber = order.OrderNumber,
             OldStatus = oldStatus.ToString(),
-            NewStatus = status.ToString(),
-            ChangedAt = DateTime.UtcNow
-        };
-
-        await _kafkaProducer.PublishAsync(OrderTopic, order.Id, "OrderStatusChanged", statusEvent);
+            NewStatus = status.ToString()
+        });
 
         return MapToResponse(order);
     }

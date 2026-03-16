@@ -4,9 +4,18 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Prometheus;
+using Confluent.Kafka;
+using MassTransit;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using InventoryManagement.Configuration;
+using InventoryManagement.Consumers;
 using InventoryManagement.Infrastructure;
 using InventoryManagement.Services;
+using ERP.Contracts;
+using ERP.Contracts.Commands;
+using ERP.Contracts.Events;
+using ERP.Contracts.Events.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -22,27 +31,90 @@ var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<Postgr
     ?? throw new InvalidOperationException("PostgreSQL settings not configured");
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings not configured");
-var kafkaSettings = builder.Configuration.GetSection("Kafka").Get<KafkaSettings>()
-    ?? throw new InvalidOperationException("Kafka settings not configured");
 
 // Register settings as singletons
 builder.Services.AddSingleton(postgresSettings);
 builder.Services.AddSingleton(jwtSettings);
-builder.Services.AddSingleton(kafkaSettings);
 
 // Register PostgreSQL DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(postgresSettings.ConnectionString)
         .UseSnakeCaseNamingConvention());
 
-// Register Kafka producer
-builder.Services.AddSingleton<KafkaProducer>();
-
 // Register services
 builder.Services.AddScoped<ProductService>();
 builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<StockMovementService>();
 builder.Services.AddScoped<IFinancialAccountInitializer, FinancialAccountInitializer>();
+
+// Configure MassTransit with Kafka Rider
+var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingInMemory((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+
+    x.AddRider(rider =>
+    {
+        rider.AddConsumer<ReserveStockConsumer>();
+        rider.AddConsumer<DeductStockConsumer>();
+        rider.AddConsumer<RestoreStockConsumer>();
+
+        // Producers for saga events + domain events
+        rider.AddProducer<StockReserved>(KafkaTopics.StockReservedEvent);
+        rider.AddProducer<StockReservationFailed>(KafkaTopics.StockReservationFailedEvent);
+        rider.AddProducer<StockDeducted>(KafkaTopics.StockDeductedEvent);
+        rider.AddProducer<StockDeductionFailed>(KafkaTopics.StockDeductionFailedEvent);
+        rider.AddProducer<StockRestored>(KafkaTopics.StockRestoredEvent);
+        rider.AddProducer<ProductCreated>(KafkaTopics.ProductCreatedEvent);
+        rider.AddProducer<ProductUpdated>(KafkaTopics.ProductUpdatedEvent);
+        rider.AddProducer<ProductDeleted>(KafkaTopics.ProductDeletedEvent);
+        rider.AddProducer<StockUpdated>(KafkaTopics.StockUpdatedEvent);
+        rider.AddProducer<LowStockAlert>(KafkaTopics.LowStockAlertEvent);
+        rider.AddProducer<StockMovementCreated>(KafkaTopics.StockMovementCreatedEvent);
+
+        rider.UsingKafka((context, k) =>
+        {
+            k.Host(kafkaBootstrap);
+
+            k.TopicEndpoint<ReserveStock>(KafkaTopics.ReserveStockCommand, "inventory-reserve-stock", e =>
+            {
+                e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                e.ConfigureConsumer<ReserveStockConsumer>(context);
+            });
+
+            k.TopicEndpoint<DeductStock>(KafkaTopics.DeductStockCommand, "inventory-deduct-stock", e =>
+            {
+                e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                e.ConfigureConsumer<DeductStockConsumer>(context);
+            });
+
+            k.TopicEndpoint<RestoreStock>(KafkaTopics.RestoreStockCommand, "inventory-restore-stock", e =>
+            {
+                e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                e.ConfigureConsumer<RestoreStockConsumer>(context);
+            });
+        });
+    });
+});
+
+// Configure OpenTelemetry tracing
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("inventory"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSource("MassTransit")
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
+            });
+    });
 
 // Add HttpClient factory for inter-service communication
 builder.Services.AddHttpClient("FinancialService", client =>

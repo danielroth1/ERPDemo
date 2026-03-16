@@ -1,23 +1,37 @@
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 using InventoryManagement.Infrastructure;
 using InventoryManagement.Models;
 using InventoryManagement.Models.DTOs;
+using DomainEvents = ERP.Contracts.Events.Domain;
 
 namespace InventoryManagement.Services;
 
 public class ProductService
 {
     private readonly AppDbContext _dbContext;
-    private readonly KafkaProducer _kafkaProducer;
+    private readonly ITopicProducer<DomainEvents.ProductCreated> _productCreatedProducer;
+    private readonly ITopicProducer<DomainEvents.ProductUpdated> _productUpdatedProducer;
+    private readonly ITopicProducer<DomainEvents.ProductDeleted> _productDeletedProducer;
+    private readonly ITopicProducer<DomainEvents.StockUpdated> _stockUpdatedProducer;
+    private readonly ITopicProducer<DomainEvents.LowStockAlert> _lowStockAlertProducer;
     private readonly ILogger<ProductService> _logger;
 
     public ProductService(
         AppDbContext dbContext,
-        KafkaProducer kafkaProducer,
+        ITopicProducer<DomainEvents.ProductCreated> productCreatedProducer,
+        ITopicProducer<DomainEvents.ProductUpdated> productUpdatedProducer,
+        ITopicProducer<DomainEvents.ProductDeleted> productDeletedProducer,
+        ITopicProducer<DomainEvents.StockUpdated> stockUpdatedProducer,
+        ITopicProducer<DomainEvents.LowStockAlert> lowStockAlertProducer,
         ILogger<ProductService> logger)
     {
         _dbContext = dbContext;
-        _kafkaProducer = kafkaProducer;
+        _productCreatedProducer = productCreatedProducer;
+        _productUpdatedProducer = productUpdatedProducer;
+        _productDeletedProducer = productDeletedProducer;
+        _stockUpdatedProducer = stockUpdatedProducer;
+        _lowStockAlertProducer = lowStockAlertProducer;
         _logger = logger;
     }
 
@@ -101,13 +115,13 @@ public class ProductService
 
         _logger.LogInformation("Product created: {ProductId} - {ProductName}", product.Id, product.Name);
 
-        await _kafkaProducer.PublishEventAsync(product.Id, "ProductCreated", new
+        await _productCreatedProducer.Produce(new DomainEvents.ProductCreated
         {
-            product.Id,
-            product.Sku,
-            product.Name,
-            product.Price,
-            product.StockQuantity
+            ProductId = product.Id,
+            Name = product.Name,
+            CategoryId = product.CategoryId,
+            Price = product.Price,
+            StockQuantity = product.StockQuantity
         });
 
         return product;
@@ -135,13 +149,13 @@ public class ProductService
 
         _logger.LogInformation("Product updated: {ProductId}", id);
 
-        await _kafkaProducer.PublishEventAsync(id, "ProductUpdated", new
+        await _productUpdatedProducer.Produce(new DomainEvents.ProductUpdated
         {
-            product.Id,
-            product.Name,
-            product.Price,
-            product.StockQuantity,
-            product.IsActive
+            ProductId = id,
+            Name = product.Name,
+            CategoryId = product.CategoryId,
+            Price = product.Price,
+            StockQuantity = product.StockQuantity
         });
 
         return true;
@@ -159,24 +173,23 @@ public class ProductService
 
         _logger.LogInformation("Stock updated for product: {ProductId}, new quantity: {Quantity}", id, newQuantity);
 
-        await _kafkaProducer.PublishEventAsync(id, "StockUpdated", new
+        await _stockUpdatedProducer.Produce(new DomainEvents.StockUpdated
         {
             ProductId = id,
-            NewQuantity = newQuantity,
-            IsLowStock = product.IsLowStock,
-            UpdatedBy = userId
+            ProductName = product.Name,
+            OldQuantity = product.StockQuantity,
+            NewQuantity = newQuantity
         });
 
         // Check for low stock alert
         if (product.IsLowStock)
         {
-            await _kafkaProducer.PublishEventAsync(product.Id, "LowStockAlert", new
+            await _lowStockAlertProducer.Produce(new DomainEvents.LowStockAlert
             {
-                product.Id,
-                product.Name,
-                product.Sku,
+                ProductId = product.Id,
+                ProductName = product.Name,
                 CurrentStock = product.StockQuantity,
-                MinLevel = product.MinStockLevel
+                ReorderLevel = product.MinStockLevel
             });
         }
 
@@ -193,7 +206,7 @@ public class ProductService
 
         _logger.LogInformation("Product deleted: {ProductId}", id);
 
-        await _kafkaProducer.PublishEventAsync(id, "ProductDeleted", new { ProductId = id });
+        await _productDeletedProducer.Produce(new DomainEvents.ProductDeleted { ProductId = id });
 
         return true;
     }
@@ -274,13 +287,13 @@ public class ProductService
 
         _logger.LogInformation("Product created: {ProductId} - {ProductName}", product.Id, product.Name);
 
-        await _kafkaProducer.PublishEventAsync(product.Id, "ProductCreated", new
+        await _productCreatedProducer.Produce(new DomainEvents.ProductCreated
         {
-            product.Id,
-            product.Sku,
-            product.Name,
-            product.Price,
-            product.StockQuantity
+            ProductId = product.Id,
+            Name = product.Name,
+            CategoryId = product.CategoryId,
+            Price = product.Price,
+            StockQuantity = product.StockQuantity
         });
 
         return product;

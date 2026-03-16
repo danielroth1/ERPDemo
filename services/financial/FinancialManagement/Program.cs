@@ -5,10 +5,19 @@ using Prometheus;
 using Serilog;
 using Serilog.Formatting.Compact;
 using System.Text;
+using Confluent.Kafka;
+using MassTransit;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using FinancialManagement.Configuration;
+using FinancialManagement.Consumers;
 using FinancialManagement.Infrastructure;
 using FinancialManagement.Services;
 using FinancialManagement.Models.DTOs;
+using ERP.Contracts;
+using ERP.Contracts.Commands;
+using ERP.Contracts.Events;
+using ERP.Contracts.Events.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -25,13 +34,9 @@ var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<Postgr
     ?? throw new InvalidOperationException("PostgreSQL configuration is missing");
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT configuration is missing");
-var kafkaSettings = builder.Configuration.GetSection("Kafka").Get<KafkaSettings>()
-    ?? throw new InvalidOperationException("Kafka configuration is missing");
-
 // Add services to the container
 builder.Services.AddSingleton(postgresSettings);
 builder.Services.AddSingleton(jwtSettings);
-builder.Services.AddSingleton(kafkaSettings);
 
 // Register PostgreSQL DbContext with dynamic JSON support
 var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(postgresSettings.ConnectionString);
@@ -42,14 +47,68 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(dataSource)
         .UseSnakeCaseNamingConvention());
 
-// Register Kafka producer
-builder.Services.AddSingleton<KafkaProducer>();
-
 // Register application services
 builder.Services.AddScoped<IAccountService, AccountService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<IReportService, ReportService>();
+
+// Configure MassTransit with Kafka Rider
+var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingInMemory((context, cfg) =>
+    {
+        cfg.ConfigureEndpoints(context);
+    });
+
+    x.AddRider(rider =>
+    {
+        rider.AddConsumer<CreatePurchaseTransactionConsumer>();
+        rider.AddConsumer<CreateRefundTransactionConsumer>();
+
+        // Producers for saga events + domain events
+        rider.AddProducer<PurchaseTransactionCreated>(KafkaTopics.PurchaseTransactionCreatedEvent);
+        rider.AddProducer<PurchaseTransactionFailed>(KafkaTopics.PurchaseTransactionFailedEvent);
+        rider.AddProducer<RefundTransactionCreated>(KafkaTopics.RefundTransactionCreatedEvent);
+        rider.AddProducer<RefundTransactionFailed>(KafkaTopics.RefundTransactionFailedEvent);
+        rider.AddProducer<TransactionCreated>(KafkaTopics.TransactionCreatedEvent);
+        rider.AddProducer<BudgetExceeded>(KafkaTopics.BudgetExceededEvent);
+
+        rider.UsingKafka((context, k) =>
+        {
+            k.Host(kafkaBootstrap);
+
+            k.TopicEndpoint<CreatePurchaseTransaction>(KafkaTopics.CreatePurchaseTransactionCommand, "financial-purchase-tx", e =>
+            {
+                e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                e.ConfigureConsumer<CreatePurchaseTransactionConsumer>(context);
+            });
+
+            k.TopicEndpoint<CreateRefundTransaction>(KafkaTopics.CreateRefundTransactionCommand, "financial-refund-tx", e =>
+            {
+                e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                e.ConfigureConsumer<CreateRefundTransactionConsumer>(context);
+            });
+        });
+    });
+});
+
+// Configure OpenTelemetry tracing
+builder.Services.AddOpenTelemetry()
+    .ConfigureResource(r => r.AddService("financial"))
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSource("MassTransit")
+            .AddOtlpExporter(o =>
+            {
+                o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
+            });
+    });
 
 // Configure JWT authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

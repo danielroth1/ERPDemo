@@ -4,7 +4,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Confluent.Kafka;
+using MassTransit;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using DashboardAnalytics.Configuration;
+using DashboardAnalytics.Consumers;
 using DashboardAnalytics.Infrastructure;
 using DashboardAnalytics.Services;
 using DashboardAnalytics.Hubs;
@@ -13,6 +18,8 @@ using Query = DashboardAnalytics.GraphQL.Query;
 using Mutation = DashboardAnalytics.GraphQL.Mutation;
 using Subscription = DashboardAnalytics.GraphQL.Subscription;
 using Prometheus;
+using ERP.Contracts;
+using ERP.Contracts.Events.Domain;
 
 // Configure Serilog
 Log.Logger = new LoggerConfiguration()
@@ -33,16 +40,116 @@ try
     
     builder.Services.Configure<JwtSettings>(
         builder.Configuration.GetSection("Jwt"));
-    builder.Services.Configure<KafkaSettings>(
-        builder.Configuration.GetSection("Kafka"));
 
     // Add PostgreSQL DbContext
     builder.Services.AddDbContext<AppDbContext>(options =>
         options.UseNpgsql(postgresSettings.ConnectionString)
             .UseSnakeCaseNamingConvention());
 
-    // Add Kafka consumer
-    builder.Services.AddHostedService<KafkaConsumerService>();
+    // Configure MassTransit with Kafka Rider (replaces raw KafkaConsumerService)
+    var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+
+    builder.Services.AddMassTransit(x =>
+    {
+        x.UsingInMemory((context, cfg) =>
+        {
+            cfg.ConfigureEndpoints(context);
+        });
+
+        x.AddRider(rider =>
+        {
+            // User event consumers
+            rider.AddConsumer<UserCreatedConsumer>();
+            rider.AddConsumer<UserUpdatedConsumer>();
+
+            // Inventory event consumers
+            rider.AddConsumer<ProductCreatedConsumer>();
+            rider.AddConsumer<ProductUpdatedConsumer>();
+            rider.AddConsumer<LowStockAlertConsumer>();
+
+            // Sales event consumers
+            rider.AddConsumer<OrderCreatedConsumer>();
+            rider.AddConsumer<OrderStatusChangedConsumer>();
+
+            // Financial event consumers
+            rider.AddConsumer<TransactionCreatedConsumer>();
+            rider.AddConsumer<BudgetExceededConsumer>();
+
+            rider.UsingKafka((context, k) =>
+            {
+                k.Host(kafkaBootstrap);
+
+                k.TopicEndpoint<UserCreated>(KafkaTopics.UserCreatedEvent, "dashboard-user-created", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<UserCreatedConsumer>(context);
+                });
+
+                k.TopicEndpoint<UserUpdated>(KafkaTopics.UserUpdatedEvent, "dashboard-user-updated", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<UserUpdatedConsumer>(context);
+                });
+
+                k.TopicEndpoint<ProductCreated>(KafkaTopics.ProductCreatedEvent, "dashboard-product-created", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<ProductCreatedConsumer>(context);
+                });
+
+                k.TopicEndpoint<ProductUpdated>(KafkaTopics.ProductUpdatedEvent, "dashboard-product-updated", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<ProductUpdatedConsumer>(context);
+                });
+
+                k.TopicEndpoint<LowStockAlert>(KafkaTopics.LowStockAlertEvent, "dashboard-low-stock", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<LowStockAlertConsumer>(context);
+                });
+
+                k.TopicEndpoint<OrderCreated>(KafkaTopics.OrderCreatedEvent, "dashboard-order-created", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<OrderCreatedConsumer>(context);
+                });
+
+                k.TopicEndpoint<OrderStatusChanged>(KafkaTopics.OrderStatusChangedEvent, "dashboard-order-status", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<OrderStatusChangedConsumer>(context);
+                });
+
+                k.TopicEndpoint<TransactionCreated>(KafkaTopics.TransactionCreatedEvent, "dashboard-transaction", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<TransactionCreatedConsumer>(context);
+                });
+
+                k.TopicEndpoint<BudgetExceeded>(KafkaTopics.BudgetExceededEvent, "dashboard-budget", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<BudgetExceededConsumer>(context);
+                });
+            });
+        });
+    });
+
+    // Configure OpenTelemetry tracing
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("dashboard"))
+        .WithTracing(tracing =>
+        {
+            tracing
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSource("MassTransit")
+                .AddOtlpExporter(o =>
+                {
+                    o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
+                });
+        });
 
     // Add services
     builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();

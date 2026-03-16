@@ -24,8 +24,4 @@ public class SmtpSettings
     public bool EnableSsl { get; set; } = true;
 }
 
-public class KafkaSettings
-{
-    public string BootstrapServers { get; set; } = string.Empty;
-    public string Topic { get; set; } = "user-events";
-}
+

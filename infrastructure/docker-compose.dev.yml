@@ -76,6 +76,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-remote-write-receiver'
     # Allow Prometheus to reach host-running .NET services (macOS & Linux)
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -99,6 +100,7 @@ services:
     depends_on:
       - prometheus
       - loki
+      - tempo
     networks:
       - erp-dev-network
 
@@ -135,6 +137,21 @@ services:
     networks:
       - erp-dev-network
 
+  # Grafana Tempo for distributed tracing
+  tempo:
+    image: grafana/tempo:2.3.1
+    container_name: erp-dev-tempo
+    command: ["-config.file=/etc/tempo/tempo.yaml"]
+    volumes:
+      - ./monitoring/tempo/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    ports:
+      - "3200:3200"   # Tempo HTTP API
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+    networks:
+      - erp-dev-network
+
   # Redis for distributed caching
   redis:
     image: redis:7-alpine
@@ -159,6 +176,7 @@ volumes:
   grafana-data:
   loki-data:
   alloy-data:
+  tempo-data:
   redis-data:
 
 networks:

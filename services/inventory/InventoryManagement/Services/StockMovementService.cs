@@ -1,24 +1,26 @@
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 using InventoryManagement.Infrastructure;
 using InventoryManagement.Models;
+using ERP.Contracts.Events.Domain;
 
 namespace InventoryManagement.Services;
 
 public class StockMovementService
 {
     private readonly AppDbContext _dbContext;
-    private readonly KafkaProducer _kafkaProducer;
+    private readonly ITopicProducer<StockMovementCreated> _stockMovementCreatedProducer;
     private readonly ProductService _productService;
     private readonly ILogger<StockMovementService> _logger;
 
     public StockMovementService(
         AppDbContext dbContext,
-        KafkaProducer kafkaProducer,
+        ITopicProducer<StockMovementCreated> stockMovementCreatedProducer,
         ProductService productService,
         ILogger<StockMovementService> logger)
     {
         _dbContext = dbContext;
-        _kafkaProducer = kafkaProducer;
+        _stockMovementCreatedProducer = stockMovementCreatedProducer;
         _productService = productService;
         _logger = logger;
     }
@@ -77,13 +79,12 @@ public class StockMovementService
             "Stock movement created: {MovementId} for product {ProductId}, type: {Type}, quantity: {Quantity}",
             movement.Id, movement.ProductId, movement.MovementType, movement.Quantity);
 
-        await _kafkaProducer.PublishEventAsync(movement.Id, "StockMovementCreated", new
+        await _stockMovementCreatedProducer.Produce(new StockMovementCreated
         {
-            movement.Id,
-            movement.ProductId,
-            movement.MovementType,
-            movement.Quantity,
-            movement.Reference
+            MovementId = movement.Id,
+            ProductId = movement.ProductId,
+            Type = movement.MovementType.ToString(),
+            Quantity = movement.Quantity
         });
 
         return movement;

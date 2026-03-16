@@ -4,7 +4,17 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 using ApiGateway.Configuration;
+using ApiGateway.Consumers;
+using ApiGateway.Sagas;
+using ApiGateway.Services;
 using AspNetCoreRateLimit;
+using Confluent.Kafka;
+using ERP.Contracts;
+using ERP.Contracts.Commands;
+using ERP.Contracts.Events;
+using MassTransit;
+using OpenTelemetry.Resources;
+using OpenTelemetry.Trace;
 using Prometheus;
 
 // Configure Serilog
@@ -80,6 +90,171 @@ try
     builder.Services.AddReverseProxy()
         .LoadFromConfig(builder.Configuration.GetSection("ReverseProxy"));
 
+    // Add Controllers (for ShopController — saga-based purchase/return)
+    builder.Services.AddControllers();
+
+    // Add PurchaseTracker / ReturnTracker (saga-to-HTTP bridge)
+    builder.Services.AddSingleton<PurchaseTracker>();
+    builder.Services.AddSingleton<ReturnTracker>();
+
+    // Configure MassTransit with Kafka Rider
+    var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+
+    builder.Services.AddMassTransit(x =>
+    {
+        // Register saga state machines with in-memory repository
+        x.AddSagaStateMachine<PurchaseStateMachine, PurchaseState>()
+            .InMemoryRepository();
+        x.AddSagaStateMachine<ReturnStateMachine, ReturnState>()
+            .InMemoryRepository();
+
+        x.UsingInMemory((context, cfg) =>
+        {
+            cfg.ConfigureEndpoints(context);
+        });
+
+        x.AddRider(rider =>
+        {
+            // Register consumers
+            rider.AddConsumer<PurchaseCompletedConsumer>();
+            rider.AddConsumer<PurchaseFailedConsumer>();
+            rider.AddConsumer<ReturnCompletedConsumer>();
+            rider.AddConsumer<ReturnFailedConsumer>();
+
+            // Register saga state machines for Kafka
+            rider.AddSagaStateMachine<PurchaseStateMachine, PurchaseState>();
+            rider.AddSagaStateMachine<ReturnStateMachine, ReturnState>();
+
+            // Register producers
+            rider.AddProducer<SubmitPurchase>(KafkaTopics.SubmitPurchase);
+            rider.AddProducer<SubmitReturn>(KafkaTopics.SubmitReturn);
+            rider.AddProducer<ReserveStock>(KafkaTopics.ReserveStockCommand);
+            rider.AddProducer<DeductStock>(KafkaTopics.DeductStockCommand);
+            rider.AddProducer<RestoreStock>(KafkaTopics.RestoreStockCommand);
+            rider.AddProducer<CreatePurchaseTransaction>(KafkaTopics.CreatePurchaseTransactionCommand);
+            rider.AddProducer<CreateRefundTransaction>(KafkaTopics.CreateRefundTransactionCommand);
+            rider.AddProducer<PurchaseCompleted>(KafkaTopics.PurchaseCompletedEvent);
+            rider.AddProducer<PurchaseFailed>(KafkaTopics.PurchaseFailedEvent);
+            rider.AddProducer<ReturnCompleted>(KafkaTopics.ReturnCompletedEvent);
+            rider.AddProducer<ReturnFailed>(KafkaTopics.ReturnFailedEvent);
+
+            rider.UsingKafka((context, k) =>
+            {
+                k.Host(kafkaBootstrap);
+
+                // Saga consumes SubmitPurchase
+                k.TopicEndpoint<SubmitPurchase>(KafkaTopics.SubmitPurchase, "gateway-purchase-saga", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<PurchaseState>(context);
+                });
+
+                // Saga consumes SubmitReturn
+                k.TopicEndpoint<SubmitReturn>(KafkaTopics.SubmitReturn, "gateway-return-saga", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<ReturnState>(context);
+                });
+
+                // Saga consumes stock/transaction events
+                k.TopicEndpoint<StockReserved>(KafkaTopics.StockReservedEvent, "gateway-purchase-saga-events", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<PurchaseState>(context);
+                });
+
+                k.TopicEndpoint<StockReservationFailed>(KafkaTopics.StockReservationFailedEvent, "gateway-purchase-saga-failures", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<PurchaseState>(context);
+                });
+
+                k.TopicEndpoint<PurchaseTransactionCreated>(KafkaTopics.PurchaseTransactionCreatedEvent, "gateway-purchase-saga-txn", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<PurchaseState>(context);
+                });
+
+                k.TopicEndpoint<PurchaseTransactionFailed>(KafkaTopics.PurchaseTransactionFailedEvent, "gateway-purchase-saga-txn-fail", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<PurchaseState>(context);
+                });
+
+                k.TopicEndpoint<StockDeducted>(KafkaTopics.StockDeductedEvent, "gateway-purchase-saga-deducted", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<PurchaseState>(context);
+                });
+
+                k.TopicEndpoint<StockDeductionFailed>(KafkaTopics.StockDeductionFailedEvent, "gateway-purchase-saga-deduct-fail", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<PurchaseState>(context);
+                });
+
+                // Return saga events
+                k.TopicEndpoint<RefundTransactionCreated>(KafkaTopics.RefundTransactionCreatedEvent, "gateway-return-saga-refund", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<ReturnState>(context);
+                });
+
+                k.TopicEndpoint<RefundTransactionFailed>(KafkaTopics.RefundTransactionFailedEvent, "gateway-return-saga-refund-fail", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<ReturnState>(context);
+                });
+
+                k.TopicEndpoint<StockRestored>(KafkaTopics.StockRestoredEvent, "gateway-return-saga-restored", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureSaga<ReturnState>(context);
+                });
+
+                // Result consumers (bridge back to HTTP)
+                k.TopicEndpoint<PurchaseCompleted>(KafkaTopics.PurchaseCompletedEvent, "gateway-purchase-results", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<PurchaseCompletedConsumer>(context);
+                });
+
+                k.TopicEndpoint<PurchaseFailed>(KafkaTopics.PurchaseFailedEvent, "gateway-purchase-failures", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<PurchaseFailedConsumer>(context);
+                });
+
+                k.TopicEndpoint<ReturnCompleted>(KafkaTopics.ReturnCompletedEvent, "gateway-return-results", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<ReturnCompletedConsumer>(context);
+                });
+
+                k.TopicEndpoint<ReturnFailed>(KafkaTopics.ReturnFailedEvent, "gateway-return-failures", e =>
+                {
+                    e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                    e.ConfigureConsumer<ReturnFailedConsumer>(context);
+                });
+            });
+        });
+    });
+
+    // Configure OpenTelemetry tracing
+    builder.Services.AddOpenTelemetry()
+        .ConfigureResource(r => r.AddService("gateway"))
+        .WithTracing(tracing =>
+        {
+            tracing
+                .AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSource("MassTransit")
+                .AddOtlpExporter(o =>
+                {
+                    o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
+                });
+        });
+
     // Add Health Checks
     builder.Services.AddHealthChecks();
 
@@ -101,6 +276,9 @@ try
 
     app.UseAuthentication();
     app.UseAuthorization();
+
+    // Map controllers (ShopController for saga-based purchase/return)
+    app.MapControllers();
 
     // Map YARP routes
     app.MapReverseProxy();

@@ -1,23 +1,34 @@
 using Microsoft.EntityFrameworkCore;
+using MassTransit;
 using UserManagement.Infrastructure;
 using UserManagement.Models;
 using UserManagement.Models.DTOs;
+using ERP.Contracts.Events.Domain;
 
 namespace UserManagement.Services;
 
 public class UserService
 {
     private readonly AppDbContext _dbContext;
-    private readonly KafkaProducer _kafkaProducer;
+    private readonly ITopicProducer<UserCreated> _userCreatedProducer;
+    private readonly ITopicProducer<UserUpdated> _userUpdatedProducer;
+    private readonly ITopicProducer<UserDeleted> _userDeletedProducer;
+    private readonly ITopicProducer<UserDeactivated> _userDeactivatedProducer;
     private readonly ILogger<UserService> _logger;
 
     public UserService(
         AppDbContext dbContext,
-        KafkaProducer kafkaProducer,
+        ITopicProducer<UserCreated> userCreatedProducer,
+        ITopicProducer<UserUpdated> userUpdatedProducer,
+        ITopicProducer<UserDeleted> userDeletedProducer,
+        ITopicProducer<UserDeactivated> userDeactivatedProducer,
         ILogger<UserService> logger)
     {
         _dbContext = dbContext;
-        _kafkaProducer = kafkaProducer;
+        _userCreatedProducer = userCreatedProducer;
+        _userUpdatedProducer = userUpdatedProducer;
+        _userDeletedProducer = userDeletedProducer;
+        _userDeactivatedProducer = userDeactivatedProducer;
         _logger = logger;
     }
 
@@ -58,14 +69,14 @@ public class UserService
 
         _logger.LogInformation("User created: {UserId} - {Email}", user.Id, user.Email);
 
-        // Publish event to Kafka
-        await _kafkaProducer.PublishEventAsync(user.Id, "UserCreated", new
+        // Publish event via MassTransit
+        await _userCreatedProducer.Produce(new UserCreated
         {
-            user.Id,
-            user.Email,
-            user.FirstName,
-            user.LastName,
-            user.Roles
+            UserId = user.Id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Role = string.Join(",", user.Roles)
         });
 
         return user;
@@ -88,13 +99,13 @@ public class UserService
 
         _logger.LogInformation("User updated: {UserId}", id);
 
-        await _kafkaProducer.PublishEventAsync(id, "UserUpdated", new
+        await _userUpdatedProducer.Produce(new UserUpdated
         {
-            user.Id,
-            user.Email,
-            user.FirstName,
-            user.LastName,
-            user.IsActive
+            UserId = id,
+            Email = user.Email,
+            FirstName = user.FirstName,
+            LastName = user.LastName,
+            Role = string.Join(",", user.Roles)
         });
 
         return true;
@@ -110,7 +121,7 @@ public class UserService
 
         _logger.LogInformation("User deleted: {UserId}", id);
 
-        await _kafkaProducer.PublishEventAsync(id, "UserDeleted", new { UserId = id });
+        await _userDeletedProducer.Produce(new UserDeleted { UserId = id });
 
         return true;
     }
@@ -140,7 +151,7 @@ public class UserService
 
         _logger.LogInformation("User deactivated: {UserId}", id);
 
-        await _kafkaProducer.PublishEventAsync(id, "UserDeactivated", new { UserId = id });
+        await _userDeactivatedProducer.Produce(new UserDeactivated { UserId = id });
 
         return true;
     }

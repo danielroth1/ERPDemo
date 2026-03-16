@@ -57,14 +57,6 @@ scrape_configs:
         labels:
           service: 'dashboard'
     metrics_path: '/metrics'
-        action: keep
-        regex: .+
-      - source_labels: [__meta_kubernetes_pod_container_port_name]
-        action: keep
-        regex: admin-http
-      - source_labels: [__meta_kubernetes_pod_label_linkerd_io_control_plane_component]
-        action: replace
-        target_label: component
 
   # Kafka JMX Exporter
   - job_name: 'kafka'
