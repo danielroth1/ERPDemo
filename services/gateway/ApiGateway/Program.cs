@@ -17,17 +17,19 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Prometheus;
 
-// Configure Serilog
+// Bootstrap logger (before config is loaded)
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console(new CompactJsonFormatter())
-    .CreateLogger();
+    .CreateBootstrapLogger();
 
 try
 {
     var builder = WebApplication.CreateBuilder(args);
 
-    // Add Serilog
-    builder.Host.UseSerilog();
+    // Replace bootstrap logger with full config-driven logger (picks up GrafanaLoki sink from appsettings)
+    builder.Host.UseSerilog((ctx, cfg) =>
+        cfg.ReadFrom.Configuration(ctx.Configuration)
+           .WriteTo.Console(new CompactJsonFormatter()));
 
     // Configure settings
     builder.Services.Configure<JwtSettings>(
@@ -74,7 +76,7 @@ try
         options.AddDefaultPolicy(policy =>
         {
             policy.WithOrigins(
-                    "http://localhost:3000",
+                    "http://localhost:3001",
                     "http://localhost:5173",
                     "http://localhost:5174",
                     "http://localhost:5175",

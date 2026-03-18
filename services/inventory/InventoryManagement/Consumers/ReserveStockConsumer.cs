@@ -8,11 +8,19 @@ namespace InventoryManagement.Consumers;
 public class ReserveStockConsumer : IConsumer<ReserveStock>
 {
     private readonly ProductService _productService;
+    private readonly ITopicProducer<StockReserved> _stockReservedProducer;
+    private readonly ITopicProducer<StockReservationFailed> _stockReservationFailedProducer;
     private readonly ILogger<ReserveStockConsumer> _logger;
 
-    public ReserveStockConsumer(ProductService productService, ILogger<ReserveStockConsumer> logger)
+    public ReserveStockConsumer(
+        ProductService productService,
+        ITopicProducer<StockReserved> stockReservedProducer,
+        ITopicProducer<StockReservationFailed> stockReservationFailedProducer,
+        ILogger<ReserveStockConsumer> logger)
     {
         _productService = productService;
+        _stockReservedProducer = stockReservedProducer;
+        _stockReservationFailedProducer = stockReservationFailedProducer;
         _logger = logger;
     }
 
@@ -25,7 +33,7 @@ public class ReserveStockConsumer : IConsumer<ReserveStock>
         var product = await _productService.GetByIdAsync(msg.ProductId);
         if (product == null)
         {
-            await context.Publish(new StockReservationFailed
+            await _stockReservationFailedProducer.Produce(new StockReservationFailed
             {
                 CorrelationId = msg.CorrelationId,
                 ProductId = msg.ProductId,
@@ -36,7 +44,7 @@ public class ReserveStockConsumer : IConsumer<ReserveStock>
 
         if (!product.IsActive)
         {
-            await context.Publish(new StockReservationFailed
+            await _stockReservationFailedProducer.Produce(new StockReservationFailed
             {
                 CorrelationId = msg.CorrelationId,
                 ProductId = msg.ProductId,
@@ -47,7 +55,7 @@ public class ReserveStockConsumer : IConsumer<ReserveStock>
 
         if (product.StockQuantity < msg.Quantity)
         {
-            await context.Publish(new StockReservationFailed
+            await _stockReservationFailedProducer.Produce(new StockReservationFailed
             {
                 CorrelationId = msg.CorrelationId,
                 ProductId = msg.ProductId,
@@ -56,7 +64,7 @@ public class ReserveStockConsumer : IConsumer<ReserveStock>
             return;
         }
 
-        await context.Publish(new StockReserved
+        await _stockReservedProducer.Produce(new StockReserved
         {
             CorrelationId = msg.CorrelationId,
             ProductId = msg.ProductId,

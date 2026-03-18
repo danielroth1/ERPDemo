@@ -37,7 +37,7 @@ const externalLinks = [
   },
   {
     name: "Grafana",
-    href: "http://localhost:3000",
+    href: "http://localhost:3001",
     icon: PresentationChartLineIcon,
   },
 ];

@@ -10,13 +10,19 @@ namespace FinancialManagement.Consumers;
 public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransaction>
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ITopicProducer<PurchaseTransactionCreated> _purchaseTransactionCreatedProducer;
+    private readonly ITopicProducer<PurchaseTransactionFailed> _purchaseTransactionFailedProducer;
     private readonly ILogger<CreatePurchaseTransactionConsumer> _logger;
 
     public CreatePurchaseTransactionConsumer(
         IServiceScopeFactory scopeFactory,
+        ITopicProducer<PurchaseTransactionCreated> purchaseTransactionCreatedProducer,
+        ITopicProducer<PurchaseTransactionFailed> purchaseTransactionFailedProducer,
         ILogger<CreatePurchaseTransactionConsumer> logger)
     {
         _scopeFactory = scopeFactory;
+        _purchaseTransactionCreatedProducer = purchaseTransactionCreatedProducer;
+        _purchaseTransactionFailedProducer = purchaseTransactionFailedProducer;
         _logger = logger;
     }
 
@@ -48,7 +54,7 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
                 taxAccount == null || revenueAccount == null || inventoryAccount == null || cogsAccount == null)
             {
                 _logger.LogError("Failed to resolve one or more accounts for purchase transaction. User: {UserId}", command.UserId);
-                await context.Publish(new PurchaseTransactionFailed
+                await _purchaseTransactionFailedProducer.Produce(new PurchaseTransactionFailed
                 {
                     CorrelationId = command.CorrelationId,
                     Reason = "Failed to resolve financial accounts"
@@ -79,7 +85,7 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
             _logger.LogInformation("Purchase transaction created: {TransactionId} for correlation {CorrelationId}",
                 result.Id, command.CorrelationId);
 
-            await context.Publish(new PurchaseTransactionCreated
+            await _purchaseTransactionCreatedProducer.Produce(new PurchaseTransactionCreated
             {
                 CorrelationId = command.CorrelationId,
                 TransactionId = result.Id
@@ -88,7 +94,7 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create purchase transaction for correlation {CorrelationId}", command.CorrelationId);
-            await context.Publish(new PurchaseTransactionFailed
+            await _purchaseTransactionFailedProducer.Produce(new PurchaseTransactionFailed
             {
                 CorrelationId = command.CorrelationId,
                 Reason = ex.Message

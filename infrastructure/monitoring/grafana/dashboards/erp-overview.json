@@ -259,6 +259,54 @@
       ],
       "title": "Errors & Warnings",
       "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 52 },
+      "id": 12,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "expr": "{service=\"gateway\"} |~ \"(?i)(saga|correlat|submit.*purchase|purchase.*saga|stock.*reserv|transaction.*creat|deduct.*stock|purchase.*complet|purchase.*fail)\"",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Purchase Saga Trace (gateway)",
+      "type": "logs"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "loki" },
+      "gridPos": { "h": 10, "w": 24, "x": 0, "y": 62 },
+      "id": 13,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "prettifyLogMessage": false,
+        "showCommonLabels": false,
+        "showLabels": true,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": false
+      },
+      "targets": [
+        {
+          "expr": "{service=~\"kafka|postgres|mongodb|redis|loki|grafana|prometheus|alloy\"}",
+          "legendFormat": "",
+          "refId": "A"
+        }
+      ],
+      "title": "Infrastructure Logs (non-service)",
+      "type": "logs"
     }
   ],
   "refresh": "30s",

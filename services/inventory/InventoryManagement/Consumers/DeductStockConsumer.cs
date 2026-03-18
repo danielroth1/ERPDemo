@@ -8,11 +8,19 @@ namespace InventoryManagement.Consumers;
 public class DeductStockConsumer : IConsumer<DeductStock>
 {
     private readonly ProductService _productService;
+    private readonly ITopicProducer<StockDeducted> _stockDeductedProducer;
+    private readonly ITopicProducer<StockDeductionFailed> _stockDeductionFailedProducer;
     private readonly ILogger<DeductStockConsumer> _logger;
 
-    public DeductStockConsumer(ProductService productService, ILogger<DeductStockConsumer> logger)
+    public DeductStockConsumer(
+        ProductService productService,
+        ITopicProducer<StockDeducted> stockDeductedProducer,
+        ITopicProducer<StockDeductionFailed> stockDeductionFailedProducer,
+        ILogger<DeductStockConsumer> logger)
     {
         _productService = productService;
+        _stockDeductedProducer = stockDeductedProducer;
+        _stockDeductionFailedProducer = stockDeductionFailedProducer;
         _logger = logger;
     }
 
@@ -25,7 +33,7 @@ public class DeductStockConsumer : IConsumer<DeductStock>
         var product = await _productService.GetByIdAsync(msg.ProductId);
         if (product == null)
         {
-            await context.Publish(new StockDeductionFailed
+            await _stockDeductionFailedProducer.Produce(new StockDeductionFailed
             {
                 CorrelationId = msg.CorrelationId,
                 ProductId = msg.ProductId,
@@ -36,7 +44,7 @@ public class DeductStockConsumer : IConsumer<DeductStock>
 
         if (product.StockQuantity < msg.Quantity)
         {
-            await context.Publish(new StockDeductionFailed
+            await _stockDeductionFailedProducer.Produce(new StockDeductionFailed
             {
                 CorrelationId = msg.CorrelationId,
                 ProductId = msg.ProductId,
@@ -49,7 +57,7 @@ public class DeductStockConsumer : IConsumer<DeductStock>
         product.UpdatedAt = DateTime.UtcNow;
         await _productService.UpdateAsync(msg.ProductId, product);
 
-        await context.Publish(new StockDeducted
+        await _stockDeductedProducer.Produce(new StockDeducted
         {
             CorrelationId = msg.CorrelationId,
             ProductId = msg.ProductId,

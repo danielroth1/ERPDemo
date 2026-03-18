@@ -8,11 +8,16 @@ namespace InventoryManagement.Consumers;
 public class RestoreStockConsumer : IConsumer<RestoreStock>
 {
     private readonly ProductService _productService;
+    private readonly ITopicProducer<StockRestored> _stockRestoredProducer;
     private readonly ILogger<RestoreStockConsumer> _logger;
 
-    public RestoreStockConsumer(ProductService productService, ILogger<RestoreStockConsumer> logger)
+    public RestoreStockConsumer(
+        ProductService productService,
+        ITopicProducer<StockRestored> stockRestoredProducer,
+        ILogger<RestoreStockConsumer> logger)
     {
         _productService = productService;
+        _stockRestoredProducer = stockRestoredProducer;
         _logger = logger;
     }
 
@@ -33,7 +38,7 @@ public class RestoreStockConsumer : IConsumer<RestoreStock>
         product.UpdatedAt = DateTime.UtcNow;
         await _productService.UpdateAsync(msg.ProductId, product);
 
-        await context.Publish(new StockRestored
+        await _stockRestoredProducer.Produce(new StockRestored
         {
             CorrelationId = msg.CorrelationId,
             ProductId = msg.ProductId,

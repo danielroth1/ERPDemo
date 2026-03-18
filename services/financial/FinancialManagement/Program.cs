@@ -67,6 +67,7 @@ builder.Services.AddMassTransit(x =>
     {
         rider.AddConsumer<CreatePurchaseTransactionConsumer>();
         rider.AddConsumer<CreateRefundTransactionConsumer>();
+        rider.AddConsumer<UserCreatedConsumer>();
 
         // Producers for saga events + domain events
         rider.AddProducer<PurchaseTransactionCreated>(KafkaTopics.PurchaseTransactionCreatedEvent);
@@ -90,6 +91,12 @@ builder.Services.AddMassTransit(x =>
             {
                 e.AutoOffsetReset = AutoOffsetReset.Earliest;
                 e.ConfigureConsumer<CreateRefundTransactionConsumer>(context);
+            });
+
+            k.TopicEndpoint<UserCreated>(KafkaTopics.UserCreatedEvent, "financial-user-created", e =>
+            {
+                e.AutoOffsetReset = AutoOffsetReset.Earliest;
+                e.ConfigureConsumer<UserCreatedConsumer>(context);
             });
         });
     });

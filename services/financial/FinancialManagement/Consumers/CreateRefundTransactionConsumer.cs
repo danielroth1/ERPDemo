@@ -10,13 +10,19 @@ namespace FinancialManagement.Consumers;
 public class CreateRefundTransactionConsumer : IConsumer<CreateRefundTransaction>
 {
     private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ITopicProducer<RefundTransactionCreated> _refundTransactionCreatedProducer;
+    private readonly ITopicProducer<RefundTransactionFailed> _refundTransactionFailedProducer;
     private readonly ILogger<CreateRefundTransactionConsumer> _logger;
 
     public CreateRefundTransactionConsumer(
         IServiceScopeFactory scopeFactory,
+        ITopicProducer<RefundTransactionCreated> refundTransactionCreatedProducer,
+        ITopicProducer<RefundTransactionFailed> refundTransactionFailedProducer,
         ILogger<CreateRefundTransactionConsumer> logger)
     {
         _scopeFactory = scopeFactory;
+        _refundTransactionCreatedProducer = refundTransactionCreatedProducer;
+        _refundTransactionFailedProducer = refundTransactionFailedProducer;
         _logger = logger;
     }
 
@@ -42,7 +48,7 @@ public class CreateRefundTransactionConsumer : IConsumer<CreateRefundTransaction
             if (userAccount == null || revenueAccount == null)
             {
                 _logger.LogError("Failed to resolve accounts for refund transaction. User: {UserId}", command.UserId);
-                await context.Publish(new RefundTransactionFailed
+                await _refundTransactionFailedProducer.Produce(new RefundTransactionFailed
                 {
                     CorrelationId = command.CorrelationId,
                     Reason = "Failed to resolve financial accounts"
@@ -68,7 +74,7 @@ public class CreateRefundTransactionConsumer : IConsumer<CreateRefundTransaction
             _logger.LogInformation("Refund transaction created: {TransactionId} for correlation {CorrelationId}",
                 result.Id, command.CorrelationId);
 
-            await context.Publish(new RefundTransactionCreated
+            await _refundTransactionCreatedProducer.Produce(new RefundTransactionCreated
             {
                 CorrelationId = command.CorrelationId,
                 TransactionId = result.Id
@@ -77,7 +83,7 @@ public class CreateRefundTransactionConsumer : IConsumer<CreateRefundTransaction
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create refund transaction for correlation {CorrelationId}", command.CorrelationId);
-            await context.Publish(new RefundTransactionFailed
+            await _refundTransactionFailedProducer.Produce(new RefundTransactionFailed
             {
                 CorrelationId = command.CorrelationId,
                 Reason = ex.Message
