@@ -26,10 +26,17 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // Aspire service defaults (service discovery, OpenTelemetry, health checks)
+    builder.AddServiceDefaults();
+
     // Replace bootstrap logger with full config-driven logger (picks up GrafanaLoki sink from appsettings)
     builder.Host.UseSerilog((ctx, cfg) =>
+    {
         cfg.ReadFrom.Configuration(ctx.Configuration)
-           .WriteTo.Console(new CompactJsonFormatter()));
+           .WriteTo.Console(new CompactJsonFormatter());
+        if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+            cfg.WriteTo.OpenTelemetry();
+    });
 
     // Configure settings
     builder.Services.Configure<JwtSettings>(
@@ -100,7 +107,8 @@ try
     builder.Services.AddSingleton<ReturnTracker>();
 
     // Configure MassTransit with Kafka Rider
-    var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+    var kafkaBootstrap = builder.Configuration.GetConnectionString("kafka")
+        ?? builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
 
     builder.Services.AddMassTransit(x =>
     {
@@ -242,22 +250,7 @@ try
         });
     });
 
-    // Configure OpenTelemetry tracing
-    builder.Services.AddOpenTelemetry()
-        .ConfigureResource(r => r.AddService("gateway"))
-        .WithTracing(tracing =>
-        {
-            tracing
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddSource("MassTransit")
-                .AddOtlpExporter(o =>
-                {
-                    o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
-                });
-        });
-
-    // Add Health Checks
+    // Health Checks
     builder.Services.AddHealthChecks();
 
     var app = builder.Build();
@@ -284,6 +277,9 @@ try
 
     // Map YARP routes
     app.MapReverseProxy();
+
+    // Aspire default endpoints
+    app.MapDefaultEndpoints();
 
     // Health checks
     app.MapHealthChecks("/health/live");

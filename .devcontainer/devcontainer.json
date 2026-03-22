@@ -1,0 +1,32 @@
+{
+  "name": "ERP Development",
+  "image": "mcr.microsoft.com/dotnet/sdk:8.0",
+  "features": {
+    "ghcr.io/devcontainers/features/node:1": {
+      "version": "20"
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-dotnettools.csdevkit",
+        "ms-dotnettools.csharp",
+        "ms-dotnettools.vscode-dotnet-runtime",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "ms-azuretools.vscode-docker",
+        "spmeesseman.vscode-taskexplorer"
+      ]
+    }
+  },
+  "forwardPorts": [5173, 8080, 15000, 3001, 9000],
+  "portsAttributes": {
+    "5173": { "label": "Frontend (Vite)" },
+    "8080": { "label": "API Gateway" },
+    "15000": { "label": "Aspire Dashboard" },
+    "3001": { "label": "Grafana" },
+    "9000": { "label": "Kafka UI" }
+  },
+  "postCreateCommand": "dotnet restore erp.sln && cd frontend && npm install"
+}

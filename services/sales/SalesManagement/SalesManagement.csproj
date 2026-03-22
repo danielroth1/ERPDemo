@@ -24,6 +24,7 @@
     <PackageReference Include="Serilog.AspNetCore" Version="8.0.3" />
     <PackageReference Include="Serilog.Formatting.Compact" Version="3.0.0" />
     <PackageReference Include="Serilog.Sinks.Grafana.Loki" Version="8.3.0" />
+    <PackageReference Include="Serilog.Sinks.OpenTelemetry" Version="4.2.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
     <PackageReference Include="MassTransit" Version="8.4.0" />
     <PackageReference Include="MassTransit.Kafka" Version="8.4.0" />
@@ -42,6 +43,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\shared\ERP.Contracts\ERP.Contracts.csproj" />
+    <ProjectReference Include="..\..\shared\ServiceDefaults\ServiceDefaults.csproj" />
   </ItemGroup>
 
 </Project>

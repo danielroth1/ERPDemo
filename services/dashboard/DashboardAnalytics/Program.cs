@@ -22,20 +22,28 @@ using ERP.Contracts;
 using ERP.Contracts.Events.Domain;
 
 // Configure Serilog
-Log.Logger = new LoggerConfiguration()
-    .WriteTo.Console(new CompactJsonFormatter())
-    .CreateLogger();
+var loggerConfig = new LoggerConfiguration()
+    .WriteTo.Console(new CompactJsonFormatter());
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+    loggerConfig = loggerConfig.WriteTo.OpenTelemetry();
+Log.Logger = loggerConfig.CreateLogger();
 
 try
 {
     var builder = WebApplication.CreateBuilder(args);
 
+    // Aspire service defaults (service discovery, OpenTelemetry, health checks)
+    builder.AddServiceDefaults();
+
     // Add Serilog
     builder.Host.UseSerilog();
 
     // Configure settings
-    var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>()
-        ?? throw new InvalidOperationException("PostgreSQL configuration is missing");
+    var postgresConnectionString = builder.Configuration.GetConnectionString("erp-dashboard")
+        ?? builder.Configuration["PostgreSQL:ConnectionString"]
+        ?? throw new InvalidOperationException("PostgreSQL not configured");
+    var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>() ?? new PostgresSettings();
+    postgresSettings.ConnectionString = postgresConnectionString;
     builder.Services.AddSingleton(postgresSettings);
     
     builder.Services.Configure<JwtSettings>(
@@ -43,11 +51,12 @@ try
 
     // Add PostgreSQL DbContext
     builder.Services.AddDbContext<AppDbContext>(options =>
-        options.UseNpgsql(postgresSettings.ConnectionString)
+        options.UseNpgsql(postgresConnectionString)
             .UseSnakeCaseNamingConvention());
 
     // Configure MassTransit with Kafka Rider (replaces raw KafkaConsumerService)
-    var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+    var kafkaBootstrap = builder.Configuration.GetConnectionString("kafka")
+        ?? builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
 
     builder.Services.AddMassTransit(x =>
     {
@@ -136,21 +145,6 @@ try
         });
     });
 
-    // Configure OpenTelemetry tracing
-    builder.Services.AddOpenTelemetry()
-        .ConfigureResource(r => r.AddService("dashboard"))
-        .WithTracing(tracing =>
-        {
-            tracing
-                .AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddSource("MassTransit")
-                .AddOtlpExporter(o =>
-                {
-                    o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
-                });
-        });
-
     // Add services
     builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
     builder.Services.AddScoped<IKPIService, KPIService>();
@@ -160,9 +154,10 @@ try
 
     // Add memory cache and distributed cache
     builder.Services.AddMemoryCache();
+    var redisConnectionString = builder.Configuration.GetConnectionString("redis")
+        ?? builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379";
     builder.Services.AddStackExchangeRedisCache(options =>
     {
-        var redisConnectionString = builder.Configuration.GetValue<string>("Redis:ConnectionString") ?? "localhost:6379";
         options.Configuration = redisConnectionString;
         options.InstanceName = "DashboardCache:";
         
@@ -284,6 +279,9 @@ try
     app.MapControllers();
     app.MapGraphQL();
     app.MapHub<DashboardHub>("/dashboardHub");
+
+    // Aspire default endpoints
+    app.MapDefaultEndpoints();
     
     app.MapHealthChecks("/health/live");
     app.MapHealthChecks("/health/ready");

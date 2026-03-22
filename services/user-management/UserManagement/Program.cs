@@ -15,16 +15,24 @@ using ERP.Contracts.Events.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Aspire service defaults (service discovery, OpenTelemetry, health checks)
+builder.AddServiceDefaults();
+
 // Configure Serilog
-Log.Logger = new LoggerConfiguration()
-    .ReadFrom.Configuration(builder.Configuration)
-    .CreateLogger();
+var loggerConfig = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration);
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+    loggerConfig = loggerConfig.WriteTo.OpenTelemetry();
+Log.Logger = loggerConfig.CreateLogger();
 
 builder.Host.UseSerilog();
 
 // Add configuration settings
-var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>()
-    ?? throw new InvalidOperationException("PostgreSQL settings not configured");
+var postgresConnectionString = builder.Configuration.GetConnectionString("erp-users")
+    ?? builder.Configuration["PostgreSQL:ConnectionString"]
+    ?? throw new InvalidOperationException("PostgreSQL not configured");
+var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>() ?? new PostgresSettings();
+postgresSettings.ConnectionString = postgresConnectionString;
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT settings not configured");
 var smtpSettings = builder.Configuration.GetSection("Smtp").Get<SmtpSettings>()
@@ -46,7 +54,8 @@ builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<EmailService>();
 
 // Configure MassTransit with Kafka Rider (producer only)
-var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+var kafkaBootstrap = builder.Configuration.GetConnectionString("kafka")
+    ?? builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
 
 builder.Services.AddMassTransit(x =>
 {
@@ -68,21 +77,6 @@ builder.Services.AddMassTransit(x =>
         });
     });
 });
-
-// Configure OpenTelemetry tracing
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService("user-management"))
-    .WithTracing(tracing =>
-    {
-        tracing
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddSource("MassTransit")
-            .AddOtlpExporter(o =>
-            {
-                o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
-            });
-    });
 
 // Configure JWT authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -158,6 +152,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Aspire default endpoints
+app.MapDefaultEndpoints();
 
 // Health check endpoints
 app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions

@@ -21,17 +21,25 @@ using ERP.Contracts.Events.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Aspire service defaults (service discovery, OpenTelemetry, health checks)
+builder.AddServiceDefaults();
+
 // Configure Serilog
-Log.Logger = new LoggerConfiguration()
+var loggerConfig = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
-    .WriteTo.Console(new CompactJsonFormatter())
-    .CreateLogger();
+    .WriteTo.Console(new CompactJsonFormatter());
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+    loggerConfig = loggerConfig.WriteTo.OpenTelemetry();
+Log.Logger = loggerConfig.CreateLogger();
 
 builder.Host.UseSerilog();
 
 // Load configuration
-var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>()
-    ?? throw new InvalidOperationException("PostgreSQL configuration is missing");
+var postgresConnectionString = builder.Configuration.GetConnectionString("erp-financial")
+    ?? builder.Configuration["PostgreSQL:ConnectionString"]
+    ?? throw new InvalidOperationException("PostgreSQL not configured");
+var postgresSettings = builder.Configuration.GetSection("PostgreSQL").Get<PostgresSettings>() ?? new PostgresSettings();
+postgresSettings.ConnectionString = postgresConnectionString;
 var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
     ?? throw new InvalidOperationException("JWT configuration is missing");
 // Add services to the container
@@ -39,7 +47,7 @@ builder.Services.AddSingleton(postgresSettings);
 builder.Services.AddSingleton(jwtSettings);
 
 // Register PostgreSQL DbContext with dynamic JSON support
-var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(postgresSettings.ConnectionString);
+var dataSourceBuilder = new Npgsql.NpgsqlDataSourceBuilder(postgresConnectionString);
 dataSourceBuilder.EnableDynamicJson();
 var dataSource = dataSourceBuilder.Build();
 
@@ -54,7 +62,8 @@ builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 
 // Configure MassTransit with Kafka Rider
-var kafkaBootstrap = builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+var kafkaBootstrap = builder.Configuration.GetConnectionString("kafka")
+    ?? builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
 
 builder.Services.AddMassTransit(x =>
 {
@@ -101,21 +110,6 @@ builder.Services.AddMassTransit(x =>
         });
     });
 });
-
-// Configure OpenTelemetry tracing
-builder.Services.AddOpenTelemetry()
-    .ConfigureResource(r => r.AddService("financial"))
-    .WithTracing(tracing =>
-    {
-        tracing
-            .AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddSource("MassTransit")
-            .AddOtlpExporter(o =>
-            {
-                o.Endpoint = new Uri(builder.Configuration["OpenTelemetry:Endpoint"] ?? "http://localhost:4317");
-            });
-    });
 
 // Configure JWT authentication
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -179,6 +173,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// Aspire default endpoints
+app.MapDefaultEndpoints();
 
 // Health check endpoint
 app.MapHealthChecks("/health");
