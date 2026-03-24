@@ -2,7 +2,7 @@ using MassTransit;
 using ERP.Contracts.Commands;
 using ERP.Contracts.Events;
 
-namespace ApiGateway.Sagas;
+namespace Orchestration.Sagas;
 
 public class ReturnStateMachine : MassTransitStateMachine<ReturnState>
 {
@@ -12,7 +12,7 @@ public class ReturnStateMachine : MassTransitStateMachine<ReturnState>
     public State Completed { get; private set; } = null!;
     public State Faulted { get; private set; } = null!;
 
-    // Events
+    // Events (all arrive via RabbitMQ)
     public Event<SubmitReturn> SubmitReturn { get; private set; } = null!;
     public Event<RefundTransactionCreated> RefundTransactionCreated { get; private set; } = null!;
     public Event<RefundTransactionFailed> RefundTransactionFailed { get; private set; } = null!;
@@ -35,37 +35,38 @@ public class ReturnStateMachine : MassTransitStateMachine<ReturnState>
                     ctx.Saga.ProductId = ctx.Message.ProductId;
                     ctx.Saga.Quantity = ctx.Message.Quantity;
                     ctx.Saga.AuthToken = ctx.Message.AuthToken;
+                    ctx.Saga.UpdatedAt = DateTime.UtcNow;
                 })
-                .Produce(ctx => ctx.Init<CreateRefundTransaction>(new
+                .Send(ctx => new Uri("queue:create-refund-transaction"), ctx => new CreateRefundTransaction
                 {
-                    ctx.Saga.CorrelationId,
-                    ctx.Saga.UserId,
-                    ctx.Saga.ProductId,
-                    ProductName = "", // Financial will look up the product
-                    ctx.Saga.Quantity,
-                    RefundAmount = 0m, // Financial will calculate from accounts
-                    ctx.Saga.AuthToken
-                }))
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    UserId = ctx.Saga.UserId,
+                    ProductId = ctx.Saga.ProductId,
+                    ProductName = "",
+                    Quantity = ctx.Saga.Quantity,
+                    RefundAmount = 0m,
+                    AuthToken = ctx.Saga.AuthToken
+                })
                 .TransitionTo(CreatingRefund)
         );
 
         During(CreatingRefund,
             When(RefundTransactionCreated)
-                .Then(ctx => ctx.Saga.TransactionId = ctx.Message.TransactionId)
-                .Produce(ctx => ctx.Init<RestoreStock>(new
+                .Then(ctx => { ctx.Saga.TransactionId = ctx.Message.TransactionId; ctx.Saga.UpdatedAt = DateTime.UtcNow; })
+                .Send(ctx => new Uri("queue:restore-stock"), ctx => new RestoreStock
                 {
-                    ctx.Saga.CorrelationId,
-                    ctx.Saga.ProductId,
-                    ctx.Saga.Quantity
-                }))
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    ProductId = ctx.Saga.ProductId,
+                    Quantity = ctx.Saga.Quantity
+                })
                 .TransitionTo(RestoringStock),
             When(RefundTransactionFailed)
-                .Then(ctx => ctx.Saga.FailureReason = ctx.Message.Reason)
-                .Produce(ctx => ctx.Init<ReturnFailed>(new
+                .Then(ctx => { ctx.Saga.FailureReason = ctx.Message.Reason; ctx.Saga.UpdatedAt = DateTime.UtcNow; })
+                .Publish(ctx => new ReturnFailed
                 {
-                    ctx.Saga.CorrelationId,
+                    CorrelationId = ctx.Saga.CorrelationId,
                     Reason = ctx.Message.Reason
-                }))
+                })
                 .TransitionTo(Faulted)
                 .Finalize()
         );
@@ -75,17 +76,18 @@ public class ReturnStateMachine : MassTransitStateMachine<ReturnState>
                 .Then(ctx =>
                 {
                     ctx.Saga.NewStock = ctx.Message.NewStock;
-                    ctx.Saga.ProductName = ""; // Will be filled from event
+                    ctx.Saga.ProductName = "";
+                    ctx.Saga.UpdatedAt = DateTime.UtcNow;
                 })
-                .Produce(ctx => ctx.Init<ReturnCompleted>(new
+                .Publish(ctx => new ReturnCompleted
                 {
-                    ctx.Saga.CorrelationId,
-                    ctx.Saga.ProductId,
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    ProductId = ctx.Saga.ProductId,
                     ProductName = ctx.Saga.ProductName,
                     QuantityReturned = ctx.Saga.Quantity,
-                    ctx.Saga.NewStock,
-                    ctx.Saga.RefundAmount
-                }))
+                    NewStock = ctx.Saga.NewStock,
+                    RefundAmount = ctx.Saga.RefundAmount
+                })
                 .TransitionTo(Completed)
                 .Finalize()
         );

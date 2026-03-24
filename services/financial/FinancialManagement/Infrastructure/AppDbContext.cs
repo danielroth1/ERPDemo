@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using FinancialManagement.Models;
+using ERP.Contracts.Infrastructure;
 
 namespace FinancialManagement.Infrastructure;
 
@@ -12,11 +13,18 @@ public class AppDbContext : DbContext
     public DbSet<Account> Accounts { get; set; } = null!;
     public DbSet<Transaction> Transactions { get; set; } = null!;
     public DbSet<Budget> Budgets { get; set; } = null!;
+    public DbSet<ProcessedMessage> ProcessedMessages { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // Configure ProcessedMessage for idempotency
+        modelBuilder.Entity<ProcessedMessage>(entity =>
+        {
+            entity.HasIndex(e => new { e.CorrelationId, e.ConsumerName }).IsUnique();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
         // Configure enum to string conversions (can't be done with annotations)
         modelBuilder.Entity<Account>()
             .Property(e => e.Type)

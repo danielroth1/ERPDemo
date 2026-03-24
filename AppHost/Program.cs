@@ -1,7 +1,8 @@
 var builder = DistributedApplication.CreateBuilder(args);
 
 // Infrastructure
-var postgres = builder.AddPostgres("postgres")
+var postgresPassword = builder.AddParameter("postgres-password", "postgres", secret: true);
+var postgres = builder.AddPostgres("postgres", password: postgresPassword)
     .WithDataVolume();
 var erpUsers = postgres.AddDatabase("erp-users", "erp_users");
 var erpInventory = postgres.AddDatabase("erp-inventory", "erp_inventory");
@@ -18,23 +19,28 @@ var redis = builder.AddRedis("redis")
 // Services (order matters — declare dependencies before dependents)
 var userManagement = builder.AddProject<Projects.UserManagement>("user-management")
     .WithReference(erpUsers)
+    .WaitFor(postgres)
     .WithReference(kafka);
 
 var financial = builder.AddProject<Projects.FinancialManagement>("financial")
     .WithReference(erpFinancial)
+    .WaitFor(postgres)
     .WithReference(kafka);
 
 var inventory = builder.AddProject<Projects.InventoryManagement>("inventory")
     .WithReference(erpInventory)
+    .WaitFor(postgres)
     .WithReference(kafka)
     .WithReference(financial);
 
 var sales = builder.AddProject<Projects.SalesManagement>("sales")
     .WithReference(erpSales)
+    .WaitFor(postgres)
     .WithReference(kafka);
 
 var dashboard = builder.AddProject<Projects.DashboardAnalytics>("dashboard")
     .WithReference(erpDashboard)
+    .WaitFor(postgres)
     .WithReference(kafka)
     .WithReference(redis);
 
@@ -60,7 +66,6 @@ var gateway = builder.AddProject<Projects.ApiGateway>("gateway")
 
 // Frontend (Vite dev server)
 builder.AddViteApp("frontend", "../frontend", "dev")
-    .WithReference(gateway)
-    .WithHttpEndpoint(port: 5173, targetPort: 5173);
+    .WithReference(gateway);
 
 builder.Build().Run();

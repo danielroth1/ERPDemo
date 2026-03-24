@@ -16,6 +16,19 @@
   ],
   "configurations": [
     // ============================================================
+    // ASPIRE
+    // ============================================================
+    {
+      "name": "Aspire: Launch AppHost",
+      "type": "dotnet",
+      "request": "launch",
+      "projectPath": "${workspaceFolder}/AppHost/AppHost.csproj",
+      "launchProfile": "http",
+      "env": {
+        "DOTNET_ENVIRONMENT": "Development"
+      }
+    },
+    // ============================================================
     // BACKEND LAUNCH CONFIGURATIONS
     // ============================================================
     {

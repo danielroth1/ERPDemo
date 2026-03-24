@@ -2,20 +2,17 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using MassTransit;
-using ERP.Contracts;
 using ERP.Contracts.Commands;
-using ERP.Contracts.Events;
-using ApiGateway.Services;
+using Orchestration.Services;
 
-namespace ApiGateway.Controllers;
+namespace Orchestration.Controllers;
 
 [ApiController]
 [Route("api/v1/shop")]
 [Authorize]
 public class ShopController : ControllerBase
 {
-    private readonly ITopicProducer<SubmitPurchase> _purchaseProducer;
-    private readonly ITopicProducer<SubmitReturn> _returnProducer;
+    private readonly ISendEndpointProvider _sendEndpointProvider;
     private readonly PurchaseTracker _purchaseTracker;
     private readonly ReturnTracker _returnTracker;
     private readonly ILogger<ShopController> _logger;
@@ -23,22 +20,17 @@ public class ShopController : ControllerBase
     private static readonly TimeSpan SagaTimeout = TimeSpan.FromSeconds(30);
 
     public ShopController(
-        ITopicProducer<SubmitPurchase> purchaseProducer,
-        ITopicProducer<SubmitReturn> returnProducer,
+        ISendEndpointProvider sendEndpointProvider,
         PurchaseTracker purchaseTracker,
         ReturnTracker returnTracker,
         ILogger<ShopController> logger)
     {
-        _purchaseProducer = purchaseProducer;
-        _returnProducer = returnProducer;
+        _sendEndpointProvider = sendEndpointProvider;
         _purchaseTracker = purchaseTracker;
         _returnTracker = returnTracker;
         _logger = logger;
     }
 
-    /// <summary>
-    /// Purchase a product — orchestrated via MassTransit saga
-    /// </summary>
     [HttpPost("purchase/{productId}")]
     public async Task<IActionResult> PurchaseProduct(string productId, [FromQuery] int quantity = 1)
     {
@@ -52,7 +44,8 @@ public class ShopController : ControllerBase
         _logger.LogInformation("Submitting purchase saga {CorrelationId} for product {ProductId}, quantity {Quantity}",
             correlationId, productId, quantity);
 
-        await _purchaseProducer.Produce(new SubmitPurchase
+        var endpoint = await _sendEndpointProvider.GetSendEndpoint(new Uri("queue:submit-purchase"));
+        await endpoint.Send(new SubmitPurchase
         {
             CorrelationId = correlationId,
             UserId = userId,
@@ -91,9 +84,6 @@ public class ShopController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Return a product — orchestrated via MassTransit saga
-    /// </summary>
     [HttpPost("return/{productId}")]
     public async Task<IActionResult> ReturnProduct(string productId, [FromQuery] int quantity = 1)
     {
@@ -107,7 +97,8 @@ public class ShopController : ControllerBase
         _logger.LogInformation("Submitting return saga {CorrelationId} for product {ProductId}, quantity {Quantity}",
             correlationId, productId, quantity);
 
-        await _returnProducer.Produce(new SubmitReturn
+        var endpoint = await _sendEndpointProvider.GetSendEndpoint(new Uri("queue:submit-return"));
+        await endpoint.Send(new SubmitReturn
         {
             CorrelationId = correlationId,
             UserId = userId,

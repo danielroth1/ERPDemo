@@ -4,7 +4,6 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Serilog;
 using Prometheus;
-using Confluent.Kafka;
 using MassTransit;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
@@ -13,8 +12,6 @@ using InventoryManagement.Consumers;
 using InventoryManagement.Infrastructure;
 using InventoryManagement.Services;
 using ERP.Contracts;
-using ERP.Contracts.Commands;
-using ERP.Contracts.Events;
 using ERP.Contracts.Events.Domain;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -55,29 +52,38 @@ builder.Services.AddScoped<CategoryService>();
 builder.Services.AddScoped<StockMovementService>();
 builder.Services.AddScoped<IFinancialAccountInitializer, FinancialAccountInitializer>();
 
-// Configure MassTransit with Kafka Rider
+// Configure MassTransit with RabbitMQ for saga commands, Kafka Rider for domain events
 var kafkaBootstrap = builder.Configuration.GetConnectionString("kafka")
     ?? builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
 
 builder.Services.AddMassTransit(x =>
 {
-    x.UsingInMemory((context, cfg) =>
+    // Register consumers for saga commands (RabbitMQ)
+    x.AddConsumer<ReserveStockConsumer>();
+    x.AddConsumer<DeductStockConsumer>();
+    x.AddConsumer<RestoreStockConsumer>();
+    x.AddConsumer<ReleaseReservationConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
     {
+        cfg.Host(rabbitHost, "/", h =>
+        {
+            h.Username("guest");
+            h.Password("guest");
+        });
+
+        cfg.UseMessageRetry(r => r.Intervals(
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(15)));
+
         cfg.ConfigureEndpoints(context);
     });
 
+    // Kafka Rider for domain event producers only
     x.AddRider(rider =>
     {
-        rider.AddConsumer<ReserveStockConsumer>();
-        rider.AddConsumer<DeductStockConsumer>();
-        rider.AddConsumer<RestoreStockConsumer>();
-
-        // Producers for saga events + domain events
-        rider.AddProducer<StockReserved>(KafkaTopics.StockReservedEvent);
-        rider.AddProducer<StockReservationFailed>(KafkaTopics.StockReservationFailedEvent);
-        rider.AddProducer<StockDeducted>(KafkaTopics.StockDeductedEvent);
-        rider.AddProducer<StockDeductionFailed>(KafkaTopics.StockDeductionFailedEvent);
-        rider.AddProducer<StockRestored>(KafkaTopics.StockRestoredEvent);
         rider.AddProducer<ProductCreated>(KafkaTopics.ProductCreatedEvent);
         rider.AddProducer<ProductUpdated>(KafkaTopics.ProductUpdatedEvent);
         rider.AddProducer<ProductDeleted>(KafkaTopics.ProductDeletedEvent);
@@ -88,24 +94,6 @@ builder.Services.AddMassTransit(x =>
         rider.UsingKafka((context, k) =>
         {
             k.Host(kafkaBootstrap);
-
-            k.TopicEndpoint<ReserveStock>(KafkaTopics.ReserveStockCommand, "inventory-reserve-stock", e =>
-            {
-                e.AutoOffsetReset = AutoOffsetReset.Earliest;
-                e.ConfigureConsumer<ReserveStockConsumer>(context);
-            });
-
-            k.TopicEndpoint<DeductStock>(KafkaTopics.DeductStockCommand, "inventory-deduct-stock", e =>
-            {
-                e.AutoOffsetReset = AutoOffsetReset.Earliest;
-                e.ConfigureConsumer<DeductStockConsumer>(context);
-            });
-
-            k.TopicEndpoint<RestoreStock>(KafkaTopics.RestoreStockCommand, "inventory-restore-stock", e =>
-            {
-                e.AutoOffsetReset = AutoOffsetReset.Earliest;
-                e.ConfigureConsumer<RestoreStockConsumer>(context);
-            });
         });
     });
 });

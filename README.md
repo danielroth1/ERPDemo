@@ -4,39 +4,51 @@ A comprehensive microservices-based ERP system demonstrating modern cloud-native
 
 ## Quick Start
 
-- install .net 8
-- start Rancher Desktop / Docker Desktop
-- start root folder in VS Code
-- `dotnet tool restore` -> installs kiota
+**Prerequisites:** .NET 9 SDK, Node.js 20+, Docker Desktop / Rancher Desktop
 
-### Local Development
+```bash
+dotnet tool restore   # install kiota
+```
 
-- install some docker environment, e.g. Kiota, Podman, or Docker Desktop
-- run some tasks with: ctrl + p -> `Task: Run Task`
-  - `infra: dev-infrastructure`
-  - `backend: watch-all-services`
-  - `backend: generate-all-api-clients`
-  - let all services build successfully `backend: generate-all-api-clients` again
-  - `frontend: dev`
+### Option A — .NET Aspire (recommended)
 
-- close any local VS Code instance connecting to remote via ssh -> might block 8080 port
+Starts all backend services and infrastructure (Postgres, Kafka, Redis) automatically.
 
-- `cd frontend` -> `npm install`
-- Run & Debug -> `Launch Frontend (Chrome)` (or whatever browser you prefer)
-  - alternatively: Run Task `dev-frontend`
+```bash
+dotnet run --project AppHost/AppHost.csproj
+```
 
-#### Deploy to local Kubernetes
+Opens the **Aspire Dashboard** in your browser where you can monitor all services and view logs.
 
-- run task with: ctrl + p -> `Task: Run Task`
-  - `k8s: deploy-local`
-- make sure to forward ports:
-  - `k8s: port-forwards-frontend`
-  - `k8s: port-forwards-gateway`
-- open frontend in browser: `http://localhost:3002`
-- optional: Run & Debug -> `K8s: Attach` -> select a service that you want the debugger to attach to
-- optional: install `Kubernetes` extension in VS Code to work with running pods
+### Option B — Manual (VS Code tasks)
 
-## Frontend
+`Ctrl+P` → `Task: Run Task`:
+
+1. `infra: dev-infrastructure` — starts Docker Compose infrastructure
+2. `backend: watch-all-services` — builds and watches all backend services
+3. (optional) `backend: generate-all-api-clients` — regenerate Kiota clients after service changes
+
+### Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev       # http://localhost:5173
+```
+
+Or use **Run & Debug** → `Frontend: Launch (Chrome)` (starts dev server + opens browser with debugger).
+
+> Close any remote SSH VS Code instances first — they may occupy port 8080.
+
+### Deploy to Local Kubernetes
+
+`Ctrl+P` → `Task: Run Task`:
+
+1. `k8s: deploy-local`
+2. `k8s: port-forward-frontend` + `k8s: port-forward-gateway`
+3. Open `http://localhost:3002`
+
+Optional: **Run & Debug** → `K8s: Attach` to debug a running pod.
 
 ## Generate Kiota API
 

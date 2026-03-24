@@ -1,8 +1,8 @@
 using MassTransit;
 
-namespace ApiGateway.Sagas;
+namespace Orchestration.Sagas;
 
-public class PurchaseState : SagaStateMachineInstance
+public class ReturnState : SagaStateMachineInstance
 {
     public Guid CorrelationId { get; set; }
     public string CurrentState { get; set; } = string.Empty;
@@ -15,11 +15,12 @@ public class PurchaseState : SagaStateMachineInstance
 
     // Data collected during saga
     public string ProductName { get; set; } = string.Empty;
-    public decimal UnitPrice { get; set; }
-    public decimal TotalCost { get; set; }
-    public decimal TotalTax { get; set; }
-    public decimal TotalRevenue { get; set; }
-    public int RemainingStock { get; set; }
+    public decimal RefundAmount { get; set; }
+    public int NewStock { get; set; }
     public string? TransactionId { get; set; }
     public string? FailureReason { get; set; }
+
+    // Timestamps for timeout detection
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

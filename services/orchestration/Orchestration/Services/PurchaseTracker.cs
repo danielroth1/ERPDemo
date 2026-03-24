@@ -1,12 +1,11 @@
 using System.Collections.Concurrent;
 using ERP.Contracts.Events;
 
-namespace ApiGateway.Services;
+namespace Orchestration.Services;
 
 public class PurchaseTracker
 {
     private readonly ConcurrentDictionary<Guid, TaskCompletionSource<PurchaseCompleted>> _pending = new();
-    private readonly ConcurrentDictionary<Guid, TaskCompletionSource<PurchaseCompleted>> _failures = new();
 
     public (Guid CorrelationId, Task<PurchaseCompleted> Task) CreatePending(TimeSpan timeout)
     {
@@ -14,7 +13,6 @@ public class PurchaseTracker
         var tcs = new TaskCompletionSource<PurchaseCompleted>(TaskCreationOptions.RunContinuationsAsynchronously);
         _pending[correlationId] = tcs;
 
-        // Auto-cancel after timeout
         var cts = new CancellationTokenSource(timeout);
         cts.Token.Register(() =>
         {

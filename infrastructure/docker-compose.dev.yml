@@ -12,7 +12,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-      POSTGRES_MULTIPLE_DATABASES: erp_users,erp_inventory,erp_sales,erp_financial,erp_dashboard
+      POSTGRES_MULTIPLE_DATABASES: erp_users,erp_inventory,erp_sales,erp_financial,erp_dashboard,erp_orchestration
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./docker/postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
@@ -49,6 +49,26 @@ services:
       - kafka-data:/var/lib/kafka/data
     networks:
       - erp-dev-network
+
+  # RabbitMQ - for saga commands (outbox, retry, dead-letter)
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: erp-dev-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - erp-dev-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Kafka UI for monitoring
   kafka-ui:
@@ -172,6 +192,7 @@ services:
 volumes:
   postgres-data:
   kafka-data:
+  rabbitmq-data:
   prometheus-data:
   grafana-data:
   loki-data:

@@ -15,7 +15,6 @@ using FinancialManagement.Infrastructure;
 using FinancialManagement.Services;
 using FinancialManagement.Models.DTOs;
 using ERP.Contracts;
-using ERP.Contracts.Commands;
 using ERP.Contracts.Events;
 using ERP.Contracts.Events.Domain;
 
@@ -61,46 +60,45 @@ builder.Services.AddScoped<ITransactionService, TransactionService>();
 builder.Services.AddScoped<IBudgetService, BudgetService>();
 builder.Services.AddScoped<IReportService, ReportService>();
 
-// Configure MassTransit with Kafka Rider
+// Configure MassTransit with RabbitMQ for saga commands, Kafka Rider for domain events
 var kafkaBootstrap = builder.Configuration.GetConnectionString("kafka")
     ?? builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
 
 builder.Services.AddMassTransit(x =>
 {
-    x.UsingInMemory((context, cfg) =>
+    // Saga command consumers (RabbitMQ)
+    x.AddConsumer<CreatePurchaseTransactionConsumer>();
+    x.AddConsumer<CreateRefundTransactionConsumer>();
+    x.AddConsumer<VoidPurchaseTransactionConsumer>();
+
+    x.UsingRabbitMq((context, cfg) =>
     {
+        cfg.Host(rabbitHost, "/", h =>
+        {
+            h.Username("guest");
+            h.Password("guest");
+        });
+
+        cfg.UseMessageRetry(r => r.Intervals(
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(15)));
+
         cfg.ConfigureEndpoints(context);
     });
 
+    // Kafka Rider for domain event producers + UserCreated consumer (domain event)
     x.AddRider(rider =>
     {
-        rider.AddConsumer<CreatePurchaseTransactionConsumer>();
-        rider.AddConsumer<CreateRefundTransactionConsumer>();
         rider.AddConsumer<UserCreatedConsumer>();
 
-        // Producers for saga events + domain events
-        rider.AddProducer<PurchaseTransactionCreated>(KafkaTopics.PurchaseTransactionCreatedEvent);
-        rider.AddProducer<PurchaseTransactionFailed>(KafkaTopics.PurchaseTransactionFailedEvent);
-        rider.AddProducer<RefundTransactionCreated>(KafkaTopics.RefundTransactionCreatedEvent);
-        rider.AddProducer<RefundTransactionFailed>(KafkaTopics.RefundTransactionFailedEvent);
         rider.AddProducer<TransactionCreated>(KafkaTopics.TransactionCreatedEvent);
         rider.AddProducer<BudgetExceeded>(KafkaTopics.BudgetExceededEvent);
 
         rider.UsingKafka((context, k) =>
         {
             k.Host(kafkaBootstrap);
-
-            k.TopicEndpoint<CreatePurchaseTransaction>(KafkaTopics.CreatePurchaseTransactionCommand, "financial-purchase-tx", e =>
-            {
-                e.AutoOffsetReset = AutoOffsetReset.Earliest;
-                e.ConfigureConsumer<CreatePurchaseTransactionConsumer>(context);
-            });
-
-            k.TopicEndpoint<CreateRefundTransaction>(KafkaTopics.CreateRefundTransactionCommand, "financial-refund-tx", e =>
-            {
-                e.AutoOffsetReset = AutoOffsetReset.Earliest;
-                e.ConfigureConsumer<CreateRefundTransactionConsumer>(context);
-            });
 
             k.TopicEndpoint<UserCreated>(KafkaTopics.UserCreatedEvent, "financial-user-created", e =>
             {

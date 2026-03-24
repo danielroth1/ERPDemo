@@ -32,6 +32,8 @@ public class Product
 
     public int StockQuantity { get; set; }
 
+    public int ReservedQuantity { get; set; }
+
     public int MinStockLevel { get; set; } = 10;
 
     public int MaxStockLevel { get; set; } = 1000;
@@ -46,5 +48,8 @@ public class Product
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
     [NotMapped]
-    public bool IsLowStock => StockQuantity <= MinStockLevel;
+    public int AvailableQuantity => StockQuantity - ReservedQuantity;
+
+    [NotMapped]
+    public bool IsLowStock => AvailableQuantity <= MinStockLevel;
 }

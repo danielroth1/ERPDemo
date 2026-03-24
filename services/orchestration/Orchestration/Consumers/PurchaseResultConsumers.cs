@@ -1,8 +1,8 @@
 using MassTransit;
 using ERP.Contracts.Events;
-using ApiGateway.Services;
+using Orchestration.Services;
 
-namespace ApiGateway.Consumers;
+namespace Orchestration.Consumers;
 
 public class PurchaseCompletedConsumer : IConsumer<PurchaseCompleted>
 {

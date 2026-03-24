@@ -8,7 +8,7 @@ services:
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_MULTIPLE_DATABASES: erp_users,erp_inventory,erp_sales,erp_financial,erp_dashboard
+      POSTGRES_MULTIPLE_DATABASES: erp_users,erp_inventory,erp_sales,erp_financial,erp_dashboard,erp_orchestration
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./infrastructure/docker/postgres-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
@@ -45,6 +45,26 @@ services:
       - kafka-data:/var/lib/kafka/data
     networks:
       - erp-network
+
+  # RabbitMQ - for saga commands (outbox, retry, dead-letter)
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: erp-rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - erp-network
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # Kafka UI
   kafka-ui:
@@ -99,6 +119,7 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_inventory;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
+      RabbitMQ__Host: rabbitmq
       Kafka__BootstrapServers: kafka:9092
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER:-erp-system}
@@ -106,6 +127,8 @@ services:
       Services__Financial: http://financial:8080
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       kafka:
         condition: service_started
@@ -148,12 +171,15 @@ services:
     environment:
       ASPNETCORE_ENVIRONMENT: Production
       PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_financial;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
+      RabbitMQ__Host: rabbitmq
       Kafka__BootstrapServers: kafka:9092
       Jwt__Secret: ${JWT_SECRET}
       Jwt__Issuer: ${JWT_ISSUER:-erp-system}
       Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
     depends_on:
       postgres:
+        condition: service_healthy
+      rabbitmq:
         condition: service_healthy
       kafka:
         condition: service_started
@@ -183,6 +209,32 @@ services:
     networks:
       - erp-network
 
+  # Orchestration Service (saga coordination)
+  orchestration:
+    build:
+      context: ./services/orchestration
+      dockerfile: Dockerfile
+    container_name: erp-orchestration
+    ports:
+      - "5010:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_orchestration;Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD}
+      RabbitMQ__Host: rabbitmq
+      Kafka__BootstrapServers: kafka:9092
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: ${JWT_ISSUER:-erp-system}
+      Jwt__Audience: ${JWT_AUDIENCE:-erp-clients}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      kafka:
+        condition: service_started
+    networks:
+      - erp-network
+
   # API Gateway
   gateway:
     build:
@@ -201,12 +253,14 @@ services:
       Services__Sales: http://sales:8080
       Services__Financial: http://financial:8080
       Services__Dashboard: http://dashboard:8080
+      Services__Orchestration: http://orchestration:8080
     depends_on:
       - user-management
       - inventory
       - sales
       - financial
       - dashboard
+      - orchestration
     networks:
       - erp-network
 
@@ -280,6 +334,7 @@ networks:
 volumes:
   postgres-data:
   kafka-data:
+  rabbitmq-data:
   prometheus-data:
   grafana-data:
   loki-data:

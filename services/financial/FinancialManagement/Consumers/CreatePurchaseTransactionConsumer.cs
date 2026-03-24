@@ -1,28 +1,26 @@
+using System.Text.Json;
 using MassTransit;
+using Microsoft.EntityFrameworkCore;
 using FinancialManagement.Models;
 using FinancialManagement.Models.DTOs;
+using FinancialManagement.Infrastructure;
 using FinancialManagement.Services;
 using ERP.Contracts.Commands;
 using ERP.Contracts.Events;
+using ERP.Contracts.Infrastructure;
 
 namespace FinancialManagement.Consumers;
 
 public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransaction>
 {
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly ITopicProducer<PurchaseTransactionCreated> _purchaseTransactionCreatedProducer;
-    private readonly ITopicProducer<PurchaseTransactionFailed> _purchaseTransactionFailedProducer;
     private readonly ILogger<CreatePurchaseTransactionConsumer> _logger;
 
     public CreatePurchaseTransactionConsumer(
         IServiceScopeFactory scopeFactory,
-        ITopicProducer<PurchaseTransactionCreated> purchaseTransactionCreatedProducer,
-        ITopicProducer<PurchaseTransactionFailed> purchaseTransactionFailedProducer,
         ILogger<CreatePurchaseTransactionConsumer> logger)
     {
         _scopeFactory = scopeFactory;
-        _purchaseTransactionCreatedProducer = purchaseTransactionCreatedProducer;
-        _purchaseTransactionFailedProducer = purchaseTransactionFailedProducer;
         _logger = logger;
     }
 
@@ -35,8 +33,23 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
         try
         {
             using var scope = _scopeFactory.CreateScope();
+            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
             var transactionService = scope.ServiceProvider.GetRequiredService<ITransactionService>();
             var accountService = scope.ServiceProvider.GetRequiredService<IAccountService>();
+
+            // Idempotency: check if already processed
+            var existing = await dbContext.ProcessedMessages
+                .FirstOrDefaultAsync(m => m.CorrelationId == command.CorrelationId && m.ConsumerName == nameof(CreatePurchaseTransactionConsumer));
+
+            if (existing != null)
+            {
+                _logger.LogWarning("Duplicate CreatePurchaseTransaction for correlation {CorrelationId}, re-producing result", command.CorrelationId);
+                if (existing.Success && existing.ResponseData != null)
+                    await context.Publish(JsonSerializer.Deserialize<PurchaseTransactionCreated>(existing.ResponseData)!);
+                else if (!existing.Success && existing.ResponseData != null)
+                    await context.Publish(JsonSerializer.Deserialize<PurchaseTransactionFailed>(existing.ResponseData)!);
+                return;
+            }
 
             // Resolve user accounts
             var userAccount = await accountService.GetAccountByUserIdAsync(command.UserId);
@@ -54,11 +67,20 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
                 taxAccount == null || revenueAccount == null || inventoryAccount == null || cogsAccount == null)
             {
                 _logger.LogError("Failed to resolve one or more accounts for purchase transaction. User: {UserId}", command.UserId);
-                await _purchaseTransactionFailedProducer.Produce(new PurchaseTransactionFailed
+                var failEvent = new PurchaseTransactionFailed
                 {
                     CorrelationId = command.CorrelationId,
                     Reason = "Failed to resolve financial accounts"
+                };
+                dbContext.ProcessedMessages.Add(new ProcessedMessage
+                {
+                    CorrelationId = command.CorrelationId,
+                    ConsumerName = nameof(CreatePurchaseTransactionConsumer),
+                    Success = false,
+                    ResponseData = JsonSerializer.Serialize(failEvent)
                 });
+                await dbContext.SaveChangesAsync();
+                await context.Publish(failEvent);
                 return;
             }
 
@@ -85,16 +107,28 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
             _logger.LogInformation("Purchase transaction created: {TransactionId} for correlation {CorrelationId}",
                 result.Id, command.CorrelationId);
 
-            await _purchaseTransactionCreatedProducer.Produce(new PurchaseTransactionCreated
+            var successEvent = new PurchaseTransactionCreated
             {
                 CorrelationId = command.CorrelationId,
                 TransactionId = result.Id
+            };
+
+            // Record as processed (transaction was already saved by transactionService)
+            dbContext.ProcessedMessages.Add(new ProcessedMessage
+            {
+                CorrelationId = command.CorrelationId,
+                ConsumerName = nameof(CreatePurchaseTransactionConsumer),
+                Success = true,
+                ResponseData = JsonSerializer.Serialize(successEvent)
             });
+            await dbContext.SaveChangesAsync();
+
+            await context.Publish(successEvent);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Failed to create purchase transaction for correlation {CorrelationId}", command.CorrelationId);
-            await _purchaseTransactionFailedProducer.Produce(new PurchaseTransactionFailed
+            await context.Publish(new PurchaseTransactionFailed
             {
                 CorrelationId = command.CorrelationId,
                 Reason = ex.Message

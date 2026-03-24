@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using InventoryManagement.Models;
+using ERP.Contracts.Infrastructure;
 
 namespace InventoryManagement.Infrastructure;
 
@@ -12,11 +13,18 @@ public class AppDbContext : DbContext
     public DbSet<Product> Products { get; set; } = null!;
     public DbSet<Category> Categories { get; set; } = null!;
     public DbSet<StockMovement> StockMovements { get; set; } = null!;
+    public DbSet<ProcessedMessage> ProcessedMessages { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
 
+        // Configure ProcessedMessage for idempotency
+        modelBuilder.Entity<ProcessedMessage>(entity =>
+        {
+            entity.HasIndex(e => new { e.CorrelationId, e.ConsumerName }).IsUnique();
+            entity.Property(e => e.CreatedAt).HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
         // Configure enum conversions
         modelBuilder.Entity<StockMovement>()
             .Property(e => e.MovementType)

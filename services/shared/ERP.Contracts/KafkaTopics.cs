@@ -14,6 +14,7 @@ public static class KafkaTopics
     // Financial command topics (one per command type)
     public const string CreatePurchaseTransactionCommand = "create-purchase-transaction";
     public const string CreateRefundTransactionCommand = "create-refund-transaction";
+    public const string VoidPurchaseTransactionCommand = "void-purchase-transaction";
 
     // Purchase saga event topics (one per event type)
     public const string StockReservedEvent = "stock-reserved";

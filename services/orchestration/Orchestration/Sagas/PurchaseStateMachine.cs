@@ -2,7 +2,7 @@ using MassTransit;
 using ERP.Contracts.Commands;
 using ERP.Contracts.Events;
 
-namespace ApiGateway.Sagas;
+namespace Orchestration.Sagas;
 
 public class PurchaseStateMachine : MassTransitStateMachine<PurchaseState>
 {
@@ -13,7 +13,7 @@ public class PurchaseStateMachine : MassTransitStateMachine<PurchaseState>
     public State Completed { get; private set; } = null!;
     public State Faulted { get; private set; } = null!;
 
-    // Events
+    // Events (all arrive via RabbitMQ)
     public Event<SubmitPurchase> SubmitPurchase { get; private set; } = null!;
     public Event<StockReserved> StockReserved { get; private set; } = null!;
     public Event<StockReservationFailed> StockReservationFailed { get; private set; } = null!;
@@ -42,13 +42,14 @@ public class PurchaseStateMachine : MassTransitStateMachine<PurchaseState>
                     ctx.Saga.ProductId = ctx.Message.ProductId;
                     ctx.Saga.Quantity = ctx.Message.Quantity;
                     ctx.Saga.AuthToken = ctx.Message.AuthToken;
+                    ctx.Saga.UpdatedAt = DateTime.UtcNow;
                 })
-                .Produce(ctx => ctx.Init<ReserveStock>(new
+                .Send(ctx => new Uri("queue:reserve-stock"), ctx => new ReserveStock
                 {
-                    ctx.Saga.CorrelationId,
-                    ctx.Saga.ProductId,
-                    ctx.Saga.Quantity
-                }))
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    ProductId = ctx.Saga.ProductId,
+                    Quantity = ctx.Saga.Quantity
+                })
                 .TransitionTo(ReservingStock)
         );
 
@@ -63,55 +64,56 @@ public class PurchaseStateMachine : MassTransitStateMachine<PurchaseState>
                     const decimal taxRate = 0.10m;
                     ctx.Saga.TotalTax = ctx.Saga.TotalCost * taxRate;
                     ctx.Saga.TotalRevenue = ctx.Saga.TotalCost - ctx.Saga.TotalTax;
+                    ctx.Saga.UpdatedAt = DateTime.UtcNow;
                 })
-                .Produce(ctx => ctx.Init<CreatePurchaseTransaction>(new
+                .Send(ctx => new Uri("queue:create-purchase-transaction"), ctx => new CreatePurchaseTransaction
                 {
-                    ctx.Saga.CorrelationId,
-                    ctx.Saga.UserId,
-                    ctx.Saga.ProductId,
-                    ctx.Saga.ProductName,
-                    ctx.Saga.Quantity,
-                    ctx.Saga.TotalCost,
-                    ctx.Saga.TotalTax,
-                    ctx.Saga.TotalRevenue,
-                    ctx.Saga.AuthToken
-                }))
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    UserId = ctx.Saga.UserId,
+                    ProductId = ctx.Saga.ProductId,
+                    ProductName = ctx.Saga.ProductName,
+                    Quantity = ctx.Saga.Quantity,
+                    TotalCost = ctx.Saga.TotalCost,
+                    TotalTax = ctx.Saga.TotalTax,
+                    TotalRevenue = ctx.Saga.TotalRevenue,
+                    AuthToken = ctx.Saga.AuthToken
+                })
                 .TransitionTo(CreatingTransaction),
             When(StockReservationFailed)
-                .Then(ctx => ctx.Saga.FailureReason = ctx.Message.Reason)
-                .Produce(ctx => ctx.Init<PurchaseFailed>(new
+                .Then(ctx => { ctx.Saga.FailureReason = ctx.Message.Reason; ctx.Saga.UpdatedAt = DateTime.UtcNow; })
+                .Publish(ctx => new PurchaseFailed
                 {
-                    ctx.Saga.CorrelationId,
+                    CorrelationId = ctx.Saga.CorrelationId,
                     Reason = ctx.Message.Reason
-                }))
+                })
                 .TransitionTo(Faulted)
                 .Finalize()
         );
 
         During(CreatingTransaction,
             When(PurchaseTransactionCreated)
-                .Then(ctx => ctx.Saga.TransactionId = ctx.Message.TransactionId)
-                .Produce(ctx => ctx.Init<DeductStock>(new
+                .Then(ctx => { ctx.Saga.TransactionId = ctx.Message.TransactionId; ctx.Saga.UpdatedAt = DateTime.UtcNow; })
+                .Send(ctx => new Uri("queue:deduct-stock"), ctx => new DeductStock
                 {
-                    ctx.Saga.CorrelationId,
-                    ctx.Saga.ProductId,
-                    ctx.Saga.Quantity
-                }))
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    ProductId = ctx.Saga.ProductId,
+                    Quantity = ctx.Saga.Quantity
+                })
                 .TransitionTo(DeductingStock),
             When(PurchaseTransactionFailed)
-                .Then(ctx => ctx.Saga.FailureReason = ctx.Message.Reason)
-                // Compensation: restore the reserved stock
-                .Produce(ctx => ctx.Init<RestoreStock>(new
+                .Then(ctx => { ctx.Saga.FailureReason = ctx.Message.Reason; ctx.Saga.UpdatedAt = DateTime.UtcNow; })
+                // Compensation: release the reservation (no stock was deducted yet)
+                .Send(ctx => new Uri("queue:release-reservation"), ctx => new ReleaseReservation
                 {
-                    ctx.Saga.CorrelationId,
-                    ctx.Saga.ProductId,
-                    ctx.Saga.Quantity
-                }))
-                .Produce(ctx => ctx.Init<PurchaseFailed>(new
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    ProductId = ctx.Saga.ProductId,
+                    Quantity = ctx.Saga.Quantity
+                })
+                .Publish(ctx => new PurchaseFailed
                 {
-                    ctx.Saga.CorrelationId,
+                    CorrelationId = ctx.Saga.CorrelationId,
                     Reason = ctx.Message.Reason
-                }))
+                })
                 .TransitionTo(Faulted)
                 .Finalize()
         );
@@ -121,25 +123,33 @@ public class PurchaseStateMachine : MassTransitStateMachine<PurchaseState>
                 .Then(ctx =>
                 {
                     ctx.Saga.RemainingStock = ctx.Message.RemainingStock;
+                    ctx.Saga.UpdatedAt = DateTime.UtcNow;
                 })
-                .Produce(ctx => ctx.Init<PurchaseCompleted>(new
+                .Publish(ctx => new PurchaseCompleted
                 {
-                    ctx.Saga.CorrelationId,
-                    ctx.Saga.ProductId,
-                    ctx.Saga.ProductName,
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    ProductId = ctx.Saga.ProductId,
+                    ProductName = ctx.Saga.ProductName,
                     QuantityPurchased = ctx.Saga.Quantity,
-                    ctx.Saga.RemainingStock,
-                    ctx.Saga.TotalCost
-                }))
+                    RemainingStock = ctx.Saga.RemainingStock,
+                    TotalCost = ctx.Saga.TotalCost
+                })
                 .TransitionTo(Completed)
                 .Finalize(),
             When(StockDeductionFailed)
-                .Then(ctx => ctx.Saga.FailureReason = ctx.Message.Reason)
-                .Produce(ctx => ctx.Init<PurchaseFailed>(new
+                .Then(ctx => { ctx.Saga.FailureReason = ctx.Message.Reason; ctx.Saga.UpdatedAt = DateTime.UtcNow; })
+                // Compensation: void the financial transaction that was already created
+                .Send(ctx => new Uri("queue:void-purchase-transaction"), ctx => new VoidPurchaseTransaction
                 {
-                    ctx.Saga.CorrelationId,
+                    CorrelationId = ctx.Saga.CorrelationId,
+                    TransactionId = ctx.Saga.TransactionId ?? string.Empty,
+                    Reason = $"Stock deduction failed: {ctx.Message.Reason}"
+                })
+                .Publish(ctx => new PurchaseFailed
+                {
+                    CorrelationId = ctx.Saga.CorrelationId,
                     Reason = ctx.Message.Reason
-                }))
+                })
                 .TransitionTo(Faulted)
                 .Finalize()
         );
