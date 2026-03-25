@@ -32,6 +32,18 @@ spec:
               key: connection-string-inventory
         - name: Kafka__BootstrapServers
           value: "kafka-service:9092"
+        - name: RabbitMQ__Host
+          value: "rabbitmq-service"
+        - name: RabbitMQ__Username
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-secret
+              key: username
+        - name: RabbitMQ__Password
+          valueFrom:
+            secretKeyRef:
+              name: rabbitmq-secret
+              key: password
         - name: Services__Financial
           value: "http://financial-service:8080"
         - name: Jwt__Secret

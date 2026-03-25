@@ -55,10 +55,14 @@ builder.Services.AddScoped<IFinancialAccountInitializer, FinancialAccountInitial
 // Configure MassTransit with RabbitMQ for saga commands, Kafka Rider for domain events
 var kafkaBootstrap = builder.Configuration.GetConnectionString("kafka")
     ?? builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+// Aspire injects ConnectionStrings__rabbitmq as amqp://user:pass@host:port
+var rabbitmqUri = builder.Configuration.GetConnectionString("rabbitmq");
 var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
 
 builder.Services.AddMassTransit(x =>
 {
+    x.SetKebabCaseEndpointNameFormatter();
+
     // Register consumers for saga commands (RabbitMQ)
     x.AddConsumer<ReserveStockConsumer>();
     x.AddConsumer<DeductStockConsumer>();
@@ -67,11 +71,10 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host(rabbitHost, "/", h =>
-        {
-            h.Username("guest");
-            h.Password("guest");
-        });
+        if (!string.IsNullOrEmpty(rabbitmqUri))
+            cfg.Host(new Uri(rabbitmqUri));
+        else
+            cfg.Host(rabbitHost, "/", h => { h.Username("guest"); h.Password("guest"); });
 
         cfg.UseMessageRetry(r => r.Intervals(
             TimeSpan.FromSeconds(1),
@@ -151,6 +154,7 @@ builder.Services.AddHealthChecks()
     .AddNpgSql(
         postgresSettings.ConnectionString,
         name: "postgresql",
+        tags: new[] { "ready" },
         timeout: TimeSpan.FromSeconds(3));
 
 // Configure Swagger
@@ -197,7 +201,10 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
     Predicate = _ => false
 });
 
-app.MapHealthChecks("/health/ready");
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 // Root endpoint removed - use /health/ready or API endpoints under /api/v1/*
 

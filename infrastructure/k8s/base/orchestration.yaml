@@ -1,21 +1,21 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: financial
+  name: orchestration
   namespace: erp-local
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: financial
+      app: orchestration
   template:
     metadata:
       labels:
-        app: financial
+        app: orchestration
     spec:
       containers:
-      - name: financial
-        image: erp/financial
+      - name: orchestration
+        image: erp/orchestration
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
@@ -25,11 +25,11 @@ spec:
           value: "http://+:8080"
         - name: ASPNETCORE_ENVIRONMENT
           value: "Production"
-        - name: PostgreSQL__ConnectionString
+        - name: ConnectionStrings__erp-orchestration
           valueFrom:
             secretKeyRef:
               name: postgres-secret
-              key: connection-string-financial
+              key: connection-string-orchestration
         - name: Kafka__BootstrapServers
           value: "kafka-service:9092"
         - name: RabbitMQ__Host
@@ -58,9 +58,9 @@ spec:
           periodSeconds: 10
         readinessProbe:
           httpGet:
-            path: /health/ready
+            path: /health
             port: 8080
-          initialDelaySeconds: 10
+          initialDelaySeconds: 15
           periodSeconds: 5
         resources:
           requests:
@@ -73,11 +73,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: financial-service
+  name: orchestration-service
   namespace: erp-local
 spec:
   selector:
-    app: financial
+    app: orchestration
   ports:
   - port: 8080
     targetPort: 8080

@@ -231,6 +231,7 @@ try
         .AddNpgSql(
             postgresSettings.ConnectionString,
             name: "postgresql",
+            tags: new[] { "ready" },
             timeout: TimeSpan.FromSeconds(3));
 
     // Add CORS
@@ -283,8 +284,14 @@ try
     // Aspire default endpoints
     app.MapDefaultEndpoints();
     
-    app.MapHealthChecks("/health/live");
-    app.MapHealthChecks("/health/ready");
+    app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = _ => false
+    });
+    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
     app.MapMetrics();
 
     // Display startup information

@@ -42,6 +42,8 @@ spec:
           value: "http://financial-service:8080"
         - name: ReverseProxy__Clusters__dashboard-cluster__Destinations__destination1__Address
           value: "http://dashboard-service:8080"
+        - name: ReverseProxy__Clusters__orchestration-cluster__Destinations__destination1__Address
+          value: "http://orchestration-service:8080"
         livenessProbe:
           httpGet:
             path: /health/live

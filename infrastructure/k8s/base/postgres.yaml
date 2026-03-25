@@ -9,7 +9,7 @@ data:
     set -e
     
     # Create multiple databases
-    for db in erp_users erp_inventory erp_sales erp_financial erp_dashboard; do
+    for db in erp_users erp_inventory erp_sales erp_financial erp_dashboard erp_orchestration; do
       echo "Creating database: $db"
       psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
         CREATE DATABASE $db;
@@ -31,6 +31,7 @@ stringData:
   connection-string-sales: "Host=postgres-service;Port=5432;Database=erp_sales;Username=postgres;Password=postgres"
   connection-string-financial: "Host=postgres-service;Port=5432;Database=erp_financial;Username=postgres;Password=postgres"
   connection-string-dashboard: "Host=postgres-service;Port=5432;Database=erp_dashboard;Username=postgres;Password=postgres"
+  connection-string-orchestration: "Host=postgres-service;Port=5432;Database=erp_orchestration;Username=postgres;Password=postgres"
 ---
 apiVersion: apps/v1
 kind: StatefulSet

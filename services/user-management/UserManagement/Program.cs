@@ -116,6 +116,7 @@ builder.Services.AddHealthChecks()
     .AddNpgSql(
         postgresSettings.ConnectionString,
         name: "postgresql",
+        tags: new[] { "ready" },
         timeout: TimeSpan.FromSeconds(3));
 
 // Configure Swagger
@@ -162,7 +163,10 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
     Predicate = _ => false // Liveness - doesn't check dependencies
 });
 
-app.MapHealthChecks("/health/ready"); // Readiness - checks all dependencies
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 try
 {

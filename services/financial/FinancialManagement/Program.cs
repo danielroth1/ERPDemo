@@ -63,10 +63,14 @@ builder.Services.AddScoped<IReportService, ReportService>();
 // Configure MassTransit with RabbitMQ for saga commands, Kafka Rider for domain events
 var kafkaBootstrap = builder.Configuration.GetConnectionString("kafka")
     ?? builder.Configuration["Kafka:BootstrapServers"] ?? "localhost:9092";
+// Aspire injects ConnectionStrings__rabbitmq as amqp://user:pass@host:port
+var rabbitmqUri = builder.Configuration.GetConnectionString("rabbitmq");
 var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
 
 builder.Services.AddMassTransit(x =>
 {
+    x.SetKebabCaseEndpointNameFormatter();
+
     // Saga command consumers (RabbitMQ)
     x.AddConsumer<CreatePurchaseTransactionConsumer>();
     x.AddConsumer<CreateRefundTransactionConsumer>();
@@ -74,11 +78,10 @@ builder.Services.AddMassTransit(x =>
 
     x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.Host(rabbitHost, "/", h =>
-        {
-            h.Username("guest");
-            h.Password("guest");
-        });
+        if (!string.IsNullOrEmpty(rabbitmqUri))
+            cfg.Host(new Uri(rabbitmqUri));
+        else
+            cfg.Host(rabbitHost, "/", h => { h.Username("guest"); h.Password("guest"); });
 
         cfg.UseMessageRetry(r => r.Intervals(
             TimeSpan.FromSeconds(1),
@@ -139,6 +142,7 @@ builder.Services.AddHealthChecks()
     .AddNpgSql(
         postgresSettings.ConnectionString,
         name: "postgresql",
+        tags: new[] { "ready" },
         timeout: TimeSpan.FromSeconds(3));
 
 // Add Prometheus metrics
@@ -172,11 +176,18 @@ app.UseAuthorization();
 
 app.MapControllers();
 
-// Aspire default endpoints
+// Aspire default endpoints (maps /health and /alive)
 app.MapDefaultEndpoints();
 
-// Health check endpoint
-app.MapHealthChecks("/health");
+// Explicit liveness (self only) and readiness (with DB) endpoints for K8s probes
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false
+});
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 // Metrics endpoint
 app.MapMetrics("/metrics");

@@ -48,7 +48,33 @@ docker ps
 - Prometheus: http://localhost:9090
 - Grafana: http://localhost:3001
 
-#### 2. Run Services Locally
+#### 2. Choose Your Backend Workflow
+
+**Option A: Standard Aspire orchestration**
+
+Run AppHost normally when you want the usual Aspire dashboard and orchestration flow without a watch-based backend startup:
+
+```powershell
+dotnet run --project AppHost/AppHost.csproj
+```
+
+**Option B: Aspire watch mode**
+
+Run AppHost with `dotnet watch` when you want a watch-based AppHost development loop:
+
+```powershell
+dotnet watch run --project AppHost/AppHost.csproj
+```
+
+In VS Code you can run the `aspire: watch-apphost` task, then use `Aspire: Attach to Watch AppHost` from Run and Debug if you need a debugger attached to the watch-started AppHost.
+
+**Option C: Manual service watch tasks**
+
+Run the services individually or via `watch-all-services` when you want the existing per-service watch workflow.
+
+**Important:** only run one AppHost instance at a time. The local Aspire dashboard/resource-service ports are fixed, so starting a second AppHost can fail with an address-in-use error.
+
+#### 3. Run Services Locally
 
 **Option A: Use VS Code Tasks** (Easiest)
 
@@ -260,6 +286,8 @@ docker-compose -f docker-compose.dev.yml up -d
 # Now they can call each other via localhost:5001, etc.
 ```
 
+If you are using either AppHost workflow above, do not run `watch-all-services` at the same time unless you intentionally want overlapping service processes and ports.
+
 ### Scenario 3: Hot Reload Frontend + Backend
 
 ```powershell
@@ -358,6 +386,8 @@ taskkill /PID <PID> /F
 
 # Or change port in launchSettings.json
 ```
+
+If this happens while launching AppHost, first stop any older AppHost instance before retrying. The local Aspire dashboard/resource-service ports are shared by that single AppHost process.
 
 ### "appsettings.Development.json not loading"
 

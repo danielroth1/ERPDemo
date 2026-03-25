@@ -18,7 +18,17 @@ Starts all backend services and infrastructure (Postgres, Kafka, Redis) automati
 dotnet run --project AppHost/AppHost.csproj
 ```
 
-Opens the **Aspire Dashboard** in your browser where you can monitor all services and view logs.
+This is the standard Aspire launch path. It starts AppHost normally and opens the **Aspire Dashboard** in your browser where you can monitor all services and view logs.
+
+If you want a watch-based AppHost workflow for development, use:
+
+```bash
+dotnet watch run --project AppHost/AppHost.csproj
+```
+
+Or in VS Code run the task `aspire: watch-apphost`, then use **Run & Debug** → `Aspire: Attach to Watch AppHost` if you need to debug the watch-started AppHost.
+
+Do not run multiple AppHost instances at the same time. The Aspire dashboard/resource-service ports are fixed in local launch settings, so a second AppHost instance can fail with an address-in-use error.
 
 ### Option B — Manual (VS Code tasks)
 

@@ -89,6 +89,9 @@ try
             .UseSnakeCaseNamingConvention());
 
     // RabbitMQ + Kafka configuration
+    // Aspire injects ConnectionStrings__rabbitmq as amqp://user:pass@host:port
+    // Fall back to individual settings when running standalone (non-Aspire)
+    var rabbitmqUri = builder.Configuration.GetConnectionString("rabbitmq");
     var rabbitHost = builder.Configuration["RabbitMQ:Host"] ?? "localhost";
     var rabbitUser = builder.Configuration["RabbitMQ:Username"] ?? "guest";
     var rabbitPass = builder.Configuration["RabbitMQ:Password"] ?? "guest";
@@ -120,11 +123,10 @@ try
         // RabbitMQ transport — unlocks outbox, retry, dead-letter
         x.UsingRabbitMq((context, cfg) =>
         {
-            cfg.Host(rabbitHost, "/", h =>
-            {
-                h.Username(rabbitUser);
-                h.Password(rabbitPass);
-            });
+            if (!string.IsNullOrEmpty(rabbitmqUri))
+                cfg.Host(new Uri(rabbitmqUri));
+            else
+                cfg.Host(rabbitHost, "/", h => { h.Username(rabbitUser); h.Password(rabbitPass); });
 
             cfg.UseMessageRetry(r => r.Intervals(
                 TimeSpan.FromSeconds(1),
@@ -172,8 +174,14 @@ try
     app.UseAuthorization();
     app.MapControllers();
     app.MapDefaultEndpoints();
-    app.MapHealthChecks("/health/live");
-    app.MapHealthChecks("/health/ready");
+    app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = _ => false
+    });
+    app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+    {
+        Predicate = check => check.Tags.Contains("ready")
+    });
     app.MapMetrics();
 
     var urls = app.Configuration["ASPNETCORE_URLS"] ?? "http://localhost:5010";

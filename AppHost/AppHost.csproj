@@ -16,6 +16,7 @@
     <PackageReference Include="Aspire.Hosting.PostgreSQL" Version="13.1.3" />
     <PackageReference Include="Aspire.Hosting.Kafka" Version="13.1.3" />
     <PackageReference Include="Aspire.Hosting.Redis" Version="13.1.3" />
+    <PackageReference Include="Aspire.Hosting.RabbitMQ" Version="13.1.3" />
     <PackageReference Include="Aspire.Hosting.JavaScript" Version="13.1.3" />
   </ItemGroup>
 
@@ -26,6 +27,7 @@
     <ProjectReference Include="..\services\sales\SalesManagement\SalesManagement.csproj" />
     <ProjectReference Include="..\services\financial\FinancialManagement\FinancialManagement.csproj" />
     <ProjectReference Include="..\services\dashboard\DashboardAnalytics\DashboardAnalytics.csproj" />
+    <ProjectReference Include="..\services\orchestration\Orchestration\Orchestration.csproj" />
   </ItemGroup>
 
 </Project>

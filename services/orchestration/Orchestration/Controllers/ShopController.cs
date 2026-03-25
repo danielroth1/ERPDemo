@@ -12,7 +12,7 @@ namespace Orchestration.Controllers;
 [Authorize]
 public class ShopController : ControllerBase
 {
-    private readonly ISendEndpointProvider _sendEndpointProvider;
+    private readonly IPublishEndpoint _publishEndpoint;
     private readonly PurchaseTracker _purchaseTracker;
     private readonly ReturnTracker _returnTracker;
     private readonly ILogger<ShopController> _logger;
@@ -20,12 +20,12 @@ public class ShopController : ControllerBase
     private static readonly TimeSpan SagaTimeout = TimeSpan.FromSeconds(30);
 
     public ShopController(
-        ISendEndpointProvider sendEndpointProvider,
+        IPublishEndpoint publishEndpoint,
         PurchaseTracker purchaseTracker,
         ReturnTracker returnTracker,
         ILogger<ShopController> logger)
     {
-        _sendEndpointProvider = sendEndpointProvider;
+        _publishEndpoint = publishEndpoint;
         _purchaseTracker = purchaseTracker;
         _returnTracker = returnTracker;
         _logger = logger;
@@ -44,8 +44,7 @@ public class ShopController : ControllerBase
         _logger.LogInformation("Submitting purchase saga {CorrelationId} for product {ProductId}, quantity {Quantity}",
             correlationId, productId, quantity);
 
-        var endpoint = await _sendEndpointProvider.GetSendEndpoint(new Uri("queue:submit-purchase"));
-        await endpoint.Send(new SubmitPurchase
+        await _publishEndpoint.Publish(new SubmitPurchase
         {
             CorrelationId = correlationId,
             UserId = userId,
@@ -97,8 +96,7 @@ public class ShopController : ControllerBase
         _logger.LogInformation("Submitting return saga {CorrelationId} for product {ProductId}, quantity {Quantity}",
             correlationId, productId, quantity);
 
-        var endpoint = await _sendEndpointProvider.GetSendEndpoint(new Uri("queue:submit-return"));
-        await endpoint.Send(new SubmitReturn
+        await _publishEndpoint.Publish(new SubmitReturn
         {
             CorrelationId = correlationId,
             UserId = userId,

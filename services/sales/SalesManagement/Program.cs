@@ -113,6 +113,7 @@ builder.Services.AddHealthChecks()
     .AddNpgSql(
         postgresSettings.ConnectionString,
         name: "postgresql",
+        tags: new[] { "ready" },
         timeout: TimeSpan.FromSeconds(3));
 
 // Add Prometheus metrics
@@ -153,11 +154,18 @@ app.MapControllers();
 // Map GraphQL endpoint
 app.MapGraphQL("/graphql");
 
-// Aspire default endpoints
+// Aspire default endpoints (maps /health and /alive)
 app.MapDefaultEndpoints();
 
-// Health check endpoint
-app.MapHealthChecks("/health");
+// Explicit liveness (self only) and readiness (with DB) endpoints for K8s probes
+app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = _ => false
+});
+app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
+{
+    Predicate = check => check.Tags.Contains("ready")
+});
 
 // Metrics endpoint
 app.MapMetrics("/metrics");

@@ -22,11 +22,13 @@
       "name": "Aspire: Launch AppHost",
       "type": "dotnet",
       "request": "launch",
-      "projectPath": "${workspaceFolder}/AppHost/AppHost.csproj",
-      "launchProfile": "http",
-      "env": {
-        "DOTNET_ENVIRONMENT": "Development"
-      }
+      "projectPath": "${workspaceFolder}/AppHost/AppHost.csproj"
+    },
+    {
+      "name": "Aspire: Attach to Watch AppHost",
+      "type": "coreclr",
+      "request": "attach",
+      "processName": "AppHost"
     },
     // ============================================================
     // BACKEND LAUNCH CONFIGURATIONS
