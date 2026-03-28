@@ -61,14 +61,16 @@
       "label": "aspire: watch-apphost",
       "command": "dotnet",
       "type": "process",
-      "args": ["watch", "run", "--project", "${workspaceFolder}/AppHost/AppHost.csproj"],
+      "args": ["watch", "run", "--launch-profile", "http", "--project", "${workspaceFolder}/AppHost/AppHost.csproj"],
       "problemMatcher": "$msCompile",
       "isBackground": true,
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "aspire" },
       "options": {
         "cwd": "${workspaceFolder}/AppHost",
         "env": {
+          "ASPIRE_ALLOW_UNSECURED_TRANSPORT": "true",
           "ASPNETCORE_ENVIRONMENT": "Development",
+          "ASPNETCORE_URLS": "http://localhost:15227",
           "DOTNET_ENVIRONMENT": "Development"
         }
       }

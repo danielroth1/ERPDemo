@@ -22,7 +22,11 @@
       "name": "Aspire: Launch AppHost",
       "type": "dotnet",
       "request": "launch",
-      "projectPath": "${workspaceFolder}/AppHost/AppHost.csproj"
+      "projectPath": "${workspaceFolder}/AppHost/AppHost.csproj",
+      "serverReadyAction": {
+        "action": "openExternally",
+        "pattern": "Login to the dashboard at\\s+(https?://\\S+)"
+      }
     },
     {
       "name": "Aspire: Attach to Watch AppHost",
