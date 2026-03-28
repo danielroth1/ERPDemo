@@ -64,6 +64,7 @@ artifacts/
 !**/packages/build/
 *.nuget.props
 *.nuget.targets
+.nuget/
 
 ## Node.js
 node_modules/
@@ -171,6 +172,7 @@ secrets.yaml
 ## Temporary files
 *.tmp
 *.temp
+.tmp/
 tmp/
 temp/
 
