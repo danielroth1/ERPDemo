@@ -72,10 +72,11 @@ builder.Services.AddMassTransit(x =>
         o.QueryDelay = TimeSpan.FromMilliseconds(50);
     });
 
-    // NOTE: UseEntityFrameworkOutbox is intentionally NOT applied to receive endpoints.
-    // Inventory consumers already implement idempotency via ProcessedMessages (saved atomically
-    // with business data before Publish). The inbox_state write added ~500ms overhead per hop.
-    // If the Publish fails after SaveChanges, MassTransit retries and ProcessedMessages re-publishes.
+    // Apply outbox filter to all receive endpoints
+    x.AddConfigureEndpointsCallback((context, name, cfg) =>
+    {
+        cfg.UseEntityFrameworkOutbox<AppDbContext>(context);
+    });
 
     // Register consumers for saga commands (RabbitMQ)
     x.AddConsumer<ReserveStockConsumer>();

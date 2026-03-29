@@ -94,7 +94,8 @@
         "backend: watch-inventory",
         "backend: watch-sales",
         "backend: watch-financial",
-        "backend: watch-dashboard"
+        "backend: watch-dashboard",
+        "backend: watch-orchestration"
       ],
       "problemMatcher": [],
       "group": { "kind": "build", "isDefault": false }
@@ -109,7 +110,11 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/gateway/ApiGateway",
-        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4319",
+          "OTEL_SERVICE_NAME": "gateway"
+        }
       }
     },
     {
@@ -122,7 +127,11 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/user-management/UserManagement",
-        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4319",
+          "OTEL_SERVICE_NAME": "user-management"
+        }
       }
     },
     {
@@ -135,7 +144,11 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/inventory/InventoryManagement",
-        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4319",
+          "OTEL_SERVICE_NAME": "inventory"
+        }
       }
     },
     {
@@ -148,7 +161,11 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/sales/SalesManagement",
-        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4319",
+          "OTEL_SERVICE_NAME": "sales"
+        }
       }
     },
     {
@@ -161,7 +178,11 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/financial/FinancialManagement",
-        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4319",
+          "OTEL_SERVICE_NAME": "financial"
+        }
       }
     },
     {
@@ -174,7 +195,28 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
       "options": {
         "cwd": "${workspaceFolder}/services/dashboard/DashboardAnalytics",
-        "env": { "ASPNETCORE_ENVIRONMENT": "Development" }
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4319",
+          "OTEL_SERVICE_NAME": "dashboard"
+        }
+      }
+    },
+    {
+      "label": "backend: watch-orchestration",
+      "command": "dotnet",
+      "type": "process",
+      "args": ["watch", "run", "--project", "${workspaceFolder}/services/orchestration/Orchestration/Orchestration.csproj"],
+      "problemMatcher": "$msCompile",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" },
+      "options": {
+        "cwd": "${workspaceFolder}/services/orchestration/Orchestration",
+        "env": {
+          "ASPNETCORE_ENVIRONMENT": "Development",
+          "OTEL_EXPORTER_OTLP_ENDPOINT": "http://localhost:4319",
+          "OTEL_SERVICE_NAME": "orchestration"
+        }
       }
     },
     {

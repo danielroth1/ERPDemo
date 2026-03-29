@@ -1,6 +1,7 @@
 // Grafana Alloy configuration for local Docker Compose development
 // Collects logs from all Docker containers and forwards them to Loki.
-// Host-running .NET services push logs directly via the Serilog Loki sink.
+// Host-running .NET services (dotnet watch) send OTLP to Alloy on port 4319,
+// which routes: logs → Loki, traces → Tempo.
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Docker container log collection
@@ -50,5 +51,35 @@ loki.source.docker "docker_logs" {
 loki.write "local" {
   endpoint {
     url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
+// OTLP receiver for host-running .NET services (dotnet watch / non-Docker dev)
+// Services set OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4319 (gRPC).
+// Logs are converted to Loki format; traces are forwarded to Tempo.
+// ──────────────────────────────────────────────────────────────────────────────
+
+otelcol.receiver.otlp "host_services" {
+  grpc {
+    endpoint = "0.0.0.0:4319"
+  }
+
+  output {
+    logs   = [otelcol.exporter.loki.default.input]
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.loki "default" {
+  forward_to = [loki.write.local.receiver]
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
   }
 }

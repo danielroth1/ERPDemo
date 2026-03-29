@@ -80,10 +80,11 @@ builder.Services.AddMassTransit(x =>
         o.QueryDelay = TimeSpan.FromMilliseconds(50);
     });
 
-    // NOTE: UseEntityFrameworkOutbox is intentionally NOT applied to receive endpoints.
-    // Financial consumers implement idempotency via ProcessedMessages, and TransactionService
-    // uses its own BeginTransactionAsync() which conflicts with the outbox middleware's transaction.
-    // The inbox_state write was adding ~500ms overhead per hop with no additional benefit here.
+    // Apply outbox filter to all receive endpoints
+    x.AddConfigureEndpointsCallback((context, name, cfg) =>
+    {
+        cfg.UseEntityFrameworkOutbox<AppDbContext>(context);
+    });
 
     // Saga command consumers (RabbitMQ)
     x.AddConsumer<CreatePurchaseTransactionConsumer>();

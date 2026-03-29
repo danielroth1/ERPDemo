@@ -152,8 +152,10 @@ services:
       - --server.http.listen-addr=0.0.0.0:12345
     ports:
       - "12345:12345"  # Alloy UI
+      - "4319:4319"    # OTLP gRPC — host .NET services (dotnet watch)
     depends_on:
       - loki
+      - tempo
     networks:
       - erp-dev-network
 
