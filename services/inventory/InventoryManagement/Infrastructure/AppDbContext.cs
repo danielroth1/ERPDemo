@@ -1,3 +1,5 @@
+using MassTransit;
+using MassTransit.EntityFrameworkCoreIntegration;
 using Microsoft.EntityFrameworkCore;
 using InventoryManagement.Models;
 using ERP.Contracts.Infrastructure;
@@ -78,5 +80,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<StockMovement>()
             .Property(e => e.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
     }
 }

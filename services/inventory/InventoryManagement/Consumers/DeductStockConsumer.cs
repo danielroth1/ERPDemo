@@ -27,13 +27,18 @@ public class DeductStockConsumer : IConsumer<DeductStock>
 
     public async Task Consume(ConsumeContext<DeductStock> context)
     {
+        var timer = new OperationTimer(_logger, "DeductStock");
         var msg = context.Message;
         _logger.LogInformation("Deducting stock for product {ProductId}, quantity {Quantity}, correlation {CorrelationId}",
             msg.ProductId, msg.Quantity, msg.CorrelationId);
 
         // Idempotency: check if already processed
-        var existing = await _dbContext.ProcessedMessages
-            .FirstOrDefaultAsync(m => m.CorrelationId == msg.CorrelationId && m.ConsumerName == nameof(DeductStockConsumer));
+        ProcessedMessage? existing;
+        using (timer.Step("IdempotencyCheck"))
+        {
+            existing = await _dbContext.ProcessedMessages
+                .FirstOrDefaultAsync(m => m.CorrelationId == msg.CorrelationId && m.ConsumerName == nameof(DeductStockConsumer));
+        }
 
         if (existing != null)
         {
@@ -45,7 +50,11 @@ public class DeductStockConsumer : IConsumer<DeductStock>
             return;
         }
 
-        var product = await _productService.GetByIdAsync(msg.ProductId);
+        InventoryManagement.Models.Product? product;
+        using (timer.Step("GetProduct"))
+        {
+            product = await _productService.GetByIdAsync(msg.ProductId);
+        }
         if (product == null)
         {
             var failEvent = new StockDeductionFailed
@@ -101,7 +110,6 @@ public class DeductStockConsumer : IConsumer<DeductStock>
             TotalCost = product.Price * msg.Quantity
         };
 
-        // Atomically save stock change + idempotency record
         _dbContext.ProcessedMessages.Add(new ProcessedMessage
         {
             CorrelationId = msg.CorrelationId,
@@ -109,10 +117,17 @@ public class DeductStockConsumer : IConsumer<DeductStock>
             Success = true,
             ResponseData = JsonSerializer.Serialize(successEvent)
         });
-        await _dbContext.SaveChangesAsync();
+        using (timer.Step("SaveChanges"))
+        {
+            await _dbContext.SaveChangesAsync();
+        }
 
-        await context.Publish(successEvent);
+        using (timer.Step("PublishStockDeducted"))
+        {
+            await context.Publish(successEvent);
+        }
 
+        timer.LogSummary();
         _logger.LogInformation("Stock deducted for product {ProductName}: -{Quantity}, remaining {Stock}",
             product.Name, msg.Quantity, product.StockQuantity);
     }

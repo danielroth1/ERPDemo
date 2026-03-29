@@ -3,6 +3,7 @@ using Microsoft.AspNetCore.Mvc;
 using System.Security.Claims;
 using MassTransit;
 using ERP.Contracts.Commands;
+using ERP.Contracts.Infrastructure;
 using Orchestration.Services;
 
 namespace Orchestration.Controllers;
@@ -41,21 +42,30 @@ public class ShopController : ControllerBase
         var authToken = Request.Headers["Authorization"].ToString();
         var (correlationId, resultTask) = _purchaseTracker.CreatePending(SagaTimeout);
 
+        var timer = new OperationTimer(_logger, "PurchaseProduct");
         _logger.LogInformation("Submitting purchase saga {CorrelationId} for product {ProductId}, quantity {Quantity}",
             correlationId, productId, quantity);
 
-        await _publishEndpoint.Publish(new SubmitPurchase
+        using (timer.Step("PublishSubmitPurchase"))
         {
-            CorrelationId = correlationId,
-            UserId = userId,
-            ProductId = productId,
-            Quantity = quantity,
-            AuthToken = authToken
-        });
+            await _publishEndpoint.Publish(new SubmitPurchase
+            {
+                CorrelationId = correlationId,
+                UserId = userId,
+                ProductId = productId,
+                Quantity = quantity,
+                AuthToken = authToken
+            });
+        }
 
         try
         {
-            var result = await resultTask;
+            ERP.Contracts.Events.PurchaseCompleted result;
+            using (timer.Step("WaitForSagaCompletion"))
+            {
+                result = await resultTask;
+            }
+            timer.LogSummary();
 
             return Ok(new
             {

@@ -1,3 +1,5 @@
+using MassTransit;
+using MassTransit.EntityFrameworkCoreIntegration;
 using Microsoft.EntityFrameworkCore;
 using FinancialManagement.Models;
 using ERP.Contracts.Infrastructure;
@@ -98,5 +100,9 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<Budget>()
             .Property(e => e.UpdatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
     }
 }

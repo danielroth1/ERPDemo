@@ -16,6 +16,7 @@ using Orchestration.Services;
 using ERP.Contracts;
 using ERP.Contracts.Events;
 using ERP.Contracts.Events.Domain;
+using ERP.Contracts.Infrastructure;
 
 Log.Logger = new LoggerConfiguration()
     .WriteTo.Console(new CompactJsonFormatter())
@@ -114,6 +115,21 @@ try
                 r.UsePostgres();
             });
 
+        // EF Core outbox — persists saga Send/Publish calls atomically with saga state transitions.
+        // UseBusOutbox() is intentionally omitted: the controller has no DB operation to be atomic with,
+        // so SubmitPurchase publishes directly to RabbitMQ. Only the consumer-level outbox is needed here.
+        x.AddEntityFrameworkOutbox<OrchestrationDbContext>(o =>
+        {
+            o.UsePostgres();
+            o.QueryDelay = TimeSpan.FromMilliseconds(50);
+        });
+
+        // Apply outbox filter to all receive endpoints
+        x.AddConfigureEndpointsCallback((context, name, cfg) =>
+        {
+            cfg.UseEntityFrameworkOutbox<OrchestrationDbContext>(context);
+        });
+
         // Result consumers
         x.AddConsumer<PurchaseCompletedConsumer>();
         x.AddConsumer<PurchaseFailedConsumer>();
@@ -132,6 +148,11 @@ try
                 TimeSpan.FromSeconds(1),
                 TimeSpan.FromSeconds(5),
                 TimeSpan.FromSeconds(15)));
+
+            // Performance filters — log message age, consume/publish/send duration
+            cfg.UseConsumeFilter(typeof(PerfConsumeFilter<>), context);
+            cfg.UsePublishFilter(typeof(PerfPublishFilter<>), context);
+            cfg.UseSendFilter(typeof(PerfSendFilter<>), context);
 
             cfg.ConfigureEndpoints(context);
         });
@@ -160,11 +181,11 @@ try
 
     var app = builder.Build();
 
-    // Ensure saga database schema
+    // Ensure saga database schema — Migrate() applies new tables (like outbox) to existing databases
     using (var scope = app.Services.CreateScope())
     {
         var dbContext = scope.ServiceProvider.GetRequiredService<OrchestrationDbContext>();
-        dbContext.Database.EnsureCreated();
+        dbContext.Database.Migrate();
     }
 
     app.UseSerilogRequestLogging();

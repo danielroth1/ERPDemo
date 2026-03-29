@@ -13,6 +13,7 @@ using InventoryManagement.Infrastructure;
 using InventoryManagement.Services;
 using ERP.Contracts;
 using ERP.Contracts.Events.Domain;
+using ERP.Contracts.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -63,6 +64,19 @@ builder.Services.AddMassTransit(x =>
 {
     x.SetKebabCaseEndpointNameFormatter();
 
+    // EF Core outbox — persists messages atomically with business data, releases DB lock before broker publish
+    x.AddEntityFrameworkOutbox<AppDbContext>(o =>
+    {
+        o.UsePostgres();
+        o.UseBusOutbox();
+        o.QueryDelay = TimeSpan.FromMilliseconds(50);
+    });
+
+    // NOTE: UseEntityFrameworkOutbox is intentionally NOT applied to receive endpoints.
+    // Inventory consumers already implement idempotency via ProcessedMessages (saved atomically
+    // with business data before Publish). The inbox_state write added ~500ms overhead per hop.
+    // If the Publish fails after SaveChanges, MassTransit retries and ProcessedMessages re-publishes.
+
     // Register consumers for saga commands (RabbitMQ)
     x.AddConsumer<ReserveStockConsumer>();
     x.AddConsumer<DeductStockConsumer>();
@@ -80,6 +94,11 @@ builder.Services.AddMassTransit(x =>
             TimeSpan.FromSeconds(1),
             TimeSpan.FromSeconds(5),
             TimeSpan.FromSeconds(15)));
+
+        // Performance filters — log message age, consume/publish/send duration
+        cfg.UseConsumeFilter(typeof(PerfConsumeFilter<>), context);
+        cfg.UsePublishFilter(typeof(PerfPublishFilter<>), context);
+        cfg.UseSendFilter(typeof(PerfSendFilter<>), context);
 
         cfg.ConfigureEndpoints(context);
     });
@@ -168,7 +187,7 @@ if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.EnsureCreated();
+    dbContext.Database.Migrate();
 }
 
 // Configure middleware

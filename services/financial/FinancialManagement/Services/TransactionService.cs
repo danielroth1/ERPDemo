@@ -125,14 +125,16 @@ public class TransactionService : ITransactionService
             _logger.LogInformation("Created transaction {TransactionNumber}: {Description}",
                 transactionNumber, request.Description);
 
-            // Publish event via MassTransit
-            await _transactionCreatedProducer.Produce(new TransactionCreated
+            // Fire-and-forget: dashboard domain event, not saga-critical. Decoupled from the hot path.
+            _ = _transactionCreatedProducer.Produce(new TransactionCreated
             {
                 TransactionId = transaction.Id,
                 Description = transaction.Description,
                 Type = transaction.Type.ToString(),
                 TotalAmount = totalDebits
-            });
+            }).ContinueWith(
+                t => _logger.LogError(t.Exception, "Failed to publish TransactionCreated to Kafka"),
+                TaskContinuationOptions.OnlyOnFaulted);
 
             return MapToResponse(transaction);
         }

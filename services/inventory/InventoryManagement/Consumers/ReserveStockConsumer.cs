@@ -27,13 +27,18 @@ public class ReserveStockConsumer : IConsumer<ReserveStock>
 
     public async Task Consume(ConsumeContext<ReserveStock> context)
     {
+        var timer = new OperationTimer(_logger, "ReserveStock");
         var msg = context.Message;
         _logger.LogInformation("Reserving stock for product {ProductId}, quantity {Quantity}, correlation {CorrelationId}",
             msg.ProductId, msg.Quantity, msg.CorrelationId);
 
         // Idempotency: check if already processed
-        var existing = await _dbContext.ProcessedMessages
-            .FirstOrDefaultAsync(m => m.CorrelationId == msg.CorrelationId && m.ConsumerName == nameof(ReserveStockConsumer));
+        ProcessedMessage? existing;
+        using (timer.Step("IdempotencyCheck"))
+        {
+            existing = await _dbContext.ProcessedMessages
+                .FirstOrDefaultAsync(m => m.CorrelationId == msg.CorrelationId && m.ConsumerName == nameof(ReserveStockConsumer));
+        }
 
         if (existing != null)
         {
@@ -42,10 +47,15 @@ public class ReserveStockConsumer : IConsumer<ReserveStock>
                 await context.Publish(JsonSerializer.Deserialize<StockReserved>(existing.ResponseData)!);
             else if (!existing.Success && existing.ResponseData != null)
                 await context.Publish(JsonSerializer.Deserialize<StockReservationFailed>(existing.ResponseData)!);
+            timer.LogSummary();
             return;
         }
 
-        var product = await _productService.GetByIdAsync(msg.ProductId);
+        InventoryManagement.Models.Product? product;
+        using (timer.Step("GetProduct"))
+        {
+            product = await _productService.GetByIdAsync(msg.ProductId);
+        }
         if (product == null)
         {
             var failEvent = new StockReservationFailed
@@ -127,10 +137,17 @@ public class ReserveStockConsumer : IConsumer<ReserveStock>
             Success = true,
             ResponseData = JsonSerializer.Serialize(successEvent)
         });
-        await _dbContext.SaveChangesAsync();
+        using (timer.Step("SaveChanges"))
+        {
+            await _dbContext.SaveChangesAsync();
+        }
 
-        await context.Publish(successEvent);
+        using (timer.Step("PublishStockReserved"))
+        {
+            await context.Publish(successEvent);
+        }
 
+        timer.LogSummary();
         _logger.LogInformation("Stock reserved for product {ProductName} ({ProductId}), qty {Quantity}, reserved {Reserved}, available {Available}",
             product.Name, msg.ProductId, msg.Quantity, product.ReservedQuantity, product.AvailableQuantity);
     }

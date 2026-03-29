@@ -58,6 +58,13 @@
     // ASPIRE TASKS
     // ============================================================
     {
+      "label": "aspire: stop",
+      "type": "shell",
+      "command": "pkill -9 dcpctrl 2>/dev/null; pkill -9 -f 'AppHost.dll' 2>/dev/null; pkill -9 -f 'dotnet.*watch.*AppHost' 2>/dev/null; echo 'Aspire stopped'",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "aspire" }
+    },
+    {
       "label": "aspire: watch-apphost",
       "command": "dotnet",
       "type": "process",

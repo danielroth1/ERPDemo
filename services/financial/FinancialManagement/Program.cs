@@ -17,6 +17,7 @@ using FinancialManagement.Models.DTOs;
 using ERP.Contracts;
 using ERP.Contracts.Events;
 using ERP.Contracts.Events.Domain;
+using ERP.Contracts.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -71,6 +72,19 @@ builder.Services.AddMassTransit(x =>
 {
     x.SetKebabCaseEndpointNameFormatter();
 
+    // EF Core outbox — persists messages atomically with business data, releases DB lock before broker publish
+    x.AddEntityFrameworkOutbox<AppDbContext>(o =>
+    {
+        o.UsePostgres();
+        o.UseBusOutbox();
+        o.QueryDelay = TimeSpan.FromMilliseconds(50);
+    });
+
+    // NOTE: UseEntityFrameworkOutbox is intentionally NOT applied to receive endpoints.
+    // Financial consumers implement idempotency via ProcessedMessages, and TransactionService
+    // uses its own BeginTransactionAsync() which conflicts with the outbox middleware's transaction.
+    // The inbox_state write was adding ~500ms overhead per hop with no additional benefit here.
+
     // Saga command consumers (RabbitMQ)
     x.AddConsumer<CreatePurchaseTransactionConsumer>();
     x.AddConsumer<CreateRefundTransactionConsumer>();
@@ -87,6 +101,11 @@ builder.Services.AddMassTransit(x =>
             TimeSpan.FromSeconds(1),
             TimeSpan.FromSeconds(5),
             TimeSpan.FromSeconds(15)));
+
+        // Performance filters — log message age, consume/publish/send duration
+        cfg.UseConsumeFilter(typeof(PerfConsumeFilter<>), context);
+        cfg.UsePublishFilter(typeof(PerfPublishFilter<>), context);
+        cfg.UseSendFilter(typeof(PerfSendFilter<>), context);
 
         cfg.ConfigureEndpoints(context);
     });

@@ -12,6 +12,14 @@ public class OrchestrationDbContext : SagaDbContext
     {
     }
 
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        base.OnModelCreating(modelBuilder);
+        modelBuilder.AddInboxStateEntity();
+        modelBuilder.AddOutboxMessageEntity();
+        modelBuilder.AddOutboxStateEntity();
+    }
+
     protected override IEnumerable<ISagaClassMap> Configurations
     {
         get

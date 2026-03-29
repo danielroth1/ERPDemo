@@ -27,6 +27,7 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
     public async Task Consume(ConsumeContext<CreatePurchaseTransaction> context)
     {
         var command = context.Message;
+        var timer = new OperationTimer(_logger, "CreatePurchaseTransaction");
         _logger.LogInformation("Creating purchase transaction for product {ProductId}, user {UserId}, correlation {CorrelationId}",
             command.ProductId, command.UserId, command.CorrelationId);
 
@@ -38,8 +39,12 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
             var accountService = scope.ServiceProvider.GetRequiredService<IAccountService>();
 
             // Idempotency: check if already processed
-            var existing = await dbContext.ProcessedMessages
-                .FirstOrDefaultAsync(m => m.CorrelationId == command.CorrelationId && m.ConsumerName == nameof(CreatePurchaseTransactionConsumer));
+            ProcessedMessage? existing;
+            using (timer.Step("IdempotencyCheck"))
+            {
+                existing = await dbContext.ProcessedMessages
+                    .FirstOrDefaultAsync(m => m.CorrelationId == command.CorrelationId && m.ConsumerName == nameof(CreatePurchaseTransactionConsumer));
+            }
 
             if (existing != null)
             {
@@ -48,22 +53,28 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
                     await context.Publish(JsonSerializer.Deserialize<PurchaseTransactionCreated>(existing.ResponseData)!);
                 else if (!existing.Success && existing.ResponseData != null)
                     await context.Publish(JsonSerializer.Deserialize<PurchaseTransactionFailed>(existing.ResponseData)!);
+                timer.LogSummary();
                 return;
             }
 
-            // Resolve user accounts
-            var userAccount = await accountService.GetAccountByUserIdAsync(command.UserId);
-            var userExpenseAccount = await accountService.GetAccountByUserIdAndTypeAsync(command.UserId, AccountType.Expense);
+            // Resolve all accounts in parallel
+            Account? companyAccount, taxAccount, revenueAccount, inventoryAccount, cogsAccount;
+            AccountResponse? userAccountResponse, userExpenseAccountResponse;
+            using (timer.Step("ResolveAccounts"))
+            {
+                // Sequential — accountService shares the same AppDbContext scoped instance,
+                // which is not thread-safe. Task.WhenAll would cause concurrent EF Core operations.
+                userAccountResponse = await accountService.GetAccountByUserIdAsync(command.UserId);
+                userExpenseAccountResponse = await accountService.GetAccountByUserIdAndTypeAsync(command.UserId, AccountType.Expense);
+                var systemAccounts = await accountService.GetSystemAccountsAsync();
+                companyAccount = systemAccounts.FirstOrDefault(a => a.Name == "Company Operating Account");
+                taxAccount = systemAccounts.FirstOrDefault(a => a.Name == "Sales Tax Payable");
+                revenueAccount = systemAccounts.FirstOrDefault(a => a.Name == "Product Sales Revenue");
+                inventoryAccount = systemAccounts.FirstOrDefault(a => a.Name == "Product Inventory");
+                cogsAccount = systemAccounts.FirstOrDefault(a => a.Name == "Cost of Goods Sold");
+            }
 
-            // Resolve system accounts
-            var systemAccounts = await accountService.GetSystemAccountsAsync();
-            var companyAccount = systemAccounts.FirstOrDefault(a => a.Name == "Company Operating Account");
-            var taxAccount = systemAccounts.FirstOrDefault(a => a.Name == "Sales Tax Payable");
-            var revenueAccount = systemAccounts.FirstOrDefault(a => a.Name == "Product Sales Revenue");
-            var inventoryAccount = systemAccounts.FirstOrDefault(a => a.Name == "Product Inventory");
-            var cogsAccount = systemAccounts.FirstOrDefault(a => a.Name == "Cost of Goods Sold");
-
-            if (userAccount == null || userExpenseAccount == null || companyAccount == null ||
+            if (userAccountResponse == null || userExpenseAccountResponse == null || companyAccount == null ||
                 taxAccount == null || revenueAccount == null || inventoryAccount == null || cogsAccount == null)
             {
                 _logger.LogError("Failed to resolve one or more accounts for purchase transaction. User: {UserId}", command.UserId);
@@ -81,6 +92,7 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
                 });
                 await dbContext.SaveChangesAsync();
                 await context.Publish(failEvent);
+                timer.LogSummary();
                 return;
             }
 
@@ -92,8 +104,8 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
                 ReferenceType = "Product",
                 Entries = new List<JournalEntryRequest>
                 {
-                    new() { AccountId = userAccount.Id, Debit = 0m, Credit = command.TotalCost, Memo = $"Payment for {command.ProductName}" },
-                    new() { AccountId = userExpenseAccount.Id, Debit = command.TotalCost, Credit = 0m, Memo = $"Expense for {command.ProductName}" },
+                    new() { AccountId = userAccountResponse.Id, Debit = 0m, Credit = command.TotalCost, Memo = $"Payment for {command.ProductName}" },
+                    new() { AccountId = userExpenseAccountResponse.Id, Debit = command.TotalCost, Credit = 0m, Memo = $"Expense for {command.ProductName}" },
                     new() { AccountId = companyAccount.Id, Debit = command.TotalCost, Credit = 0m, Memo = $"Payment received for {command.ProductName}" },
                     new() { AccountId = taxAccount.Id, Debit = 0m, Credit = command.TotalTax, Memo = $"Sales tax collected for {command.ProductName}" },
                     new() { AccountId = revenueAccount.Id, Debit = 0m, Credit = command.TotalRevenue, Memo = $"Revenue from sale of {command.ProductName}" },
@@ -102,7 +114,11 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
                 }
             };
 
-            var result = await transactionService.CreateTransactionAsync(request, command.UserId);
+            TransactionResponse result;
+            using (timer.Step("CreateTransaction"))
+            {
+                result = await transactionService.CreateTransactionAsync(request, command.UserId);
+            }
 
             _logger.LogInformation("Purchase transaction created: {TransactionId} for correlation {CorrelationId}",
                 result.Id, command.CorrelationId);
@@ -121,9 +137,17 @@ public class CreatePurchaseTransactionConsumer : IConsumer<CreatePurchaseTransac
                 Success = true,
                 ResponseData = JsonSerializer.Serialize(successEvent)
             });
-            await dbContext.SaveChangesAsync();
+            using (timer.Step("SaveProcessedMessage"))
+            {
+                await dbContext.SaveChangesAsync();
+            }
 
-            await context.Publish(successEvent);
+            using (timer.Step("PublishTransactionCreated"))
+            {
+                await context.Publish(successEvent);
+            }
+
+            timer.LogSummary();
         }
         catch (Exception ex)
         {
