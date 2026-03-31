@@ -51,6 +51,7 @@ declare -a SERVICES=(
   "erp-sales:services/sales:services/sales/Dockerfile"
   "erp-financial:services/financial:services/financial/Dockerfile"
   "erp-dashboard:services/dashboard:services/dashboard/Dockerfile"
+  "erp-orchestration:services/orchestration:services/orchestration/Dockerfile"
 )
 
 echo "════════════════════════════════════════════════════════════"

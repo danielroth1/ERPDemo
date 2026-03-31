@@ -21,7 +21,7 @@ spec:
         - containerPort: 3000
           name: http
         env:
-        # Admin credentials — overridden in production via grafana-admin-secret
+        # Admin credentials - overridden in production via grafana-admin-secret
         - name: GF_SECURITY_ADMIN_USER
           value: admin
         - name: GF_SECURITY_ADMIN_PASSWORD

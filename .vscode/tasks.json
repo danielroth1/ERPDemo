@@ -87,6 +87,20 @@
     // BACKEND TASKS
     // ============================================================
     {
+      "label": "backend: stop-all-services",
+      "type": "shell",
+      "command": "pkill -9 -f 'dotnet.*watch.*ApiGateway' 2>/dev/null; pkill -9 -f 'dotnet.*watch.*UserManagement' 2>/dev/null; pkill -9 -f 'dotnet.*watch.*InventoryManagement' 2>/dev/null; pkill -9 -f 'dotnet.*watch.*SalesManagement' 2>/dev/null; pkill -9 -f 'dotnet.*watch.*FinancialManagement' 2>/dev/null; pkill -9 -f 'dotnet.*watch.*DashboardAnalytics' 2>/dev/null; pkill -9 -f 'dotnet.*watch.*Orchestration' 2>/dev/null; echo 'All backend services stopped'",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" }
+    },
+    {
+      "label": "backend: restart-all-services",
+      "dependsOrder": "sequence",
+      "dependsOn": ["backend: stop-all-services", "backend: watch-all-services"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend" }
+    },
+    {
       "label": "backend: watch-all-services",
       "dependsOn": [
         "backend: watch-gateway",
@@ -543,9 +557,10 @@
     },
     {
       "label": "k8s: build-images",
-      "command": "powershell",
+      "command": "bash",
       "type": "shell",
-      "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\scripts\\containerd-build-images.ps1"],
+      "args": ["${workspaceFolder}/scripts/k3s-build-local.sh"],
+      // "args": ["-NoProfile", "-ExecutionPolicy", "Bypass", "-File", "${workspaceFolder}\\scripts\\containerd-build-images.ps1"],
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated" }
     },
