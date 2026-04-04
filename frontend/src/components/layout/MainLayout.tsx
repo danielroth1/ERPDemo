@@ -40,6 +40,11 @@ const externalLinks = [
     href: "http://localhost:3001",
     icon: PresentationChartLineIcon,
   },
+  {
+    name: "pgAdmin",
+    href: (import.meta.env.VITE_PGADMIN_URL as string | undefined) ?? "http://localhost:5050",
+    icon: CircleStackIcon,
+  },
 ];
 
 export const MainLayout: React.FC = () => {

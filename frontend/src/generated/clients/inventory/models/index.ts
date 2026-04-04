@@ -173,6 +173,33 @@ export function createObjectApiResponseFromDiscriminatorValue(parseNode: ParseNo
 /**
  * Creates a new instance of the appropriate class based on discriminator value
  * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {ProductDocumentDtoApiResponse}
+ */
+// @ts-ignore
+export function createProductDocumentDtoApiResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoProductDocumentDtoApiResponse;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {ProductDocumentDto}
+ */
+// @ts-ignore
+export function createProductDocumentDtoFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoProductDocumentDto;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {ProductDocumentDtoListApiResponse}
+ */
+// @ts-ignore
+export function createProductDocumentDtoListApiResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoProductDocumentDtoListApiResponse;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
  * @returns {ProductRequest}
  */
 // @ts-ignore
@@ -223,42 +250,6 @@ export function createProductResponsePaginatedResponseApiResponseFromDiscriminat
 // @ts-ignore
 export function createProductResponsePaginatedResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
     return deserializeIntoProductResponsePaginatedResponse;
-}
-/**
- * Creates a new instance of the appropriate class based on discriminator value
- * @param parseNode The parse node to use to read the discriminator value and create the object
- * @returns {PurchaseResponseApiResponse}
- */
-// @ts-ignore
-export function createPurchaseResponseApiResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
-    return deserializeIntoPurchaseResponseApiResponse;
-}
-/**
- * Creates a new instance of the appropriate class based on discriminator value
- * @param parseNode The parse node to use to read the discriminator value and create the object
- * @returns {PurchaseResponse}
- */
-// @ts-ignore
-export function createPurchaseResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
-    return deserializeIntoPurchaseResponse;
-}
-/**
- * Creates a new instance of the appropriate class based on discriminator value
- * @param parseNode The parse node to use to read the discriminator value and create the object
- * @returns {ReturnResponseApiResponse}
- */
-// @ts-ignore
-export function createReturnResponseApiResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
-    return deserializeIntoReturnResponseApiResponse;
-}
-/**
- * Creates a new instance of the appropriate class based on discriminator value
- * @param parseNode The parse node to use to read the discriminator value and create the object
- * @returns {ReturnResponse}
- */
-// @ts-ignore
-export function createReturnResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
-    return deserializeIntoReturnResponse;
 }
 /**
  * Creates a new instance of the appropriate class based on discriminator value
@@ -340,6 +331,15 @@ export function createStockMovementResponseFromDiscriminatorValue(parseNode: Par
 // @ts-ignore
 export function createStockMovementResponseListApiResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
     return deserializeIntoStockMovementResponseListApiResponse;
+}
+/**
+ * Creates a new instance of the appropriate class based on discriminator value
+ * @param parseNode The parse node to use to read the discriminator value and create the object
+ * @returns {StringApiResponse}
+ */
+// @ts-ignore
+export function createStringApiResponseFromDiscriminatorValue(parseNode: ParseNode | undefined) : ((instance?: Parsable) => Record<string, (node: ParseNode) => void>) {
+    return deserializeIntoStringApiResponse;
 }
 /**
  * The deserialization information for the current model
@@ -484,6 +484,52 @@ export function deserializeIntoObjectApiResponse(objectApiResponse: Partial<Obje
 }
 /**
  * The deserialization information for the current model
+ * @param ProductDocumentDto The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoProductDocumentDto(productDocumentDto: Partial<ProductDocumentDto> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "backingStoreEnabled": n => { productDocumentDto.backingStoreEnabled = true; },
+        "contentType": n => { productDocumentDto.contentType = n.getStringValue(); },
+        "id": n => { productDocumentDto.id = n.getStringValue(); },
+        "originalFileName": n => { productDocumentDto.originalFileName = n.getStringValue(); },
+        "productId": n => { productDocumentDto.productId = n.getStringValue(); },
+        "sizeBytes": n => { productDocumentDto.sizeBytes = n.getNumberValue(); },
+        "uploadedAt": n => { productDocumentDto.uploadedAt = n.getDateValue(); },
+        "uploadedBy": n => { productDocumentDto.uploadedBy = n.getStringValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param ProductDocumentDtoApiResponse The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoProductDocumentDtoApiResponse(productDocumentDtoApiResponse: Partial<ProductDocumentDtoApiResponse> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "backingStoreEnabled": n => { productDocumentDtoApiResponse.backingStoreEnabled = true; },
+        "data": n => { productDocumentDtoApiResponse.data = n.getObjectValue<ProductDocumentDto>(createProductDocumentDtoFromDiscriminatorValue); },
+        "message": n => { productDocumentDtoApiResponse.message = n.getStringValue(); },
+        "success": n => { productDocumentDtoApiResponse.success = n.getBooleanValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
+ * @param ProductDocumentDtoListApiResponse The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoProductDocumentDtoListApiResponse(productDocumentDtoListApiResponse: Partial<ProductDocumentDtoListApiResponse> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "backingStoreEnabled": n => { productDocumentDtoListApiResponse.backingStoreEnabled = true; },
+        "data": n => { productDocumentDtoListApiResponse.data = n.getCollectionOfObjectValues<ProductDocumentDto>(createProductDocumentDtoFromDiscriminatorValue); },
+        "message": n => { productDocumentDtoListApiResponse.message = n.getStringValue(); },
+        "success": n => { productDocumentDtoListApiResponse.success = n.getBooleanValue(); },
+    }
+}
+/**
+ * The deserialization information for the current model
  * @param ProductRequest The instance to deserialize into.
  * @returns {Record<string, (node: ParseNode) => void>}
  */
@@ -517,7 +563,9 @@ export function deserializeIntoProductResponse(productResponse: Partial<ProductR
         "cost": n => { productResponse.cost = n.getNumberValue(); },
         "createdAt": n => { productResponse.createdAt = n.getDateValue(); },
         "description": n => { productResponse.description = n.getStringValue(); },
+        "documents": n => { productResponse.documents = n.getCollectionOfObjectValues<ProductDocumentDto>(createProductDocumentDtoFromDiscriminatorValue); },
         "id": n => { productResponse.id = n.getStringValue(); },
+        "imageUrl": n => { productResponse.imageUrl = n.getStringValue(); },
         "isActive": n => { productResponse.isActive = n.getBooleanValue(); },
         "isLowStock": n => { productResponse.isLowStock = n.getBooleanValue(); },
         "maxStockLevel": n => { productResponse.maxStockLevel = n.getNumberValue(); },
@@ -586,66 +634,6 @@ export function deserializeIntoProductResponsePaginatedResponseApiResponse(produ
         "data": n => { productResponsePaginatedResponseApiResponse.data = n.getObjectValue<ProductResponsePaginatedResponse>(createProductResponsePaginatedResponseFromDiscriminatorValue); },
         "message": n => { productResponsePaginatedResponseApiResponse.message = n.getStringValue(); },
         "success": n => { productResponsePaginatedResponseApiResponse.success = n.getBooleanValue(); },
-    }
-}
-/**
- * The deserialization information for the current model
- * @param PurchaseResponse The instance to deserialize into.
- * @returns {Record<string, (node: ParseNode) => void>}
- */
-// @ts-ignore
-export function deserializeIntoPurchaseResponse(purchaseResponse: Partial<PurchaseResponse> | undefined = {}) : Record<string, (node: ParseNode) => void> {
-    return {
-        "backingStoreEnabled": n => { purchaseResponse.backingStoreEnabled = true; },
-        "productId": n => { purchaseResponse.productId = n.getStringValue(); },
-        "productName": n => { purchaseResponse.productName = n.getStringValue(); },
-        "quantityPurchased": n => { purchaseResponse.quantityPurchased = n.getNumberValue(); },
-        "remainingStock": n => { purchaseResponse.remainingStock = n.getNumberValue(); },
-        "totalCost": n => { purchaseResponse.totalCost = n.getNumberValue(); },
-    }
-}
-/**
- * The deserialization information for the current model
- * @param PurchaseResponseApiResponse The instance to deserialize into.
- * @returns {Record<string, (node: ParseNode) => void>}
- */
-// @ts-ignore
-export function deserializeIntoPurchaseResponseApiResponse(purchaseResponseApiResponse: Partial<PurchaseResponseApiResponse> | undefined = {}) : Record<string, (node: ParseNode) => void> {
-    return {
-        "backingStoreEnabled": n => { purchaseResponseApiResponse.backingStoreEnabled = true; },
-        "data": n => { purchaseResponseApiResponse.data = n.getObjectValue<PurchaseResponse>(createPurchaseResponseFromDiscriminatorValue); },
-        "message": n => { purchaseResponseApiResponse.message = n.getStringValue(); },
-        "success": n => { purchaseResponseApiResponse.success = n.getBooleanValue(); },
-    }
-}
-/**
- * The deserialization information for the current model
- * @param ReturnResponse The instance to deserialize into.
- * @returns {Record<string, (node: ParseNode) => void>}
- */
-// @ts-ignore
-export function deserializeIntoReturnResponse(returnResponse: Partial<ReturnResponse> | undefined = {}) : Record<string, (node: ParseNode) => void> {
-    return {
-        "backingStoreEnabled": n => { returnResponse.backingStoreEnabled = true; },
-        "newStock": n => { returnResponse.newStock = n.getNumberValue(); },
-        "productId": n => { returnResponse.productId = n.getStringValue(); },
-        "productName": n => { returnResponse.productName = n.getStringValue(); },
-        "quantityReturned": n => { returnResponse.quantityReturned = n.getNumberValue(); },
-        "refundAmount": n => { returnResponse.refundAmount = n.getNumberValue(); },
-    }
-}
-/**
- * The deserialization information for the current model
- * @param ReturnResponseApiResponse The instance to deserialize into.
- * @returns {Record<string, (node: ParseNode) => void>}
- */
-// @ts-ignore
-export function deserializeIntoReturnResponseApiResponse(returnResponseApiResponse: Partial<ReturnResponseApiResponse> | undefined = {}) : Record<string, (node: ParseNode) => void> {
-    return {
-        "backingStoreEnabled": n => { returnResponseApiResponse.backingStoreEnabled = true; },
-        "data": n => { returnResponseApiResponse.data = n.getObjectValue<ReturnResponse>(createReturnResponseFromDiscriminatorValue); },
-        "message": n => { returnResponseApiResponse.message = n.getStringValue(); },
-        "success": n => { returnResponseApiResponse.success = n.getBooleanValue(); },
     }
 }
 /**
@@ -779,6 +767,20 @@ export function deserializeIntoStockMovementResponseListApiResponse(stockMovemen
         "success": n => { stockMovementResponseListApiResponse.success = n.getBooleanValue(); },
     }
 }
+/**
+ * The deserialization information for the current model
+ * @param StringApiResponse The instance to deserialize into.
+ * @returns {Record<string, (node: ParseNode) => void>}
+ */
+// @ts-ignore
+export function deserializeIntoStringApiResponse(stringApiResponse: Partial<StringApiResponse> | undefined = {}) : Record<string, (node: ParseNode) => void> {
+    return {
+        "backingStoreEnabled": n => { stringApiResponse.backingStoreEnabled = true; },
+        "data": n => { stringApiResponse.data = n.getStringValue(); },
+        "message": n => { stringApiResponse.message = n.getStringValue(); },
+        "success": n => { stringApiResponse.success = n.getBooleanValue(); },
+    }
+}
 export interface EmptyResponse extends BackedModel, Parsable {
     /**
      * Stores model information.
@@ -887,6 +889,76 @@ export interface ObjectApiResponse extends BackedModel, Parsable {
      */
     success?: boolean | null;
 }
+export interface ProductDocumentDto extends BackedModel, Parsable {
+    /**
+     * Stores model information.
+     */
+    backingStoreEnabled?: boolean | null;
+    /**
+     * The contentType property
+     */
+    contentType?: string | null;
+    /**
+     * The id property
+     */
+    id?: string | null;
+    /**
+     * The originalFileName property
+     */
+    originalFileName?: string | null;
+    /**
+     * The productId property
+     */
+    productId?: string | null;
+    /**
+     * The sizeBytes property
+     */
+    sizeBytes?: number | null;
+    /**
+     * The uploadedAt property
+     */
+    uploadedAt?: Date | null;
+    /**
+     * The uploadedBy property
+     */
+    uploadedBy?: string | null;
+}
+export interface ProductDocumentDtoApiResponse extends BackedModel, Parsable {
+    /**
+     * Stores model information.
+     */
+    backingStoreEnabled?: boolean | null;
+    /**
+     * The data property
+     */
+    data?: ProductDocumentDto | null;
+    /**
+     * The message property
+     */
+    message?: string | null;
+    /**
+     * The success property
+     */
+    success?: boolean | null;
+}
+export interface ProductDocumentDtoListApiResponse extends BackedModel, Parsable {
+    /**
+     * Stores model information.
+     */
+    backingStoreEnabled?: boolean | null;
+    /**
+     * The data property
+     */
+    data?: ProductDocumentDto[] | null;
+    /**
+     * The message property
+     */
+    message?: string | null;
+    /**
+     * The success property
+     */
+    success?: boolean | null;
+}
 export interface ProductRequest extends BackedModel, Parsable {
     /**
      * Stores model information.
@@ -959,9 +1031,17 @@ export interface ProductResponse extends BackedModel, Parsable {
      */
     description?: string | null;
     /**
+     * The documents property
+     */
+    documents?: ProductDocumentDto[] | null;
+    /**
      * The id property
      */
     id?: string | null;
+    /**
+     * The imageUrl property
+     */
+    imageUrl?: string | null;
     /**
      * The isActive property
      */
@@ -1074,94 +1154,6 @@ export interface ProductResponsePaginatedResponseApiResponse extends BackedModel
      * The data property
      */
     data?: ProductResponsePaginatedResponse | null;
-    /**
-     * The message property
-     */
-    message?: string | null;
-    /**
-     * The success property
-     */
-    success?: boolean | null;
-}
-export interface PurchaseResponse extends BackedModel, Parsable {
-    /**
-     * Stores model information.
-     */
-    backingStoreEnabled?: boolean | null;
-    /**
-     * The productId property
-     */
-    productId?: string | null;
-    /**
-     * The productName property
-     */
-    productName?: string | null;
-    /**
-     * The quantityPurchased property
-     */
-    quantityPurchased?: number | null;
-    /**
-     * The remainingStock property
-     */
-    remainingStock?: number | null;
-    /**
-     * The totalCost property
-     */
-    totalCost?: number | null;
-}
-export interface PurchaseResponseApiResponse extends BackedModel, Parsable {
-    /**
-     * Stores model information.
-     */
-    backingStoreEnabled?: boolean | null;
-    /**
-     * The data property
-     */
-    data?: PurchaseResponse | null;
-    /**
-     * The message property
-     */
-    message?: string | null;
-    /**
-     * The success property
-     */
-    success?: boolean | null;
-}
-export interface ReturnResponse extends BackedModel, Parsable {
-    /**
-     * Stores model information.
-     */
-    backingStoreEnabled?: boolean | null;
-    /**
-     * The newStock property
-     */
-    newStock?: number | null;
-    /**
-     * The productId property
-     */
-    productId?: string | null;
-    /**
-     * The productName property
-     */
-    productName?: string | null;
-    /**
-     * The quantityReturned property
-     */
-    quantityReturned?: number | null;
-    /**
-     * The refundAmount property
-     */
-    refundAmount?: number | null;
-}
-export interface ReturnResponseApiResponse extends BackedModel, Parsable {
-    /**
-     * Stores model information.
-     */
-    backingStoreEnabled?: boolean | null;
-    /**
-     * The data property
-     */
-    data?: ReturnResponse | null;
     /**
      * The message property
      */
@@ -1337,6 +1329,49 @@ export function serializeObjectApiResponse(writer: SerializationWriter, objectAp
 /**
  * Serializes information the current object
  * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param ProductDocumentDto The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeProductDocumentDto(writer: SerializationWriter, productDocumentDto: Partial<ProductDocumentDto> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!productDocumentDto || isSerializingDerivedType) { return; }
+    writer.writeStringValue("contentType", productDocumentDto.contentType);
+    writer.writeStringValue("id", productDocumentDto.id);
+    writer.writeStringValue("originalFileName", productDocumentDto.originalFileName);
+    writer.writeStringValue("productId", productDocumentDto.productId);
+    writer.writeNumberValue("sizeBytes", productDocumentDto.sizeBytes);
+    writer.writeDateValue("uploadedAt", productDocumentDto.uploadedAt);
+    writer.writeStringValue("uploadedBy", productDocumentDto.uploadedBy);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param ProductDocumentDtoApiResponse The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeProductDocumentDtoApiResponse(writer: SerializationWriter, productDocumentDtoApiResponse: Partial<ProductDocumentDtoApiResponse> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!productDocumentDtoApiResponse || isSerializingDerivedType) { return; }
+    writer.writeObjectValue<ProductDocumentDto>("data", productDocumentDtoApiResponse.data, serializeProductDocumentDto);
+    writer.writeStringValue("message", productDocumentDtoApiResponse.message);
+    writer.writeBooleanValue("success", productDocumentDtoApiResponse.success);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param ProductDocumentDtoListApiResponse The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeProductDocumentDtoListApiResponse(writer: SerializationWriter, productDocumentDtoListApiResponse: Partial<ProductDocumentDtoListApiResponse> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!productDocumentDtoListApiResponse || isSerializingDerivedType) { return; }
+    writer.writeCollectionOfObjectValues<ProductDocumentDto>("data", productDocumentDtoListApiResponse.data, serializeProductDocumentDto);
+    writer.writeStringValue("message", productDocumentDtoListApiResponse.message);
+    writer.writeBooleanValue("success", productDocumentDtoListApiResponse.success);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
  * @param ProductRequest The instance to serialize from.
  * @param writer Serialization writer to use to serialize this model
  */
@@ -1368,7 +1403,9 @@ export function serializeProductResponse(writer: SerializationWriter, productRes
     writer.writeNumberValue("cost", productResponse.cost);
     writer.writeDateValue("createdAt", productResponse.createdAt);
     writer.writeStringValue("description", productResponse.description);
+    writer.writeCollectionOfObjectValues<ProductDocumentDto>("documents", productResponse.documents, serializeProductDocumentDto);
     writer.writeStringValue("id", productResponse.id);
+    writer.writeStringValue("imageUrl", productResponse.imageUrl);
     writer.writeBooleanValue("isActive", productResponse.isActive);
     writer.writeBooleanValue("isLowStock", productResponse.isLowStock);
     writer.writeNumberValue("maxStockLevel", productResponse.maxStockLevel);
@@ -1433,62 +1470,6 @@ export function serializeProductResponsePaginatedResponseApiResponse(writer: Ser
     writer.writeObjectValue<ProductResponsePaginatedResponse>("data", productResponsePaginatedResponseApiResponse.data, serializeProductResponsePaginatedResponse);
     writer.writeStringValue("message", productResponsePaginatedResponseApiResponse.message);
     writer.writeBooleanValue("success", productResponsePaginatedResponseApiResponse.success);
-}
-/**
- * Serializes information the current object
- * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
- * @param PurchaseResponse The instance to serialize from.
- * @param writer Serialization writer to use to serialize this model
- */
-// @ts-ignore
-export function serializePurchaseResponse(writer: SerializationWriter, purchaseResponse: Partial<PurchaseResponse> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
-    if (!purchaseResponse || isSerializingDerivedType) { return; }
-    writer.writeStringValue("productId", purchaseResponse.productId);
-    writer.writeStringValue("productName", purchaseResponse.productName);
-    writer.writeNumberValue("quantityPurchased", purchaseResponse.quantityPurchased);
-    writer.writeNumberValue("remainingStock", purchaseResponse.remainingStock);
-    writer.writeNumberValue("totalCost", purchaseResponse.totalCost);
-}
-/**
- * Serializes information the current object
- * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
- * @param PurchaseResponseApiResponse The instance to serialize from.
- * @param writer Serialization writer to use to serialize this model
- */
-// @ts-ignore
-export function serializePurchaseResponseApiResponse(writer: SerializationWriter, purchaseResponseApiResponse: Partial<PurchaseResponseApiResponse> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
-    if (!purchaseResponseApiResponse || isSerializingDerivedType) { return; }
-    writer.writeObjectValue<PurchaseResponse>("data", purchaseResponseApiResponse.data, serializePurchaseResponse);
-    writer.writeStringValue("message", purchaseResponseApiResponse.message);
-    writer.writeBooleanValue("success", purchaseResponseApiResponse.success);
-}
-/**
- * Serializes information the current object
- * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
- * @param ReturnResponse The instance to serialize from.
- * @param writer Serialization writer to use to serialize this model
- */
-// @ts-ignore
-export function serializeReturnResponse(writer: SerializationWriter, returnResponse: Partial<ReturnResponse> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
-    if (!returnResponse || isSerializingDerivedType) { return; }
-    writer.writeNumberValue("newStock", returnResponse.newStock);
-    writer.writeStringValue("productId", returnResponse.productId);
-    writer.writeStringValue("productName", returnResponse.productName);
-    writer.writeNumberValue("quantityReturned", returnResponse.quantityReturned);
-    writer.writeNumberValue("refundAmount", returnResponse.refundAmount);
-}
-/**
- * Serializes information the current object
- * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
- * @param ReturnResponseApiResponse The instance to serialize from.
- * @param writer Serialization writer to use to serialize this model
- */
-// @ts-ignore
-export function serializeReturnResponseApiResponse(writer: SerializationWriter, returnResponseApiResponse: Partial<ReturnResponseApiResponse> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
-    if (!returnResponseApiResponse || isSerializingDerivedType) { return; }
-    writer.writeObjectValue<ReturnResponse>("data", returnResponseApiResponse.data, serializeReturnResponse);
-    writer.writeStringValue("message", returnResponseApiResponse.message);
-    writer.writeBooleanValue("success", returnResponseApiResponse.success);
 }
 /**
  * Serializes information the current object
@@ -1611,6 +1592,19 @@ export function serializeStockMovementResponseListApiResponse(writer: Serializat
     writer.writeCollectionOfObjectValues<StockMovementResponse>("data", stockMovementResponseListApiResponse.data, serializeStockMovementResponse);
     writer.writeStringValue("message", stockMovementResponseListApiResponse.message);
     writer.writeBooleanValue("success", stockMovementResponseListApiResponse.success);
+}
+/**
+ * Serializes information the current object
+ * @param isSerializingDerivedType A boolean indicating whether the serialization is for a derived type.
+ * @param StringApiResponse The instance to serialize from.
+ * @param writer Serialization writer to use to serialize this model
+ */
+// @ts-ignore
+export function serializeStringApiResponse(writer: SerializationWriter, stringApiResponse: Partial<StringApiResponse> | undefined | null = {}, isSerializingDerivedType: boolean = false) : void {
+    if (!stringApiResponse || isSerializingDerivedType) { return; }
+    writer.writeStringValue("data", stringApiResponse.data);
+    writer.writeStringValue("message", stringApiResponse.message);
+    writer.writeBooleanValue("success", stringApiResponse.success);
 }
 export interface StockAdjustmentRequest extends BackedModel, Parsable {
     /**
@@ -1753,6 +1747,24 @@ export interface StockMovementResponseListApiResponse extends BackedModel, Parsa
      * The data property
      */
     data?: StockMovementResponse[] | null;
+    /**
+     * The message property
+     */
+    message?: string | null;
+    /**
+     * The success property
+     */
+    success?: boolean | null;
+}
+export interface StringApiResponse extends BackedModel, Parsable {
+    /**
+     * Stores model information.
+     */
+    backingStoreEnabled?: boolean | null;
+    /**
+     * The data property
+     */
+    data?: string | null;
     /**
      * The message property
      */

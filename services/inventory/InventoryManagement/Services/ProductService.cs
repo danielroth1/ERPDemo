@@ -217,6 +217,21 @@ public class ProductService
             ? await _dbContext.Categories.FindAsync(product.CategoryId)
             : null;
 
+        var documents = await _dbContext.ProductDocuments
+            .Where(d => d.ProductId == product.Id)
+            .OrderByDescending(d => d.UploadedAt)
+            .Select(d => new ProductDocumentDto
+            {
+                Id = d.Id,
+                ProductId = d.ProductId,
+                OriginalFileName = d.OriginalFileName,
+                ContentType = d.ContentType,
+                SizeBytes = d.SizeBytes,
+                UploadedBy = d.UploadedBy,
+                UploadedAt = d.UploadedAt
+            })
+            .ToListAsync();
+
         return new ProductResponse
         {
             Id = product.Id,
@@ -233,6 +248,8 @@ public class ProductService
             Unit = product.Unit,
             IsActive = product.IsActive,
             IsLowStock = product.IsLowStock,
+            ImageUrl = product.ImageUrl,
+            Documents = documents,
             CreatedAt = product.CreatedAt,
             UpdatedAt = product.UpdatedAt
         };

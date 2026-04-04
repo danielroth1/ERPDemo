@@ -1,0 +1,21 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "ERP Postgres (dev)",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "postgres",
+      "Username": "postgres",
+      "SSLMode": "prefer",
+      "Databases": [
+        "erp_users",
+        "erp_inventory",
+        "erp_sales",
+        "erp_financial",
+        "erp_dashboard",
+        "erp_orchestration"
+      ]
+    }
+  }
+}

@@ -14,6 +14,7 @@ using InventoryManagement.Services;
 using ERP.Contracts;
 using ERP.Contracts.Events.Domain;
 using ERP.Contracts.Infrastructure;
+using Minio;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -41,6 +42,16 @@ var jwtSettings = builder.Configuration.GetSection("Jwt").Get<JwtSettings>()
 // Register settings as singletons
 builder.Services.AddSingleton(postgresSettings);
 builder.Services.AddSingleton(jwtSettings);
+
+// Register MinIO object storage
+var minioSettings = builder.Configuration.GetSection("Minio").Get<MinioSettings>() ?? new MinioSettings();
+builder.Services.AddSingleton(minioSettings);
+builder.Services.AddMinio(configureClient => configureClient
+    .WithEndpoint(minioSettings.Endpoint)
+    .WithCredentials(minioSettings.AccessKey, minioSettings.SecretKey)
+    .WithSSL(minioSettings.UseSSL)
+    .Build());
+builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
 
 // Register PostgreSQL DbContext
 builder.Services.AddDbContext<AppDbContext>(options =>
@@ -189,6 +200,15 @@ if (app.Environment.IsDevelopment())
     using var scope = app.Services.CreateScope();
     var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
     dbContext.Database.Migrate();
+
+    // Ensure MinIO buckets exist (dev only; in prod use infra-as-code)
+    var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
+    try { await fileStorage.EnsureBucketsExistAsync(); }
+    catch (Exception ex)
+    {
+        var startupLogger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+        startupLogger.LogWarning(ex, "MinIO bucket setup failed — object storage may not be ready yet");
+    }
 }
 
 // Configure middleware

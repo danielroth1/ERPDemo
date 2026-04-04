@@ -298,6 +298,7 @@ public class ProductsController : ControllerBase
 - **State**: Redux Toolkit with typed slices
 - **API calls**: **MUST use Kiota-generated clients** - Never use direct fetch/axios calls
 - **Types**: Use types from generated Kiota models
+- **Admin role check**: Use `user.roles?.some(role => role === 2)` to check for admin. Roles: `0` = User, `1` = Manager, `2` = Admin.
 
 ### API Gateway Configuration
 
@@ -870,6 +871,19 @@ your-service:
     - erp-network
 ```
 
+#### ⚠️ MANDATORY: Keep infrastructure files in sync
+
+When adding a new service or any infrastructure resource (databases, message brokers, storage, etc.), you **MUST** update ALL THREE of these locations to keep them consistent:
+
+1. **`docker-compose.yml`** — production/full-stack compose file (root of project)
+2. **`infrastructure/docker-compose.dev.yml`** — dev infra-only compose file (used for local development; does NOT include application services)
+3. **`infrastructure/k8s/`** — Kubernetes manifests (Deployment + Service YAML for each resource)
+
+**Environment variable rules**:
+- Secrets and environment-specific values **MUST** be stored in `.env` (root) and referenced in compose files as `${VAR_NAME}`
+- Development-specific configuration (URLs, ports, feature flags) goes in `appsettings.Development.json` of the relevant service, **not** hardcoded in compose files
+- Never commit `.env` files with real secrets
+
 #### Add to API Gateway routes (if needed):
 Update `services/gateway/ApiGateway/appsettings.json`:
 ```json
@@ -928,7 +942,8 @@ Update `services/gateway/ApiGateway/appsettings.json`:
 - [ ] Swagger/OpenAPI configured
 - [ ] Logging configured (Serilog)
 - [ ] Metrics endpoint added (Prometheus)
-- [ ] **Kiota API client generated** (run `scripts/generate-api-clients.ps1`)
+- [ ] `backend: generate-{service}-api-clients` VS Code task added to `.vscode/tasks.json` and added as dependency to `generate-all-api-clients`
+- [ ] **Kiota API client generated** (run VS Code task `backend: generate-{service}-api-clients`)
 - [ ] **Frontend service wrapper created** using Kiota client (never direct API calls)
 
 ## 📚 Additional Resources

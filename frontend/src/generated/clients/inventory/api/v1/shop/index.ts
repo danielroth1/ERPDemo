@@ -6,10 +6,6 @@ import { CategoriesRequestBuilderRequestsMetadata, type CategoriesRequestBuilder
 // @ts-ignore
 import { ProductsRequestBuilderRequestsMetadata, type ProductsRequestBuilder } from './products/index.js';
 // @ts-ignore
-import { PurchaseRequestBuilderNavigationMetadata, type PurchaseRequestBuilder } from './purchase/index.js';
-// @ts-ignore
-import { ReturnRequestBuilderNavigationMetadata, type ReturnRequestBuilder } from './returnEscaped/index.js';
-// @ts-ignore
 import { type BaseRequestBuilder, type KeysToExcludeForNavigationMetadata, type NavigationMetadata } from '@microsoft/kiota-abstractions';
 
 /**
@@ -24,14 +20,6 @@ export interface ShopRequestBuilder extends BaseRequestBuilder<ShopRequestBuilde
      * The products property
      */
     get products(): ProductsRequestBuilder;
-    /**
-     * The purchase property
-     */
-    get purchase(): PurchaseRequestBuilder;
-    /**
-     * The return property
-     */
-    get returnEscaped(): ReturnRequestBuilder;
 }
 /**
  * Uri template for the request builder.
@@ -46,12 +34,6 @@ export const ShopRequestBuilderNavigationMetadata: Record<Exclude<keyof ShopRequ
     },
     products: {
         requestsMetadata: ProductsRequestBuilderRequestsMetadata,
-    },
-    purchase: {
-        navigationMetadata: PurchaseRequestBuilderNavigationMetadata,
-    },
-    returnEscaped: {
-        navigationMetadata: ReturnRequestBuilderNavigationMetadata,
     },
 };
 /* tslint:enable */

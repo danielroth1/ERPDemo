@@ -29,6 +29,7 @@
     <PackageReference Include="MassTransit.EntityFrameworkCore" Version="8.4.0" />
     <PackageReference Include="MassTransit.RabbitMQ" Version="8.4.0" />
     <PackageReference Include="MassTransit.Kafka" Version="8.4.0" />
+    <PackageReference Include="Minio" Version="6.0.4" />
     <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
     <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.10.0" />

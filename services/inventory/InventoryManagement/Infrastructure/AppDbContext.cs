@@ -15,6 +15,7 @@ public class AppDbContext : DbContext
     public DbSet<Product> Products { get; set; } = null!;
     public DbSet<Category> Categories { get; set; } = null!;
     public DbSet<StockMovement> StockMovements { get; set; } = null!;
+    public DbSet<ProductDocument> ProductDocuments { get; set; } = null!;
     public DbSet<ProcessedMessage> ProcessedMessages { get; set; } = null!;
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -80,6 +81,20 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<StockMovement>()
             .Property(e => e.CreatedAt)
             .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        modelBuilder.Entity<ProductDocument>()
+            .Property(e => e.Id)
+            .HasDefaultValueSql("gen_random_uuid()::text");
+
+        modelBuilder.Entity<ProductDocument>()
+            .Property(e => e.UploadedAt)
+            .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+        modelBuilder.Entity<ProductDocument>()
+            .HasOne(d => d.Product)
+            .WithMany()
+            .HasForeignKey(d => d.ProductId)
+            .OnDelete(DeleteBehavior.Cascade);
 
         modelBuilder.AddInboxStateEntity();
         modelBuilder.AddOutboxMessageEntity();

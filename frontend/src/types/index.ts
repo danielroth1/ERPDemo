@@ -50,9 +50,22 @@ export interface Product {
   unitPrice: number;
   stockQuantity: number;
   reorderLevel: number;
+  unit?: string;
   isActive: boolean;
+  imageUrl?: string | null;
+  documents?: ProductDocument[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProductDocument {
+  id: string;
+  productId: string;
+  originalFileName: string;
+  contentType: string;
+  sizeBytes: number;
+  uploadedBy: string;
+  uploadedAt: string;
 }
 
 export interface Category {

@@ -10,6 +10,7 @@ import { ProtectedRoute } from "./features/auth/ProtectedRoute";
 import { MainLayout } from "./components/layout/MainLayout";
 import { DashboardPage } from "./features/dashboard/DashboardPage";
 import { InventoryPage } from "./features/inventory/InventoryPage";
+import { ItemDetailPage } from "./features/inventory/ItemDetailPage";
 import { UsersPage } from "./features/users/UsersPage";
 import { SalesPage } from "./features/sales/SalesPage";
 import { FinancialPage } from "./features/financial/FinancialPage";
@@ -43,6 +44,7 @@ function App() {
               {/* Hidden from nav but route kept */}
               <Route path="users" element={<UsersPage />} />
               <Route path="inventory" element={<InventoryPage />} />
+              <Route path="inventory/:id" element={<ItemDetailPage />} />
               <Route path="shop" element={<ShopPage />} />
               <Route path="sales" element={<SalesPage />} />
               <Route path="financial" element={<FinancialPage />} />

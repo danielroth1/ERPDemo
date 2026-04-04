@@ -30,8 +30,21 @@ public class ProductResponse
     public string Unit { get; set; } = string.Empty;
     public bool IsActive { get; set; }
     public bool IsLowStock { get; set; }
+    public string? ImageUrl { get; set; }
+    public List<ProductDocumentDto> Documents { get; set; } = new();
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
+}
+
+public class ProductDocumentDto
+{
+    public string Id { get; set; } = string.Empty;
+    public string ProductId { get; set; } = string.Empty;
+    public string OriginalFileName { get; set; } = string.Empty;
+    public string ContentType { get; set; } = string.Empty;
+    public long SizeBytes { get; set; }
+    public string UploadedBy { get; set; } = string.Empty;
+    public DateTime UploadedAt { get; set; }
 }
 
 public class CategoryRequest

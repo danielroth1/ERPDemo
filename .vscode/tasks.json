@@ -601,6 +601,15 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "port-forward" }
     },
     {
+      "label": "k8s: port-forward-pgadmin",
+      "command": "kubectl",
+      "type": "shell",
+      "args": ["-n", "erp-local", "port-forward", "svc/pgadmin-service", "5051:5050"],
+      "problemMatcher": [],
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "port-forward" }
+    },
+    {
       "label": "k8s: deploy-service",
       "command": "kubectl",
       "type": "shell",

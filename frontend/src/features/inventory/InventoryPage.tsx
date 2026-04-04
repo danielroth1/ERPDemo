@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAppDispatch, useAppSelector } from '../../store/hooks';
 import { fetchProducts, fetchCategories, deleteProduct, seedProducts } from './inventorySlice';
 import { Modal } from '../../components/common/Modal';
@@ -10,6 +11,7 @@ import { inventoryService } from '../../services/inventory.service';
 
 export const InventoryPage: React.FC = () => {
   const dispatch = useAppDispatch();
+  const navigate = useNavigate();
   const { products, categories, isLoading, totalProducts } = useAppSelector(
     (state) => state.inventory
   );
@@ -268,7 +270,12 @@ export const InventoryPage: React.FC = () => {
               {products.map((product) => (
                 <tr key={product.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{product.name}</div>
+                    <button
+                      onClick={() => navigate(`/inventory/${product.id}`)}
+                      className="text-sm font-medium text-primary-700 hover:text-primary-900 hover:underline text-left"
+                    >
+                      {product.name}
+                    </button>
                     <div className="text-sm text-gray-500">{product.description}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">

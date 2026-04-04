@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: pgadmin-config
+  namespace: erp-local
+data:
+  servers.json: |
+    {
+      "Servers": {
+        "1": {
+          "Name": "ERP Postgres",
+          "Group": "Servers",
+          "Host": "postgres-service",
+          "Port": 5432,
+          "MaintenanceDB": "postgres",
+          "Username": "postgres",
+          "SSLMode": "prefer",
+          "Databases": [
+            "erp_users",
+            "erp_inventory",
+            "erp_sales",
+            "erp_financial",
+            "erp_dashboard",
+            "erp_orchestration"
+          ]
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin
+  namespace: erp-local
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pgadmin
+  template:
+    metadata:
+      labels:
+        app: pgadmin
+    spec:
+      containers:
+      - name: pgadmin
+        image: dpage/pgadmin4:8
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 80
+          name: http
+        env:
+        - name: PGADMIN_DEFAULT_EMAIL
+          value: admin@erp.local
+        - name: PGADMIN_DEFAULT_PASSWORD
+          value: admin
+        - name: PGADMIN_CONFIG_SERVER_MODE
+          value: "False"
+        - name: PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED
+          value: "False"
+        volumeMounts:
+        - name: pgadmin-config
+          mountPath: /pgadmin4/servers.json
+          subPath: servers.json
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "50m"
+          limits:
+            memory: "384Mi"
+            cpu: "300m"
+      volumes:
+      - name: pgadmin-config
+        configMap:
+          name: pgadmin-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin-service
+  namespace: erp-local
+spec:
+  type: LoadBalancer
+  selector:
+    app: pgadmin
+  ports:
+  - port: 5050
+    targetPort: 80
+    protocol: TCP
+    name: http

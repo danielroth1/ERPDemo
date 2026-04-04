@@ -1,5 +1,6 @@
 import { inventoryApiClient } from './inventory-api.client';
-import type { Product, Category, StockMovement, PaginatedResponse } from '../types';
+import { getApiBaseUrl } from './api-base-url';
+import type { Product, Category, StockMovement, PaginatedResponse, ProductDocument } from '../types';
 import type { ProductResponse, CategoryResponse, StockMovementResponse } from '../generated/clients/inventory/models';
 
 // Map Kiota types to legacy types
@@ -13,7 +14,18 @@ function mapProductResponse(product: ProductResponse): Product {
     unitPrice: product.price || 0,
     stockQuantity: product.stockQuantity || 0,
     reorderLevel: product.minStockLevel || 0,
+    unit: (product as any).unit ?? 'pcs',
     isActive: product.isActive ?? true,
+    imageUrl: (product as any).imageUrl ?? null,
+    documents: ((product as any).documents ?? []).map((d: any): ProductDocument => ({
+      id: d.id || '',
+      productId: d.productId || '',
+      originalFileName: d.originalFileName || '',
+      contentType: d.contentType || '',
+      sizeBytes: d.sizeBytes || 0,
+      uploadedBy: d.uploadedBy || '',
+      uploadedAt: d.uploadedAt || new Date().toISOString(),
+    })),
     createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
     updatedAt: product.updatedAt?.toISOString() || new Date().toISOString(),
   };
@@ -151,6 +163,133 @@ class InventoryService {
   // Seed products
   async seedProducts(): Promise<{ productsCreated: number; productsDeleted: number }> {
     return await inventoryApiClient.seedProducts();
+  }
+
+  // --- File / Media methods ---
+
+  private getAuthHeaders(): Record<string, string> {
+    const token = localStorage.getItem('accessToken');
+    return token ? { Authorization: `Bearer ${token}` } : {};
+  }
+
+  private fileUrl(productId: string, suffix: string): string {
+    return `${getApiBaseUrl()}/api/v1/productfiles/${productId}${suffix}`;
+  }
+
+  uploadImage(
+    productId: string,
+    file: File,
+    onProgress: (percent: number) => void,
+    signal: AbortSignal,
+  ): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const form = new FormData();
+      form.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      signal.addEventListener('abort', () => xhr.abort());
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const body = JSON.parse(xhr.responseText);
+          resolve(body.data as string);
+        } else {
+          const msg = (() => { try { return JSON.parse(xhr.responseText)?.message; } catch { return xhr.statusText; } })();
+          reject(new Error(msg || 'Upload failed'));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'));
+
+      xhr.open('POST', this.fileUrl(productId, '/image'));
+      const headers = this.getAuthHeaders();
+      Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+      xhr.send(form);
+    });
+  }
+
+  async deleteImage(productId: string): Promise<void> {
+    const res = await fetch(this.fileUrl(productId, '/image'), {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to delete image');
+  }
+
+  uploadDocument(
+    productId: string,
+    file: File,
+    onProgress: (percent: number) => void,
+    signal: AbortSignal,
+  ): Promise<ProductDocument> {
+    return new Promise((resolve, reject) => {
+      const form = new FormData();
+      form.append('file', file);
+
+      const xhr = new XMLHttpRequest();
+      signal.addEventListener('abort', () => xhr.abort());
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(Math.round((e.loaded / e.total) * 100));
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          const body = JSON.parse(xhr.responseText);
+          const d = body.data;
+          resolve({
+            id: d.id,
+            productId: d.productId,
+            originalFileName: d.originalFileName,
+            contentType: d.contentType,
+            sizeBytes: d.sizeBytes,
+            uploadedBy: d.uploadedBy,
+            uploadedAt: d.uploadedAt,
+          });
+        } else {
+          const msg = (() => { try { return JSON.parse(xhr.responseText)?.message; } catch { return xhr.statusText; } })();
+          reject(new Error(msg || 'Upload failed'));
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.onabort = () => reject(new DOMException('Upload cancelled', 'AbortError'));
+
+      xhr.open('POST', this.fileUrl(productId, '/documents'));
+      const headers = this.getAuthHeaders();
+      Object.entries(headers).forEach(([k, v]) => xhr.setRequestHeader(k, v));
+      xhr.send(form);
+    });
+  }
+
+  async getDocuments(productId: string): Promise<ProductDocument[]> {
+    const res = await fetch(this.fileUrl(productId, '/documents'), {
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to fetch documents');
+    const body = await res.json();
+    return (body.data ?? []).map((d: any): ProductDocument => ({
+      id: d.id,
+      productId: d.productId,
+      originalFileName: d.originalFileName,
+      contentType: d.contentType,
+      sizeBytes: d.sizeBytes,
+      uploadedBy: d.uploadedBy,
+      uploadedAt: d.uploadedAt,
+    }));
+  }
+
+  getDocumentDownloadUrl(productId: string, docId: string): string {
+    return this.fileUrl(productId, `/documents/${docId}/download`);
+  }
+
+  async deleteDocument(productId: string, docId: string): Promise<void> {
+    const res = await fetch(this.fileUrl(productId, `/documents/${docId}`), {
+      method: 'DELETE',
+      headers: this.getAuthHeaders(),
+    });
+    if (!res.ok) throw new Error('Failed to delete document');
   }
 }
 

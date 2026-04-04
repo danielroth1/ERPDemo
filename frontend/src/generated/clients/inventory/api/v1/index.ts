@@ -4,6 +4,8 @@
 // @ts-ignore
 import { CategoriesRequestBuilderNavigationMetadata, CategoriesRequestBuilderRequestsMetadata, type CategoriesRequestBuilder } from './categories/index.js';
 // @ts-ignore
+import { ProductfilesRequestBuilderNavigationMetadata, type ProductfilesRequestBuilder } from './productfiles/index.js';
+// @ts-ignore
 import { ProductsRequestBuilderNavigationMetadata, ProductsRequestBuilderRequestsMetadata, type ProductsRequestBuilder } from './products/index.js';
 // @ts-ignore
 import { ShopRequestBuilderNavigationMetadata, type ShopRequestBuilder } from './shop/index.js';
@@ -20,6 +22,10 @@ export interface V1RequestBuilder extends BaseRequestBuilder<V1RequestBuilder> {
      * The Categories property
      */
     get categories(): CategoriesRequestBuilder;
+    /**
+     * The productfiles property
+     */
+    get productfiles(): ProductfilesRequestBuilder;
     /**
      * The Products property
      */
@@ -44,6 +50,9 @@ export const V1RequestBuilderNavigationMetadata: Record<Exclude<keyof V1RequestB
     categories: {
         requestsMetadata: CategoriesRequestBuilderRequestsMetadata,
         navigationMetadata: CategoriesRequestBuilderNavigationMetadata,
+    },
+    productfiles: {
+        navigationMetadata: ProductfilesRequestBuilderNavigationMetadata,
     },
     products: {
         requestsMetadata: ProductsRequestBuilderRequestsMetadata,
