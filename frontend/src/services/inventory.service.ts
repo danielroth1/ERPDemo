@@ -1,7 +1,41 @@
 import { inventoryApiClient } from './inventory-api.client';
+import { createApolloClient } from './apollo.client';
+import { GET_PRODUCTS, GET_PRODUCT_WITH_DOCUMENTS } from '../features/inventory/graphql/queries';
+import type { GqlProductItem, GqlProductDocument } from '../features/inventory/graphql/queries';
 import { getApiBaseUrl } from './api-base-url';
 import type { Product, Category, StockMovement, PaginatedResponse, ProductDocument } from '../types';
 import type { ProductResponse, CategoryResponse, StockMovementResponse } from '../generated/clients/inventory/models';
+
+// Singleton Apollo client for inventory GraphQL reads
+const inventoryGqlClient = createApolloClient('inventory');
+
+// Map GraphQL response (camelCase from HotChocolate) to frontend Product type
+function mapGqlProduct(p: GqlProductItem & { documents?: GqlProductDocument[] }): Product {
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    sku: p.sku,
+    categoryId: p.categoryId,
+    unitPrice: p.price,
+    stockQuantity: p.stockQuantity,
+    reorderLevel: p.minStockLevel,
+    unit: p.unit,
+    isActive: p.isActive,
+    imageUrl: p.imageUrl,
+    documents: (p.documents ?? []).map((d: GqlProductDocument): ProductDocument => ({
+      id: d.id,
+      productId: d.productId,
+      originalFileName: d.originalFileName,
+      contentType: d.contentType,
+      sizeBytes: d.sizeBytes,
+      uploadedBy: d.uploadedBy,
+      uploadedAt: d.uploadedAt,
+    })),
+    createdAt: p.createdAt,
+    updatedAt: p.updatedAt,
+  };
+}
 
 // Map Kiota types to legacy types
 function mapProductResponse(product: ProductResponse): Product {
@@ -54,22 +88,32 @@ function mapStockMovementResponse(movement: StockMovementResponse): StockMovemen
 }
 
 class InventoryService {
-  // Products
+  // Products — reads via GraphQL (projections + batch DataLoader)
   async getProducts(page: number = 1, pageSize: number = 10): Promise<PaginatedResponse<Product>> {
-    const response = await inventoryApiClient.getProducts(page, pageSize);
-    
+    const skip = (page - 1) * pageSize;
+    const { data } = await inventoryGqlClient.query({
+      query: GET_PRODUCTS,
+      variables: { skip, take: pageSize },
+      fetchPolicy: 'network-only',
+    });
+    const segment = data?.products;
     return {
-      items: response.items?.map(mapProductResponse) || [],
-      page: response.page || page,
-      pageSize: response.pageSize || pageSize,
-      totalCount: response.totalCount || 0,
-      totalPages: response.totalPages || 1,
+      items: (segment?.items ?? []).map(mapGqlProduct),
+      page,
+      pageSize,
+      totalCount: segment?.totalCount ?? 0,
+      totalPages: Math.ceil((segment?.totalCount ?? 0) / pageSize),
     };
   }
 
   async getProduct(id: string): Promise<Product> {
-    const product = await inventoryApiClient.getProduct(id);
-    return mapProductResponse(product);
+    const { data } = await inventoryGqlClient.query({
+      query: GET_PRODUCT_WITH_DOCUMENTS,
+      variables: { id },
+      fetchPolicy: 'network-only',
+    });
+    if (!data?.product) throw new Error(`Product ${id} not found`);
+    return mapGqlProduct(data.product);
   }
 
   async createProduct(product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>): Promise<Product> {

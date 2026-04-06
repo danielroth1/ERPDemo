@@ -9,6 +9,8 @@ using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using InventoryManagement.Configuration;
 using InventoryManagement.Consumers;
+using InventoryManagement.GraphQL;
+using InventoryManagement.GraphQL.Types;
 using InventoryManagement.Infrastructure;
 using InventoryManagement.Services;
 using ERP.Contracts;
@@ -53,10 +55,25 @@ builder.Services.AddMinio(configureClient => configureClient
     .Build());
 builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
 
-// Register PostgreSQL DbContext
+// Register PostgreSQL DbContext (scoped — used by controllers and services)
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(postgresSettings.ConnectionString)
         .UseSnakeCaseNamingConvention());
+
+// Register DbContext factory for GraphQL DataLoaders (singleton factory, per-use context)
+builder.Services.AddDbContextFactory<AppDbContext>(options =>
+    options.UseNpgsql(postgresSettings.ConnectionString)
+        .UseSnakeCaseNamingConvention());
+
+// Register GraphQL server
+builder.Services
+    .AddGraphQLServer()
+    .AddQueryType<Query>()
+    .AddTypeExtension<ProductTypeExtension>()
+    .AddTypeExtension<ProductGqlConfiguration>()
+    .AddTypeExtension<ProductDocumentGqlConfiguration>()
+    .AddProjections()
+    .AddFiltering();
 
 // Register services
 builder.Services.AddScoped<ProductService>();
@@ -231,6 +248,9 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapControllers();
+
+// GraphQL endpoint — authentication enforced here and at the gateway level
+app.MapGraphQL().RequireAuthorization();
 
 // Aspire default endpoints
 app.MapDefaultEndpoints();

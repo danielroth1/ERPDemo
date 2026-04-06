@@ -35,6 +35,10 @@
     <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.10.0" />
     <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.10.0" />
 
+    <!-- GraphQL -->
+    <PackageReference Include="HotChocolate.AspNetCore" Version="13.9.15" />
+    <PackageReference Include="HotChocolate.Data" Version="13.9.15" />
+
     <!-- Kiota Dependencies for Generated API Clients -->
     <PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.17.3" />
     <PackageReference Include="Microsoft.Kiota.Http.HttpClientLibrary" Version="1.17.3" />

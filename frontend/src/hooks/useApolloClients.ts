@@ -4,6 +4,7 @@ import { createApolloClient } from '../services/apollo.client';
 export interface ApolloClients {
   dashboard: ReturnType<typeof createApolloClient>;
   sales: ReturnType<typeof createApolloClient>;
+  inventory: ReturnType<typeof createApolloClient>;
 }
 
 /**
@@ -17,5 +18,6 @@ export function useApolloClients(): ApolloClients {
   return useMemo(() => ({
     dashboard: createApolloClient('dashboard'),
     sales: createApolloClient('sales'),
+    inventory: createApolloClient('inventory'),
   }), []);
 }
