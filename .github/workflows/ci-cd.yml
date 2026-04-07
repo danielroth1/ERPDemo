@@ -17,13 +17,19 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        service:
-          - user-management
-          - inventory
-          - sales
-          - financial
-          - dashboard
-          - gateway
+        include:
+          - service: user-management
+            test-project: services/user-management/UserManagement.Tests/UserManagement.Tests.csproj
+          - service: inventory
+            test-project: services/inventory/InventoryManagement.Tests/InventoryManagement.Tests.csproj
+          - service: sales
+            test-project: services/sales/SalesManagement.Tests/SalesManagement.Tests.csproj
+          - service: financial
+            test-project: services/financial/FinancialManagement.Tests/FinancialManagement.Tests.csproj
+          - service: dashboard
+            test-project: services/dashboard/DashboardAnalytics.Tests/DashboardAnalytics.Tests.csproj
+          - service: orchestration
+            test-project: services/orchestration/Orchestration.Tests/Orchestration.Tests.csproj
 
     steps:
       - name: Checkout code
@@ -32,22 +38,18 @@ jobs:
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: '8.0.x'
+          dotnet-version: |
+            8.0.x
+            9.0.x
 
       - name: Restore dependencies
         run: dotnet restore services/${{ matrix.service }}/*/*.csproj
 
       - name: Build
-        run: dotnet build services/${{ matrix.service }}/*/*.csproj --no-restore --configuration Release
+        run: dotnet build services/${{ matrix.service }}/*/*.csproj --configuration Release
 
       - name: Run unit tests
-        run: dotnet test tests/unit/${{ matrix.service }}.UnitTests/*.csproj --no-build --verbosity normal --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
-
-      - name: Run integration tests
-        run: |
-          if [ -d "tests/integration/${{ matrix.service }}.IntegrationTests" ]; then
-            dotnet test tests/integration/${{ matrix.service }}.IntegrationTests/*.csproj --no-build --verbosity normal --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
-          fi
+        run: dotnet test ${{ matrix.test-project }} --verbosity normal --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
 
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4

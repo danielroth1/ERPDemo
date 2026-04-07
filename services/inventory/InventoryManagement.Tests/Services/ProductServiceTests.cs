@@ -1,101 +1,336 @@
 using FluentAssertions;
+using MassTransit;
+using Microsoft.Extensions.Logging;
 using Moq;
+using InventoryManagement.Infrastructure;
 using InventoryManagement.Models;
-using InventoryManagement.Repositories;
 using InventoryManagement.Services;
-using Xunit;
+using InventoryManagement.Tests.Helpers;
+using DomainEvents = ERP.Contracts.Events.Domain;
 
 namespace InventoryManagement.Tests.Services;
 
-public class ProductServiceTests
+public class ProductServiceTests : IDisposable
 {
-    private readonly Mock<IProductRepository> _productRepositoryMock;
-    private readonly Mock<IStockMovementRepository> _stockMovementRepositoryMock;
-    private readonly ProductService _productService;
+    private readonly AppDbContext _dbContext;
+    private readonly Mock<ITopicProducer<DomainEvents.ProductCreated>> _productCreatedProducer;
+    private readonly Mock<ITopicProducer<DomainEvents.ProductUpdated>> _productUpdatedProducer;
+    private readonly Mock<ITopicProducer<DomainEvents.ProductDeleted>> _productDeletedProducer;
+    private readonly Mock<ITopicProducer<DomainEvents.StockUpdated>> _stockUpdatedProducer;
+    private readonly Mock<ITopicProducer<DomainEvents.LowStockAlert>> _lowStockAlertProducer;
+    private readonly Mock<ILogger<ProductService>> _loggerMock;
+    private readonly ProductService _service;
 
     public ProductServiceTests()
     {
-        _productRepositoryMock = new Mock<IProductRepository>();
-        _stockMovementRepositoryMock = new Mock<IStockMovementRepository>();
-        _productService = new ProductService(
-            _productRepositoryMock.Object,
-            _stockMovementRepositoryMock.Object
-        );
+        _dbContext = DbContextHelper.CreateInMemoryContext();
+        _productCreatedProducer = new Mock<ITopicProducer<DomainEvents.ProductCreated>>();
+        _productUpdatedProducer = new Mock<ITopicProducer<DomainEvents.ProductUpdated>>();
+        _productDeletedProducer = new Mock<ITopicProducer<DomainEvents.ProductDeleted>>();
+        _stockUpdatedProducer = new Mock<ITopicProducer<DomainEvents.StockUpdated>>();
+        _lowStockAlertProducer = new Mock<ITopicProducer<DomainEvents.LowStockAlert>>();
+        _loggerMock = new Mock<ILogger<ProductService>>();
+
+        _service = new ProductService(
+            _dbContext,
+            _productCreatedProducer.Object,
+            _productUpdatedProducer.Object,
+            _productDeletedProducer.Object,
+            _stockUpdatedProducer.Object,
+            _lowStockAlertProducer.Object,
+            _loggerMock.Object);
     }
+
+    public void Dispose() => _dbContext.Dispose();
+
+    private Product CreateProduct(string? id = null, string? sku = null, string? name = null,
+        string? categoryId = null, decimal price = 29.99m, int stockQuantity = 100,
+        int minStockLevel = 10, bool isActive = true) => new()
+    {
+        Id = id ?? Guid.NewGuid().ToString(),
+        Sku = sku ?? $"SKU-{Guid.NewGuid():N}"[..20],
+        Name = name ?? "Test Product",
+        Description = "Test description",
+        CategoryId = categoryId ?? "cat-1",
+        Price = price,
+        Cost = price * 0.6m,
+        StockQuantity = stockQuantity,
+        MinStockLevel = minStockLevel,
+        MaxStockLevel = 1000,
+        Unit = "pcs",
+        IsActive = isActive,
+        CreatedAt = DateTime.UtcNow,
+        UpdatedAt = DateTime.UtcNow
+    };
+
+    private async Task<Product> SeedProductAsync(Product? product = null)
+    {
+        var p = product ?? CreateProduct();
+        _dbContext.Products.Add(p);
+        await _dbContext.SaveChangesAsync();
+        return p;
+    }
+
+    // ==================== GetAllAsync ====================
 
     [Fact]
     public async Task GetAllAsync_ShouldReturnAllProducts()
     {
-        // Arrange
-        var products = new List<Product>
-        {
-            new() { Id = "1", Name = "Product 1", SKU = "SKU001", UnitPrice = 10.99m, StockQuantity = 100 },
-            new() { Id = "2", Name = "Product 2", SKU = "SKU002", UnitPrice = 20.99m, StockQuantity = 50 }
-        };
+        await SeedProductAsync(CreateProduct(name: "Product A"));
+        await SeedProductAsync(CreateProduct(name: "Product B"));
 
-        _productRepositoryMock
-            .Setup(r => r.GetAllAsync(1, 10))
-            .ReturnsAsync((products, products.Count));
+        var result = await _service.GetAllAsync();
 
-        // Act
-        var (result, total) = await _productService.GetAllAsync(1, 10);
-
-        // Assert
         result.Should().HaveCount(2);
-        total.Should().Be(2);
     }
+
+    [Fact]
+    public async Task GetAllAsync_WithPagination_ShouldReturnPagedResults()
+    {
+        for (int i = 0; i < 5; i++)
+            await SeedProductAsync(CreateProduct(name: $"Product {i}"));
+
+        var result = await _service.GetAllAsync(page: 1, pageSize: 2);
+
+        result.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithIsActiveFilter_ShouldReturnOnlyActive()
+    {
+        await SeedProductAsync(CreateProduct(name: "Active", isActive: true));
+        await SeedProductAsync(CreateProduct(name: "Inactive", isActive: false));
+
+        var result = await _service.GetAllAsync(isActive: true);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("Active");
+    }
+
+    [Fact]
+    public async Task GetAllAsync_WithIsActiveFalseFilter_ShouldReturnOnlyInactive()
+    {
+        await SeedProductAsync(CreateProduct(name: "Active", isActive: true));
+        await SeedProductAsync(CreateProduct(name: "Inactive", isActive: false));
+
+        var result = await _service.GetAllAsync(isActive: false);
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("Inactive");
+    }
+
+    [Fact]
+    public async Task GetAllAsync_EmptyDatabase_ShouldReturnEmptyList()
+    {
+        var result = await _service.GetAllAsync();
+
+        result.Should().BeEmpty();
+    }
+
+    // ==================== GetTotalCountAsync ====================
+
+    [Fact]
+    public async Task GetTotalCountAsync_ShouldReturnTotalCount()
+    {
+        await SeedProductAsync();
+        await SeedProductAsync();
+        await SeedProductAsync();
+
+        var count = await _service.GetTotalCountAsync();
+
+        count.Should().Be(3);
+    }
+
+    [Fact]
+    public async Task GetTotalCountAsync_WithActiveFilter_ShouldCountOnlyActive()
+    {
+        await SeedProductAsync(CreateProduct(isActive: true));
+        await SeedProductAsync(CreateProduct(isActive: false));
+
+        var count = await _service.GetTotalCountAsync(isActive: true);
+
+        count.Should().Be(1);
+    }
+
+    // ==================== GetByIdAsync ====================
 
     [Fact]
     public async Task GetByIdAsync_WithExistingId_ShouldReturnProduct()
     {
-        // Arrange
-        var productId = "123";
-        var product = new Product
-        {
-            Id = productId,
-            Name = "Test Product",
-            SKU = "SKU001",
-            UnitPrice = 10.99m,
-            StockQuantity = 100
-        };
+        var product = await SeedProductAsync(CreateProduct(id: "prod-123", name: "Laptop"));
 
-        _productRepositoryMock
-            .Setup(r => r.GetByIdAsync(productId))
-            .ReturnsAsync(product);
+        var result = await _service.GetByIdAsync("prod-123");
 
-        // Act
-        var result = await _productService.GetByIdAsync(productId);
-
-        // Assert
         result.Should().NotBeNull();
-        result!.Id.Should().Be(productId);
-        result.Name.Should().Be("Test Product");
+        result!.Id.Should().Be("prod-123");
+        result.Name.Should().Be("Laptop");
     }
+
+    [Fact]
+    public async Task GetByIdAsync_WithNonExistingId_ShouldReturnNull()
+    {
+        var result = await _service.GetByIdAsync("nonexistent");
+
+        result.Should().BeNull();
+    }
+
+    // ==================== GetBySkuAsync ====================
+
+    [Fact]
+    public async Task GetBySkuAsync_WithExistingSku_ShouldReturnProduct()
+    {
+        await SeedProductAsync(CreateProduct(sku: "SKU-LAPTOP-001", name: "Laptop"));
+
+        var result = await _service.GetBySkuAsync("SKU-LAPTOP-001");
+
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("Laptop");
+    }
+
+    [Fact]
+    public async Task GetBySkuAsync_CaseInsensitive_ShouldReturnProduct()
+    {
+        await SeedProductAsync(CreateProduct(sku: "SKU-LAPTOP-001", name: "Laptop"));
+
+        var result = await _service.GetBySkuAsync("sku-laptop-001");
+
+        result.Should().NotBeNull();
+        result!.Name.Should().Be("Laptop");
+    }
+
+    [Fact]
+    public async Task GetBySkuAsync_WithNonExistingSku_ShouldReturnNull()
+    {
+        var result = await _service.GetBySkuAsync("NONEXISTENT");
+
+        result.Should().BeNull();
+    }
+
+    // ==================== GetLowStockProductsAsync ====================
+
+    [Fact]
+    public async Task GetLowStockProductsAsync_ShouldReturnLowStockProducts()
+    {
+        await SeedProductAsync(CreateProduct(name: "Low Stock", stockQuantity: 5, minStockLevel: 10, isActive: true));
+        await SeedProductAsync(CreateProduct(name: "Normal Stock", stockQuantity: 100, minStockLevel: 10, isActive: true));
+
+        var result = await _service.GetLowStockProductsAsync();
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("Low Stock");
+    }
+
+    [Fact]
+    public async Task GetLowStockProductsAsync_ExcludesInactiveProducts()
+    {
+        await SeedProductAsync(CreateProduct(name: "Inactive Low", stockQuantity: 5, minStockLevel: 10, isActive: false));
+
+        var result = await _service.GetLowStockProductsAsync();
+
+        result.Should().BeEmpty();
+    }
+
+    [Fact]
+    public async Task GetLowStockProductsAsync_IncludesExactlyAtMinLevel()
+    {
+        await SeedProductAsync(CreateProduct(name: "At Min", stockQuantity: 10, minStockLevel: 10, isActive: true));
+
+        var result = await _service.GetLowStockProductsAsync();
+
+        result.Should().HaveCount(1);
+    }
+
+    // ==================== GetByCategoryIdAsync ====================
+
+    [Fact]
+    public async Task GetByCategoryIdAsync_ShouldReturnProductsInCategory()
+    {
+        await SeedProductAsync(CreateProduct(name: "A", categoryId: "cat-electronics"));
+        await SeedProductAsync(CreateProduct(name: "B", categoryId: "cat-electronics"));
+        await SeedProductAsync(CreateProduct(name: "C", categoryId: "cat-furniture"));
+
+        var result = await _service.GetByCategoryIdAsync("cat-electronics");
+
+        result.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task GetByCategoryIdAsync_WithNoProducts_ShouldReturnEmpty()
+    {
+        var result = await _service.GetByCategoryIdAsync("cat-empty");
+
+        result.Should().BeEmpty();
+    }
+
+    // ==================== GetCountByCategoryIdAsync ====================
+
+    [Fact]
+    public async Task GetCountByCategoryIdAsync_ShouldReturnCorrectCount()
+    {
+        await SeedProductAsync(CreateProduct(categoryId: "cat-1"));
+        await SeedProductAsync(CreateProduct(categoryId: "cat-1"));
+        await SeedProductAsync(CreateProduct(categoryId: "cat-2"));
+
+        var count = await _service.GetCountByCategoryIdAsync("cat-1");
+
+        count.Should().Be(2);
+    }
+
+    // ==================== SearchAsync ====================
+
+    [Fact]
+    public async Task SearchAsync_ByName_ShouldReturnMatchingProducts()
+    {
+        await SeedProductAsync(CreateProduct(name: "Dell Laptop", sku: "DELL-001"));
+        await SeedProductAsync(CreateProduct(name: "HP Laptop", sku: "HP-0001"));
+        await SeedProductAsync(CreateProduct(name: "Samsung Monitor", sku: "SAM-001"));
+
+        var result = await _service.SearchAsync("laptop");
+
+        result.Should().HaveCount(2);
+    }
+
+    [Fact]
+    public async Task SearchAsync_BySku_ShouldReturnMatchingProducts()
+    {
+        await SeedProductAsync(CreateProduct(name: "Dell Laptop", sku: "DELL-001"));
+        await SeedProductAsync(CreateProduct(name: "HP Laptop", sku: "HP-0001"));
+
+        var result = await _service.SearchAsync("DELL");
+
+        result.Should().HaveCount(1);
+        result[0].Name.Should().Be("Dell Laptop");
+    }
+
+    [Fact]
+    public async Task SearchAsync_CaseInsensitive_ShouldWork()
+    {
+        await SeedProductAsync(CreateProduct(name: "UPPERCASE Product", sku: "UP-00001"));
+
+        var result = await _service.SearchAsync("uppercase");
+
+        result.Should().HaveCount(1);
+    }
+
+    [Fact]
+    public async Task SearchAsync_NoMatch_ShouldReturnEmpty()
+    {
+        await SeedProductAsync(CreateProduct(name: "Laptop", sku: "LAP-001"));
+
+        var result = await _service.SearchAsync("nonexistent");
+
+        result.Should().BeEmpty();
+    }
+
+    // ==================== CreateAsync ====================
 
     [Fact]
     public async Task CreateAsync_WithValidProduct_ShouldCreateProduct()
     {
-        // Arrange
-        var product = new Product
-        {
-            Name = "New Product",
-            SKU = "SKU001",
-            Description = "Test description",
-            CategoryId = "cat-1",
-            UnitPrice = 29.99m,
-            StockQuantity = 100,
-            ReorderLevel = 20,
-            IsActive = true
-        };
+        var product = CreateProduct(name: "New Product");
 
-        _productRepositoryMock
-            .Setup(r => r.CreateAsync(It.IsAny<Product>()))
-            .ReturnsAsync((Product p) => { p.Id = "new-id"; return p; });
+        var result = await _service.CreateAsync(product);
 
-        // Act
-        var result = await _productService.CreateAsync(product);
-
-        // Assert
         result.Should().NotBeNull();
         result.Id.Should().NotBeNullOrEmpty();
         result.Name.Should().Be("New Product");
@@ -103,201 +338,223 @@ public class ProductServiceTests
     }
 
     [Fact]
-    public async Task UpdateAsync_WithValidData_ShouldUpdateProduct()
+    public async Task CreateAsync_ShouldPublishProductCreatedEvent()
     {
-        // Arrange
-        var productId = "123";
-        var existingProduct = new Product
-        {
-            Id = productId,
-            Name = "Old Name",
-            SKU = "SKU001",
-            UnitPrice = 10.99m,
-            StockQuantity = 100,
-            CreatedAt = DateTime.UtcNow.AddDays(-10)
-        };
+        var product = CreateProduct(name: "New Product", categoryId: "cat-1", price: 29.99m);
 
-        var updatedProduct = new Product
-        {
-            Id = productId,
-            Name = "New Name",
-            SKU = "SKU001",
-            UnitPrice = 15.99m,
-            StockQuantity = 150
-        };
+        await _service.CreateAsync(product);
 
-        _productRepositoryMock
-            .Setup(r => r.GetByIdAsync(productId))
-            .ReturnsAsync(existingProduct);
-
-        _productRepositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Product>()))
-            .ReturnsAsync((Product p) => p);
-
-        // Act
-        var result = await _productService.UpdateAsync(productId, updatedProduct);
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.Name.Should().Be("New Name");
-        result.UnitPrice.Should().Be(15.99m);
-        result.UpdatedAt.Should().BeCloseTo(DateTime.UtcNow, TimeSpan.FromSeconds(5));
+        _productCreatedProducer.Verify(p => p.Produce(
+            It.Is<DomainEvents.ProductCreated>(e =>
+                e.Name == "New Product" &&
+                e.CategoryId == "cat-1" &&
+                e.Price == 29.99m),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task DeleteAsync_WithExistingId_ShouldReturnTrue()
+    public async Task CreateAsync_ShouldPersistProductInDatabase()
     {
-        // Arrange
-        var productId = "123";
-        
-        _productRepositoryMock
-            .Setup(r => r.DeleteAsync(productId))
-            .ReturnsAsync(true);
+        var product = CreateProduct(name: "Persisted Product");
 
-        // Act
-        var result = await _productService.DeleteAsync(productId);
+        var result = await _service.CreateAsync(product);
 
-        // Assert
+        var fromDb = await _dbContext.Products.FindAsync(result.Id);
+        fromDb.Should().NotBeNull();
+        fromDb!.Name.Should().Be("Persisted Product");
+    }
+
+    [Fact]
+    public async Task CreateAsync_ShouldAssignNewGuidId()
+    {
+        var product = CreateProduct();
+        product.Id = "old-id";
+
+        var result = await _service.CreateAsync(product);
+
+        result.Id.Should().NotBe("old-id");
+        Guid.TryParse(result.Id, out _).Should().BeTrue();
+    }
+
+    // ==================== UpdateAsync ====================
+
+    [Fact]
+    public async Task UpdateAsync_WithExistingProduct_ShouldUpdateAndReturnTrue()
+    {
+        await SeedProductAsync(CreateProduct(id: "prod-1", name: "Old Name"));
+
+        var updated = CreateProduct(name: "New Name", price: 49.99m);
+        var result = await _service.UpdateAsync("prod-1", updated);
+
         result.Should().BeTrue();
+        var fromDb = await _dbContext.Products.FindAsync("prod-1");
+        fromDb!.Name.Should().Be("New Name");
+        fromDb.Price.Should().Be(49.99m);
     }
 
     [Fact]
-    public async Task GetLowStockProductsAsync_ShouldReturnProductsBelowReorderLevel()
+    public async Task UpdateAsync_ShouldUpdateTimestamp()
     {
-        // Arrange
-        var lowStockProducts = new List<Product>
-        {
-            new() { Id = "1", Name = "Product 1", StockQuantity = 5, ReorderLevel = 10 },
-            new() { Id = "2", Name = "Product 2", StockQuantity = 8, ReorderLevel = 15 }
-        };
+        var oldTime = DateTime.UtcNow.AddDays(-1);
+        var product = CreateProduct(id: "prod-1");
+        product.UpdatedAt = oldTime;
+        await SeedProductAsync(product);
 
-        _productRepositoryMock
-            .Setup(r => r.GetLowStockProductsAsync())
-            .ReturnsAsync(lowStockProducts);
+        await _service.UpdateAsync("prod-1", CreateProduct());
 
-        // Act
-        var result = await _productService.GetLowStockProductsAsync();
-
-        // Assert
-        result.Should().HaveCount(2);
-        result.All(p => p.StockQuantity <= p.ReorderLevel).Should().BeTrue();
+        var fromDb = await _dbContext.Products.FindAsync("prod-1");
+        fromDb!.UpdatedAt.Should().BeAfter(oldTime);
     }
 
     [Fact]
-    public async Task SearchAsync_ShouldReturnMatchingProducts()
+    public async Task UpdateAsync_ShouldPublishProductUpdatedEvent()
     {
-        // Arrange
-        var searchQuery = "laptop";
-        var matchingProducts = new List<Product>
-        {
-            new() { Id = "1", Name = "Laptop Dell", SKU = "LAP001" },
-            new() { Id = "2", Name = "Laptop HP", SKU = "LAP002" }
-        };
+        await SeedProductAsync(CreateProduct(id: "prod-1"));
 
-        _productRepositoryMock
-            .Setup(r => r.SearchAsync(searchQuery))
-            .ReturnsAsync(matchingProducts);
+        await _service.UpdateAsync("prod-1", CreateProduct(name: "Updated", price: 99.99m));
 
-        // Act
-        var result = await _productService.SearchAsync(searchQuery);
-
-        // Assert
-        result.Should().HaveCount(2);
-        result.All(p => p.Name.Contains("Laptop", StringComparison.OrdinalIgnoreCase)).Should().BeTrue();
+        _productUpdatedProducer.Verify(p => p.Produce(
+            It.Is<DomainEvents.ProductUpdated>(e =>
+                e.ProductId == "prod-1" &&
+                e.Name == "Updated" &&
+                e.Price == 99.99m),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task AdjustStockAsync_WithPositiveQuantity_ShouldIncreaseStock()
+    public async Task UpdateAsync_WithNonExistingProduct_ShouldReturnFalse()
     {
-        // Arrange
-        var productId = "123";
-        var product = new Product
-        {
-            Id = productId,
-            Name = "Test Product",
-            SKU = "SKU001",
-            StockQuantity = 100
-        };
+        var result = await _service.UpdateAsync("nonexistent", CreateProduct());
 
-        _productRepositoryMock
-            .Setup(r => r.GetByIdAsync(productId))
-            .ReturnsAsync(product);
+        result.Should().BeFalse();
+    }
 
-        _productRepositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Product>()))
-            .ReturnsAsync((Product p) => p);
+    // ==================== UpdateStockAsync ====================
 
-        _stockMovementRepositoryMock
-            .Setup(r => r.CreateAsync(It.IsAny<StockMovement>()))
-            .ReturnsAsync((StockMovement sm) => sm);
+    [Fact]
+    public async Task UpdateStockAsync_ShouldUpdateQuantity()
+    {
+        await SeedProductAsync(CreateProduct(id: "prod-1", stockQuantity: 100));
 
-        // Act
-        var result = await _productService.AdjustStockAsync(productId, 50, "Adjustment", "Stock adjustment");
+        var result = await _service.UpdateStockAsync("prod-1", 150, "user-1");
 
-        // Assert
-        result.Should().NotBeNull();
-        result!.StockQuantity.Should().Be(150);
-        
-        _stockMovementRepositoryMock.Verify(r => r.CreateAsync(It.Is<StockMovement>(sm =>
-            sm.ProductId == productId &&
-            sm.Quantity == 50 &&
-            sm.Type == "Adjustment"
-        )), Times.Once);
+        result.Should().BeTrue();
+        var fromDb = await _dbContext.Products.FindAsync("prod-1");
+        fromDb!.StockQuantity.Should().Be(150);
     }
 
     [Fact]
-    public async Task AdjustStockAsync_WithNegativeQuantity_ShouldDecreaseStock()
+    public async Task UpdateStockAsync_ShouldPublishStockUpdatedEvent()
     {
-        // Arrange
-        var productId = "123";
-        var product = new Product
-        {
-            Id = productId,
-            Name = "Test Product",
-            SKU = "SKU001",
-            StockQuantity = 100
-        };
+        await SeedProductAsync(CreateProduct(id: "prod-1", stockQuantity: 100));
 
-        _productRepositoryMock
-            .Setup(r => r.GetByIdAsync(productId))
-            .ReturnsAsync(product);
+        await _service.UpdateStockAsync("prod-1", 50, "user-1");
 
-        _productRepositoryMock
-            .Setup(r => r.UpdateAsync(It.IsAny<Product>()))
-            .ReturnsAsync((Product p) => p);
-
-        _stockMovementRepositoryMock
-            .Setup(r => r.CreateAsync(It.IsAny<StockMovement>()))
-            .ReturnsAsync((StockMovement sm) => sm);
-
-        // Act
-        var result = await _productService.AdjustStockAsync(productId, -30, "Sale", "Product sold");
-
-        // Assert
-        result.Should().NotBeNull();
-        result!.StockQuantity.Should().Be(70);
+        _stockUpdatedProducer.Verify(p => p.Produce(
+            It.Is<DomainEvents.StockUpdated>(e =>
+                e.ProductId == "prod-1" &&
+                e.NewQuantity == 50),
+            It.IsAny<CancellationToken>()), Times.Once);
     }
 
     [Fact]
-    public async Task AdjustStockAsync_WithInsufficientStock_ShouldThrowException()
+    public async Task UpdateStockAsync_WhenLowStock_ShouldPublishLowStockAlert()
     {
-        // Arrange
-        var productId = "123";
-        var product = new Product
-        {
-            Id = productId,
-            Name = "Test Product",
-            SKU = "SKU001",
-            StockQuantity = 10
-        };
+        await SeedProductAsync(CreateProduct(id: "prod-1", stockQuantity: 5, minStockLevel: 10));
 
-        _productRepositoryMock
-            .Setup(r => r.GetByIdAsync(productId))
-            .ReturnsAsync(product);
+        await _service.UpdateStockAsync("prod-1", 3, "user-1");
 
-        // Act & Assert
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await _productService.AdjustStockAsync(productId, -50, "Sale", "Product sold")
-        );
+        _lowStockAlertProducer.Verify(p => p.Produce(
+            It.Is<DomainEvents.LowStockAlert>(e => e.ProductId == "prod-1"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task UpdateStockAsync_WithNonExistingProduct_ShouldReturnFalse()
+    {
+        var result = await _service.UpdateStockAsync("nonexistent", 100, "user-1");
+
+        result.Should().BeFalse();
+    }
+
+    // ==================== DeleteAsync ====================
+
+    [Fact]
+    public async Task DeleteAsync_WithExistingProduct_ShouldDeleteAndReturnTrue()
+    {
+        await SeedProductAsync(CreateProduct(id: "prod-1"));
+
+        var result = await _service.DeleteAsync("prod-1");
+
+        result.Should().BeTrue();
+        var fromDb = await _dbContext.Products.FindAsync("prod-1");
+        fromDb.Should().BeNull();
+    }
+
+    [Fact]
+    public async Task DeleteAsync_ShouldPublishProductDeletedEvent()
+    {
+        await SeedProductAsync(CreateProduct(id: "prod-1"));
+
+        await _service.DeleteAsync("prod-1");
+
+        _productDeletedProducer.Verify(p => p.Produce(
+            It.Is<DomainEvents.ProductDeleted>(e => e.ProductId == "prod-1"),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WithNonExistingProduct_ShouldReturnFalse()
+    {
+        var result = await _service.DeleteAsync("nonexistent");
+
+        result.Should().BeFalse();
+    }
+
+    // ==================== Model Tests ====================
+
+    [Fact]
+    public void Product_AvailableQuantity_ShouldCalculateCorrectly()
+    {
+        var product = new Product { StockQuantity = 100, ReservedQuantity = 30 };
+
+        product.AvailableQuantity.Should().Be(70);
+    }
+
+    [Fact]
+    public void Product_IsLowStock_WhenBelowMinLevel_ShouldBeTrue()
+    {
+        var product = new Product { StockQuantity = 5, ReservedQuantity = 0, MinStockLevel = 10 };
+
+        product.IsLowStock.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Product_IsLowStock_WhenAboveMinLevel_ShouldBeFalse()
+    {
+        var product = new Product { StockQuantity = 100, ReservedQuantity = 0, MinStockLevel = 10 };
+
+        product.IsLowStock.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Product_IsLowStock_ConsidersReservedQuantity()
+    {
+        var product = new Product { StockQuantity = 20, ReservedQuantity = 15, MinStockLevel = 10 };
+
+        product.IsLowStock.Should().BeTrue();
+    }
+
+    [Fact]
+    public void Product_DefaultValues_ShouldBeCorrect()
+    {
+        var product = new Product();
+
+        product.MinStockLevel.Should().Be(10);
+        product.MaxStockLevel.Should().Be(1000);
+        product.Unit.Should().Be("pcs");
+        product.IsActive.Should().BeTrue();
+        product.StockQuantity.Should().Be(0);
+        product.ReservedQuantity.Should().Be(0);
     }
 }

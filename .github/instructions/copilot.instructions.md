@@ -226,12 +226,16 @@ src/
 ### Backend Tests
 
 ```powershell
-# Run all tests
-dotnet test
+# Run all tests across all services
+dotnet test erp.sln --verbosity minimal
 
 # Run specific service tests
-cd services/user-management
-dotnet test --verbosity minimal
+dotnet test services/user-management/UserManagement.Tests/
+dotnet test services/inventory/InventoryManagement.Tests/
+dotnet test services/sales/SalesManagement.Tests/
+dotnet test services/financial/FinancialManagement.Tests/
+dotnet test services/dashboard/DashboardAnalytics.Tests/
+dotnet test services/orchestration/Orchestration.Tests/
 
 # Run with coverage
 dotnet test --collect:"XPlat Code Coverage"
@@ -249,10 +253,135 @@ npm test
 npm run test:e2e
 ```
 
-### Test Structure
+### Test Project Structure
 
-- **Model Tests**: Validate entity properties, defaults, validation
-- **Service Tests**: Test business logic with mocked dependencies
+Test projects are **co-located** with their service (not in a centralized `tests/` folder):
+
+```
+services/
+├── user-management/
+│   ├── UserManagement/              # Service project
+│   └── UserManagement.Tests/        # Test project (net9.0)
+│       ├── Helpers/
+│       │   └── DbContextHelper.cs   # InMemory DB factory
+│       ├── Models/
+│       │   ├── UserModelTests.cs    # Entity default values, properties
+│       │   ├── RoleTests.cs         # Enum values
+│       │   └── DtoTests.cs          # DTO/response model tests
+│       └── Services/
+│           ├── UserServiceTests.cs  # CRUD, events, pagination
+│           └── JwtServiceTests.cs   # Token generation, validation, refresh
+├── inventory/
+│   ├── InventoryManagement/
+│   └── InventoryManagement.Tests/
+│       ├── Helpers/DbContextHelper.cs
+│       └── Services/
+│           ├── ProductServiceTests.cs
+│           ├── CategoryServiceTests.cs
+│           └── StockMovementServiceTests.cs
+```
+
+### Test Framework & Packages
+
+All test projects use:
+- **xUnit 2.9.2** - Test framework
+- **Moq 4.20.72** - Mocking framework
+- **FluentAssertions 6.12.1** - Assertion library
+- **Microsoft.EntityFrameworkCore.InMemory** - In-memory database provider
+- **coverlet** - Code coverage
+
+### Writing Tests: Key Patterns
+
+#### 1. InMemory DbContext Helper
+
+Each test project has a `Helpers/DbContextHelper.cs` that creates an isolated InMemory database per test:
+
+```csharp
+public static class DbContextHelper
+{
+    public static AppDbContext CreateInMemoryContext()
+    {
+        var options = new DbContextOptionsBuilder<AppDbContext>()
+            .UseInMemoryDatabase(databaseName: Guid.NewGuid().ToString())
+            .ConfigureWarnings(w => w.Ignore(InMemoryEventId.TransactionIgnoredWarning))
+            .Options;
+
+        var context = new TestAppDbContext(options);
+        context.Database.EnsureCreated();
+        return context;
+    }
+
+    // Subclass to configure JSONB value objects for InMemory provider
+    private class TestAppDbContext : AppDbContext
+    {
+        public TestAppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
+            // Configure OwnsOne/OwnsMany for JSONB value objects
+            // e.g., modelBuilder.Entity<Customer>().OwnsOne(c => c.DefaultBillingAddress);
+        }
+    }
+}
+```
+
+#### 2. Service Test Pattern
+
+Services use `IDisposable` with real InMemory DbContext and mocked Kafka producers:
+
+```csharp
+public class ProductServiceTests : IDisposable
+{
+    private readonly AppDbContext _dbContext;
+    private readonly Mock<ITopicProducer<ProductCreated>> _eventProducer;
+    private readonly ProductService _service;
+
+    public ProductServiceTests()
+    {
+        _dbContext = DbContextHelper.CreateInMemoryContext();
+        _eventProducer = new Mock<ITopicProducer<ProductCreated>>();
+        _service = new ProductService(_dbContext, _eventProducer.Object, ...);
+    }
+
+    public void Dispose() => _dbContext.Dispose();
+
+    [Fact]
+    public async Task CreateAsync_ShouldPublishEvent()
+    {
+        var product = CreateProduct();
+        await _service.CreateAsync(product);
+
+        _eventProducer.Verify(p => p.Produce(
+            It.Is<ProductCreated>(e => e.ProductId == product.Id),
+            It.IsAny<CancellationToken>()), Times.Once);
+    }
+}
+```
+
+#### 3. What to Test
+
+- **Service methods**: All CRUD operations, edge cases (not found, duplicates), pagination
+- **Domain events**: Verify Kafka events are published with correct data via `Mock.Verify()`
+- **Model defaults**: Entity default values, computed properties (e.g., `AvailableQuantity`)
+- **DTOs**: Response mapping, factory methods (`ApiResponse.SuccessResponse()`, `ErrorResponse()`)
+- **Business logic**: Stock calculations, role checks, email uniqueness
+
+#### 4. Naming Convention
+
+```
+MethodName_Scenario_ExpectedBehavior
+```
+
+Examples:
+- `GetByIdAsync_WithExistingId_ShouldReturnProduct`
+- `CreateAsync_ShouldPublishProductCreatedEvent`
+- `DeleteAsync_WithNonExistingId_ShouldReturnFalse`
+
+### Test Structure Categories
+
+- **Model Tests**: Validate entity properties, defaults, computed properties
+- **Service Tests**: Test business logic with InMemory DB + mocked Kafka producers
 - **Integration Tests**: Test with real database (TestContainers)
 - **E2E Tests**: Full user workflows (Playwright)
 
