@@ -58,6 +58,24 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "AppHost", "AppHost\AppHost.
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchestration.Tests", "services\orchestration\Orchestration.Tests\Orchestration.Tests.csproj", "{03DBB0D6-AB32-4919-9ECC-8CB54FBFF935}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "shared", "shared", "{9F08BDB6-3D0B-4F3E-B88D-CE815E960E87}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ERP.Testing.Shared", "tests\shared\ERP.Testing.Shared\ERP.Testing.Shared.csproj", "{31CA2957-7A3F-44AB-B769-2351924A6F69}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "InventoryManagement.IntegrationTests", "services\inventory\InventoryManagement.IntegrationTests\InventoryManagement.IntegrationTests.csproj", "{C1932908-125F-4036-9DD0-79A02C57E99C}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "user-management", "user-management", "{F74D9A06-0713-4434-AB05-BDAB659FAE42}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UserManagement.IntegrationTests", "services\user-management\UserManagement.IntegrationTests\UserManagement.IntegrationTests.csproj", "{0C40D29F-D86B-40B7-8336-93A9B2B85F28}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "SalesManagement.IntegrationTests", "services\sales\SalesManagement.IntegrationTests\SalesManagement.IntegrationTests.csproj", "{412DDD92-B013-4FB5-9363-52B0CC454FE5}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FinancialManagement.IntegrationTests", "services\financial\FinancialManagement.IntegrationTests\FinancialManagement.IntegrationTests.csproj", "{BC53CD20-C380-483B-B331-080DE5A868A9}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "DashboardAnalytics.IntegrationTests", "services\dashboard\DashboardAnalytics.IntegrationTests\DashboardAnalytics.IntegrationTests.csproj", "{1AC45613-ABDC-4F9B-AEA7-86AF6997F315}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Orchestration.IntegrationTests", "services\orchestration\Orchestration.IntegrationTests\Orchestration.IntegrationTests.csproj", "{8C56B418-C6EF-49E1-AD12-EC115E2BA472}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -132,6 +150,34 @@ Global
 		{03DBB0D6-AB32-4919-9ECC-8CB54FBFF935}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{03DBB0D6-AB32-4919-9ECC-8CB54FBFF935}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{03DBB0D6-AB32-4919-9ECC-8CB54FBFF935}.Release|Any CPU.Build.0 = Release|Any CPU
+		{31CA2957-7A3F-44AB-B769-2351924A6F69}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31CA2957-7A3F-44AB-B769-2351924A6F69}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31CA2957-7A3F-44AB-B769-2351924A6F69}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31CA2957-7A3F-44AB-B769-2351924A6F69}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C1932908-125F-4036-9DD0-79A02C57E99C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C1932908-125F-4036-9DD0-79A02C57E99C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C1932908-125F-4036-9DD0-79A02C57E99C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C1932908-125F-4036-9DD0-79A02C57E99C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0C40D29F-D86B-40B7-8336-93A9B2B85F28}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0C40D29F-D86B-40B7-8336-93A9B2B85F28}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0C40D29F-D86B-40B7-8336-93A9B2B85F28}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0C40D29F-D86B-40B7-8336-93A9B2B85F28}.Release|Any CPU.Build.0 = Release|Any CPU
+		{412DDD92-B013-4FB5-9363-52B0CC454FE5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{412DDD92-B013-4FB5-9363-52B0CC454FE5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{412DDD92-B013-4FB5-9363-52B0CC454FE5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{412DDD92-B013-4FB5-9363-52B0CC454FE5}.Release|Any CPU.Build.0 = Release|Any CPU
+		{BC53CD20-C380-483B-B331-080DE5A868A9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{BC53CD20-C380-483B-B331-080DE5A868A9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{BC53CD20-C380-483B-B331-080DE5A868A9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{BC53CD20-C380-483B-B331-080DE5A868A9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{1AC45613-ABDC-4F9B-AEA7-86AF6997F315}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{1AC45613-ABDC-4F9B-AEA7-86AF6997F315}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{1AC45613-ABDC-4F9B-AEA7-86AF6997F315}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{1AC45613-ABDC-4F9B-AEA7-86AF6997F315}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8C56B418-C6EF-49E1-AD12-EC115E2BA472}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8C56B418-C6EF-49E1-AD12-EC115E2BA472}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8C56B418-C6EF-49E1-AD12-EC115E2BA472}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8C56B418-C6EF-49E1-AD12-EC115E2BA472}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -161,6 +207,15 @@ Global
 		{FA000000-0000-0000-0000-000000000001} = {F0000000-0000-0000-0000-000000000001}
 		{AA000000-0000-0000-0000-000000000001} = {FA000000-0000-0000-0000-000000000001}
 		{03DBB0D6-AB32-4919-9ECC-8CB54FBFF935} = {F8888888-8888-8888-8888-888888888888}
+		{9F08BDB6-3D0B-4F3E-B88D-CE815E960E87} = {F8888888-8888-8888-8888-888888888888}
+		{31CA2957-7A3F-44AB-B769-2351924A6F69} = {9F08BDB6-3D0B-4F3E-B88D-CE815E960E87}
+		{C1932908-125F-4036-9DD0-79A02C57E99C} = {F3333333-3333-3333-3333-333333333333}
+		{F74D9A06-0713-4434-AB05-BDAB659FAE42} = {F0000000-0000-0000-0000-000000000001}
+		{0C40D29F-D86B-40B7-8336-93A9B2B85F28} = {F74D9A06-0713-4434-AB05-BDAB659FAE42}
+		{412DDD92-B013-4FB5-9363-52B0CC454FE5} = {F4444444-4444-4444-4444-444444444444}
+		{BC53CD20-C380-483B-B331-080DE5A868A9} = {F5555555-5555-5555-5555-555555555555}
+		{1AC45613-ABDC-4F9B-AEA7-86AF6997F315} = {F6666666-6666-6666-6666-666666666666}
+		{8C56B418-C6EF-49E1-AD12-EC115E2BA472} = {FA000000-0000-0000-0000-000000000001}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {A0000000-0000-0000-0000-000000000000}

@@ -300,3 +300,6 @@ finally
 {
     Log.CloseAndFlush();
 }
+
+// Make the implicit Program class accessible to integration test projects
+public partial class Program { }

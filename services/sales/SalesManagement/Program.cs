@@ -192,3 +192,5 @@ Console.WriteLine(new string('=', 80) + "\n");
 Log.Information("Sales Management Service started successfully");
 
 app.Run();
+
+public partial class Program { }

@@ -300,3 +300,5 @@ static async Task InitializeDefaultAccountsAsync(IServiceProvider services)
         Console.WriteLine($"\n❌ Failed to initialize system accounts: {ex.Message}\n");
     }
 }
+
+public partial class Program { }
