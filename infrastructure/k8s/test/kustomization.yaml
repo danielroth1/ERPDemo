@@ -1,0 +1,31 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: erp-test
+
+resources:
+  - ../base
+
+# Map the local image names built by CI (erp-xxx:test) to the base image names (erp/xxx)
+images:
+  - name: erp/user-management
+    newName: erp-user-management
+    newTag: test
+  - name: erp/inventory
+    newName: erp-inventory
+    newTag: test
+  - name: erp/sales
+    newName: erp-sales
+    newTag: test
+  - name: erp/financial
+    newName: erp-financial
+    newTag: test
+  - name: erp/dashboard
+    newName: erp-dashboard
+    newTag: test
+  - name: erp/gateway
+    newName: erp-gateway
+    newTag: test
+  - name: erp/frontend
+    newName: erp-frontend
+    newTag: test

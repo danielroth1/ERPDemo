@@ -273,9 +273,21 @@ jobs:
       - name: Deploy to KinD
         run: |
           kubectl create namespace erp-test
-          kubectl apply -f infrastructure/k8s/base/ -n erp-test
-          kubectl apply -f tests/e2e/k8s/ -n erp-test
-          kubectl wait --for=condition=ready pod --all -n erp-test --timeout=300s
+          kubectl apply -k infrastructure/k8s/test/
+          # Wait for infrastructure dependencies first
+          kubectl rollout status deployment/kafka -n erp-test --timeout=300s
+          kubectl rollout status statefulset/postgres -n erp-test --timeout=120s
+          kubectl rollout status deployment/rabbitmq -n erp-test --timeout=120s
+          # Wait for kafka topics job to complete (Jobs use condition=complete, not ready)
+          kubectl wait --for=condition=complete job/kafka-init-topics -n erp-test --timeout=120s
+          # Wait for application services
+          kubectl rollout status deployment/gateway -n erp-test --timeout=180s
+          kubectl rollout status deployment/user-management -n erp-test --timeout=180s
+          kubectl rollout status deployment/inventory -n erp-test --timeout=180s
+          kubectl rollout status deployment/sales -n erp-test --timeout=180s
+          kubectl rollout status deployment/financial -n erp-test --timeout=180s
+          kubectl rollout status deployment/dashboard -n erp-test --timeout=180s
+          kubectl rollout status deployment/frontend -n erp-test --timeout=120s
 
       - name: Install Playwright
         working-directory: ./tests/e2e
