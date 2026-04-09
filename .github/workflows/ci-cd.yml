@@ -197,6 +197,61 @@ jobs:
           cluster_name: erp-test
           config: /tmp/kind-config.yaml
 
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      - name: Generate Kiota clients (inventory)
+        run: |
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/financial.json \
+            --output services/inventory/InventoryManagement/Generated/Clients/Financial \
+            --class-name FinancialServiceClient \
+            --namespace-name InventoryManagement.Generated.Clients.Financial \
+            --backing-store --additional-data --clean-output
+
+      - name: Generate Kiota clients (sales)
+        run: |
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/financial.json \
+            --output services/sales/SalesManagement/Generated/Clients/Financial \
+            --class-name FinancialServiceClient \
+            --namespace-name SalesManagement.Generated.Clients.Financial \
+            --backing-store --additional-data --clean-output
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/inventory.json \
+            --output services/sales/SalesManagement/Generated/Clients/Inventory \
+            --class-name InventoryServiceClient \
+            --namespace-name SalesManagement.Generated.Clients.Inventory \
+            --backing-store --additional-data --clean-output
+
+      - name: Generate Kiota clients (dashboard)
+        run: |
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/user-management.json \
+            --output services/dashboard/DashboardAnalytics/Generated/Clients/UserManagement \
+            --class-name UserManagementServiceClient \
+            --namespace-name DashboardAnalytics.Generated.Clients.UserManagement \
+            --backing-store --additional-data --clean-output
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/sales.json \
+            --output services/dashboard/DashboardAnalytics/Generated/Clients/Sales \
+            --class-name SalesServiceClient \
+            --namespace-name DashboardAnalytics.Generated.Clients.Sales \
+            --backing-store --additional-data --clean-output
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/financial.json \
+            --output services/dashboard/DashboardAnalytics/Generated/Clients/Financial \
+            --class-name FinancialServiceClient \
+            --namespace-name DashboardAnalytics.Generated.Clients.Financial \
+            --backing-store --additional-data --clean-output
+
       - name: Load Docker images
         run: |
           docker build -t erp-user-management:test -f ./services/user-management/Dockerfile ./services
