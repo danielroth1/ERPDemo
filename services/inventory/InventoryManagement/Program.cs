@@ -211,14 +211,17 @@ builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
-// Apply migrations on startup in development
+// Apply migrations on startup (all environments including K8s)
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
+}
+
+// Ensure MinIO buckets exist (dev only; in prod use infra-as-code)
 if (app.Environment.IsDevelopment())
 {
     using var scope = app.Services.CreateScope();
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.Migrate();
-
-    // Ensure MinIO buckets exist (dev only; in prod use infra-as-code)
     var fileStorage = scope.ServiceProvider.GetRequiredService<IFileStorageService>();
     try { await fileStorage.EnsureBucketsExistAsync(); }
     catch (Exception ex)

@@ -281,13 +281,29 @@ jobs:
           # Wait for kafka topics job to complete (Jobs use condition=complete, not ready)
           kubectl wait --for=condition=complete job/kafka-init-topics -n erp-test --timeout=120s
           # Wait for application services
-          kubectl rollout status deployment/gateway -n erp-test --timeout=180s
-          kubectl rollout status deployment/user-management -n erp-test --timeout=180s
-          kubectl rollout status deployment/inventory -n erp-test --timeout=180s
-          kubectl rollout status deployment/sales -n erp-test --timeout=180s
-          kubectl rollout status deployment/financial -n erp-test --timeout=180s
-          kubectl rollout status deployment/dashboard -n erp-test --timeout=180s
-          kubectl rollout status deployment/frontend -n erp-test --timeout=120s
+          kubectl rollout status deployment/gateway -n erp-test --timeout=300s
+          kubectl rollout status deployment/user-management -n erp-test --timeout=300s
+          kubectl rollout status deployment/inventory -n erp-test --timeout=300s
+          kubectl rollout status deployment/sales -n erp-test --timeout=300s
+          kubectl rollout status deployment/financial -n erp-test --timeout=300s
+          kubectl rollout status deployment/dashboard -n erp-test --timeout=300s
+          kubectl rollout status deployment/frontend -n erp-test --timeout=180s
+
+      - name: Debug failed deployments
+        if: failure()
+        run: |
+          echo "=== Pod Status ==="
+          kubectl get pods -n erp-test -o wide || true
+          echo "=== Events ==="
+          kubectl get events -n erp-test --sort-by='.lastTimestamp' | tail -40 || true
+          for svc in financial inventory sales user-management dashboard gateway; do
+            echo "=== ${svc} Pod Description ==="
+            kubectl describe pod -l app=${svc} -n erp-test || true
+            echo "=== ${svc} Logs (previous container) ==="
+            kubectl logs -l app=${svc} -n erp-test --previous --tail=50 || true
+            echo "=== ${svc} Logs (current container) ==="
+            kubectl logs -l app=${svc} -n erp-test --tail=50 || true
+          done
 
       - name: Install Playwright
         working-directory: ./tests/e2e

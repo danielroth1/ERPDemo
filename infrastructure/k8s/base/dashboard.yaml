@@ -13,6 +13,13 @@ spec:
       labels:
         app: dashboard
     spec:
+      initContainers:
+      - name: wait-for-postgres
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z postgres-service 5432; do echo "Waiting for postgres..."; sleep 3; done']
+      - name: wait-for-kafka
+        image: busybox:1.36
+        command: ['sh', '-c', 'until nc -z kafka-service 9092; do echo "Waiting for kafka..."; sleep 3; done']
       containers:
       - name: dashboard
         image: erp/dashboard

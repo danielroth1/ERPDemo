@@ -248,10 +248,9 @@ try
 
     var app = builder.Build();
 
-    // Apply migrations on startup in development
-    if (app.Environment.IsDevelopment())
+    // Apply schema on startup (all environments including Production/K8s)
+    using (var scope = app.Services.CreateScope())
     {
-        using var scope = app.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         dbContext.Database.EnsureCreated();
     }
