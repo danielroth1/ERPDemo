@@ -44,6 +44,11 @@ const services = {
     url: 'http://localhost:5004/swagger/v1/swagger.json',
     output: './src/generated/clients/financial',
     className: 'FinancialClient'
+  },
+  'orchestration': {
+    url: 'http://localhost:5010/swagger/v1/swagger.json',
+    output: './src/generated/clients/orchestration',
+    className: 'OrchestrationClient'
   }
 };
 

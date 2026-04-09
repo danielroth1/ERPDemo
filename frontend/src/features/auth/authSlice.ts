@@ -22,8 +22,8 @@ export const login = createAsyncThunk(
     try {
       const response = await authService.login(credentials);
       return response.user;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Login failed');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Login failed');
     }
   }
 );
@@ -34,8 +34,8 @@ export const register = createAsyncThunk(
     try {
       const response = await authService.register(data);
       return response.user;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Registration failed');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Registration failed');
     }
   }
 );

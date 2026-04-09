@@ -8,7 +8,7 @@ function mapAccountResponse(account: AccountResponse): Account {
     id: account.id || '',
     name: account.name || '',
     accountNumber: account.accountNumber || '',
-    type: (account.type || '') as any,
+    type: (account.type || '') as Account['type'],
     balance: account.balance || 0,
     isActive: account.isActive || false,
     createdAt: account.createdAt?.toISOString() || new Date().toISOString(),
@@ -124,12 +124,12 @@ class FinancialService {
   }
 
   // Reports
-  async getBalanceSheet(): Promise<any> {
+  async getBalanceSheet(): Promise<unknown> {
     const report = await financialApiClient.getBalanceSheet();
     return report;
   }
 
-  async getProfitLoss(startDate: string, endDate: string): Promise<any> {
+  async getProfitLoss(startDate: string, endDate: string): Promise<unknown> {
     const report = await financialApiClient.getIncomeStatement(
       new Date(startDate),
       new Date(endDate)

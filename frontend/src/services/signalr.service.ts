@@ -4,7 +4,7 @@ import { getApiBaseUrl } from './api-base-url';
 
 class SignalRService {
   private connection: signalR.HubConnection | null = null;
-  private listeners: Map<string, Set<Function>> = new Map();
+  private listeners: Map<string, Set<(...args: unknown[]) => void>> = new Map();
 
   async connect() {
     if (this.connection?.state === signalR.HubConnectionState.Connected) {
@@ -86,7 +86,7 @@ class SignalRService {
     }
   }
 
-  on(event: string, callback: Function) {
+  on(event: string, callback: (...args: unknown[]) => void) {
     if (!this.listeners.has(event)) {
       this.listeners.set(event, new Set());
     }
@@ -95,14 +95,14 @@ class SignalRService {
     return () => this.off(event, callback);
   }
 
-  off(event: string, callback: Function) {
+  off(event: string, callback: (...args: unknown[]) => void) {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
       eventListeners.delete(callback);
     }
   }
 
-  private notifyListeners(event: string, data: any) {
+  private notifyListeners(event: string, data: unknown) {
     const eventListeners = this.listeners.get(event);
     if (eventListeners) {
       eventListeners.forEach((callback) => callback(data));

@@ -16,7 +16,7 @@ export const InventoryPage: React.FC = () => {
     (state) => state.inventory
   );
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProduct, setEditingProduct] = useState<any>(null);
+  const [editingProduct, setEditingProduct] = useState<import('../../types').Product | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [showCategoryManager, setShowCategoryManager] = useState(false);
@@ -43,7 +43,7 @@ export const InventoryPage: React.FC = () => {
         try {
           const count = await inventoryService.getCategoryProductCount(category.id);
           counts[category.id] = count;
-        } catch (error) {
+        } catch (_error) {
           counts[category.id] = 0;
         }
       })
@@ -56,8 +56,8 @@ export const InventoryPage: React.FC = () => {
       try {
         await dispatch(deleteProduct(id)).unwrap();
         toast.success('Product deleted successfully');
-      } catch (error: any) {
-        toast.error(error || 'Failed to delete product');
+      } catch (error) {
+        toast.error((error as string) || 'Failed to delete product');
       }
     }
   };
@@ -72,8 +72,8 @@ export const InventoryPage: React.FC = () => {
         setCurrentPage(1);
         await dispatch(fetchProducts({ page: 1, pageSize }));
         await dispatch(fetchCategories());
-      } catch (error: any) {
-        toast.error(error || 'Failed to seed products');
+      } catch (error) {
+        toast.error((error as string) || 'Failed to seed products');
       } finally {
         setIsSeeding(false);
       }
@@ -94,13 +94,13 @@ export const InventoryPage: React.FC = () => {
             await inventoryService.deleteCategory(categoryId);
             toast.success('Category deleted successfully');
             await dispatch(fetchCategories());
-          } catch (error: any) {
-            toast.error(error?.message || 'Failed to delete category');
+          } catch (error) {
+            toast.error((error as Error)?.message || 'Failed to delete category');
           }
         }
       }
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to check category products');
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to check category products');
     }
   };
 
@@ -113,12 +113,12 @@ export const InventoryPage: React.FC = () => {
       setCategoryToDelete(null);
       await dispatch(fetchCategories());
       await dispatch(fetchProducts({ page: currentPage, pageSize }));
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to delete category');
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to delete category');
     }
   };
 
-  const handleEdit = (product: any) => {
+  const handleEdit = (product: import('../../types').Product) => {
     setEditingProduct(product);
     setIsModalOpen(true);
   };

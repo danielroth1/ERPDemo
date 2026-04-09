@@ -53,8 +53,8 @@ export const QueryExecutor: React.FC<QueryExecutorProps> = ({ services }) => {
       } else {
         toast.error(data.errorMessage || 'Query failed');
       }
-    } catch (error: any) {
-      toast.error(error?.message || 'Query execution failed');
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Query execution failed');
       setResult(null);
     } finally {
       setExecuting(false);

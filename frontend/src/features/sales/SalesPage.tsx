@@ -20,8 +20,8 @@ export const SalesPage: React.FC = () => {
     try {
       await dispatch(updateOrderStatus({ id, status })).unwrap();
       toast.success('Order status updated successfully');
-    } catch (error: any) {
-      toast.error(error || 'Failed to update order status');
+    } catch (error) {
+      toast.error((error as string) || 'Failed to update order status');
     }
   };
 
@@ -30,8 +30,8 @@ export const SalesPage: React.FC = () => {
       try {
         await dispatch(deleteOrder(id)).unwrap();
         toast.success('Order deleted successfully');
-      } catch (error: any) {
-        toast.error(error || 'Failed to delete order');
+      } catch (error) {
+        toast.error((error as string) || 'Failed to delete order');
       }
     }
   };

@@ -9,7 +9,7 @@ function mapOrderResponse(order: OrderResponse): Order {
     orderNumber: order.orderNumber || '',
     customerId: order.customerId || '',
     orderDate: order.createdAt?.toISOString() || new Date().toISOString(),
-    status: order.status as any,
+    status: order.status as Order['status'],
     totalAmount: order.total || 0,
     notes: order.notes || '',
     items: [],
@@ -26,7 +26,7 @@ function mapCustomerResponse(customer: CustomerResponse): Customer {
     name: fullName,
     email: customer.email || '',
     phone: customer.phone || '',
-    address: customer.defaultBillingAddress as any || {
+    address: (customer.defaultBillingAddress as unknown as Customer['address']) || {
       street: '',
       city: '',
       state: '',

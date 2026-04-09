@@ -50,7 +50,7 @@ export const ShopPage: React.FC = () => {
         setCurrency('USD'); // accountData.currency might not exist
         setAccountId(accountData.id);
       }
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || 'Failed to load shop data');
     } finally {
       setLoading(false);
@@ -67,7 +67,7 @@ export const ShopPage: React.FC = () => {
       await shopService.purchaseProduct(productId);
       toast.success(`Successfully purchased ${productName}`);
       await loadData(); // Refresh products and balance
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || 'Failed to purchase product');
     }
   };
@@ -77,7 +77,7 @@ export const ShopPage: React.FC = () => {
       await shopService.returnProduct(productId);
       toast.success(`Successfully returned ${productName}`);
       await loadData(); // Refresh products and balance
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || 'Failed to return product');
     }
   };
@@ -92,7 +92,7 @@ export const ShopPage: React.FC = () => {
       await financialService.adjustAccountBalance(accountId, 100);
       toast.success('Balance increased by $100');
       await loadData();
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || 'Failed to increase balance');
     }
   };
@@ -107,7 +107,7 @@ export const ShopPage: React.FC = () => {
       await financialService.adjustAccountBalance(accountId, -100);
       toast.success('Balance decreased by $100');
       await loadData();
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || 'Failed to decrease balance');
     }
   };

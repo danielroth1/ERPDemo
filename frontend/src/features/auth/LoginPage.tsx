@@ -29,8 +29,8 @@ export const LoginPage: React.FC = () => {
       await dispatch(login(formData)).unwrap();
       toast.success('Login successful!');
       navigate('/dashboard');
-    } catch (err: any) {
-      toast.error(err || 'Login failed');
+    } catch (err) {
+      toast.error((err as string) || 'Login failed');
     }
   };
 

@@ -31,6 +31,7 @@ export const useDatabaseSubscription = (options: UseGraphQLSubscriptionOptions =
       },
     });
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setClient(wsClient);
 
     return () => {
@@ -58,16 +59,16 @@ export const useDatabaseSubscription = (options: UseGraphQLSubscriptionOptions =
       const unsubscribe = client.subscribe(
         { query } as SubscribePayload,
         {
-          next: (data: any) => {
+          next: (data: { data?: Record<string, DatabaseUpdateEvent> }) => {
             const event = data.data?.[`on${subscriptionType}`];
             if (event) {
               setLastEvent(event);
               options.onData?.(event);
             }
           },
-          error: (error: any) => {
+          error: (error: unknown) => {
             console.error('Subscription error:', error);
-            options.onError?.(error);
+            options.onError?.(error as Error);
           },
           complete: () => {
             console.log('Subscription complete');

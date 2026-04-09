@@ -49,8 +49,8 @@ export const DatabaseOverviewPage: React.FC = () => {
       setLoading(true);
       const data = await databaseService.getDatabaseOverview(forceRefresh, true);
       setOverview(data);
-    } catch (error: any) {
-      toast.error(error?.message || 'Failed to load database overview');
+    } catch (error) {
+      toast.error((error as Error)?.message || 'Failed to load database overview');
     } finally {
       setLoading(false);
     }
@@ -60,8 +60,8 @@ export const DatabaseOverviewPage: React.FC = () => {
     try {
       const data = await databaseService.getAlerts(false);
       setAlerts(data);
-    } catch (error: any) {
-      console.error('Failed to load alerts:', error);
+    } catch (error) {
+      console.error('Failed to load alerts:', (error as Error)?.message);
     }
   };
 
@@ -81,7 +81,7 @@ export const DatabaseOverviewPage: React.FC = () => {
       await databaseService.clearCache();
       toast.success('Cache cleared successfully');
       await loadOverview(true);
-    } catch (error: any) {
+    } catch (_error) {
       toast.error('Failed to clear cache');
     }
   };

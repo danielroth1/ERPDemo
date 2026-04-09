@@ -140,7 +140,7 @@ export const DashboardPage: React.FC = () => {
 
       setMetrics(metricsResponse.data);
       setAlerts(alertsResponse.data);
-    } catch (error: any) {
+    } catch (_error: unknown) {
       toast.error("Failed to load dashboard data");
     } finally {
       setLoading(false);
@@ -207,7 +207,7 @@ export const DashboardPage: React.FC = () => {
               </div>
             ) : kpiData?.allKPIs ? (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {kpiData.allKPIs.slice(0, 4).map((kpi: any) => (
+                {kpiData.allKPIs.slice(0, 4).map((kpi: KPI) => (
                   <div
                     key={kpi.id}
                     className="border border-gray-200 p-3 rounded"
@@ -265,7 +265,7 @@ export const DashboardPage: React.FC = () => {
             ) : readAlertsResponse.data?.readAlerts ?
             (
               <div>
-                {readAlertsResponse.data.readAlerts.map((alert: Alert) => (
+                {readAlertsResponse.data.readAlerts.map((_alert: Alert) => (
                   <div></div>
                 ))}
               </div>
@@ -278,7 +278,7 @@ export const DashboardPage: React.FC = () => {
               <p className="text-sm text-gray-500">Loading alerts...</p>
             ) : alertData?.unreadAlerts ? (
               <div className="space-y-2">
-                {alertData.unreadAlerts.slice(0, 3).map((alert: any) => (
+                {alertData.unreadAlerts.slice(0, 3).map((alert: Alert) => (
                   <div
                     key={alert.id}
                     className={`p-2 rounded text-xs ${

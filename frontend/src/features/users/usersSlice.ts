@@ -25,8 +25,8 @@ export const fetchUsers = createAsyncThunk(
   async ({ page, pageSize }: { page: number; pageSize: number }, { rejectWithValue }) => {
     try {
       return await userService.getUsers(page, pageSize);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.statusText || 'Failed to fetch users');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { statusText?: string } }).response?.statusText || 'Failed to fetch users');
     }
   }
 );
@@ -36,8 +36,8 @@ export const updateUser = createAsyncThunk(
   async ({ id, user }: { id: string; user: Partial<User> }, { rejectWithValue }) => {
     try {
       return await userService.updateUser(id, user);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.statusText || 'Failed to update user');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { statusText?: string } }).response?.statusText || 'Failed to update user');
     }
   }
 );
@@ -48,8 +48,8 @@ export const deleteUser = createAsyncThunk(
     try {
       await userService.deleteUser(id);
       return id;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.statusText || 'Failed to delete user');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { statusText?: string } }).response?.statusText || 'Failed to delete user');
     }
   }
 );
@@ -61,8 +61,8 @@ export const toggleUserStatus = createAsyncThunk(
       return isActive
         ? await userService.deactivateUser(id)
         : await userService.activateUser(id);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.statusText || 'Failed to update user status');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { statusText?: string } }).response?.statusText || 'Failed to update user status');
     }
   }
 );

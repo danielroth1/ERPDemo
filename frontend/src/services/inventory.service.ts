@@ -38,30 +38,45 @@ function mapGqlProduct(p: GqlProductItem & { documents?: GqlProductDocument[] })
 }
 
 // Map Kiota types to legacy types
+type ExtendedProductResponse = ProductResponse & {
+  unit?: string;
+  imageUrl?: string | null;
+  documents?: Array<{
+    id?: string;
+    productId?: string;
+    originalFileName?: string;
+    contentType?: string;
+    sizeBytes?: number;
+    uploadedBy?: string;
+    uploadedAt?: string;
+  }>;
+};
+
 function mapProductResponse(product: ProductResponse): Product {
+  const p = product as ExtendedProductResponse;
   return {
-    id: product.id || '',
-    name: product.name || '',
-    description: product.description || '',
-    sku: product.sku || '',
-    categoryId: product.categoryId || '',
-    unitPrice: product.price || 0,
-    stockQuantity: product.stockQuantity || 0,
-    reorderLevel: product.minStockLevel || 0,
-    unit: (product as any).unit ?? 'pcs',
-    isActive: product.isActive ?? true,
-    imageUrl: (product as any).imageUrl ?? null,
-    documents: ((product as any).documents ?? []).map((d: any): ProductDocument => ({
+    id: p.id || '',
+    name: p.name || '',
+    description: p.description || '',
+    sku: p.sku || '',
+    categoryId: p.categoryId || '',
+    unitPrice: p.price || 0,
+    stockQuantity: p.stockQuantity || 0,
+    reorderLevel: p.minStockLevel || 0,
+    unit: p.unit ?? 'pcs',
+    isActive: p.isActive ?? true,
+    imageUrl: p.imageUrl ?? null,
+    documents: (p.documents ?? []).map((d): ProductDocument => ({
       id: d.id || '',
       productId: d.productId || '',
       originalFileName: d.originalFileName || '',
       contentType: d.contentType || '',
       sizeBytes: d.sizeBytes || 0,
       uploadedBy: d.uploadedBy || '',
-      uploadedAt: d.uploadedAt || new Date().toISOString(),
+      uploadedAt: d.uploadedAt?.toISOString() ?? new Date().toISOString(),
     })),
-    createdAt: product.createdAt?.toISOString() || new Date().toISOString(),
-    updatedAt: product.updatedAt?.toISOString() || new Date().toISOString(),
+    createdAt: p.createdAt?.toISOString() || new Date().toISOString(),
+    updatedAt: p.updatedAt?.toISOString() || new Date().toISOString(),
   };
 }
 
@@ -79,7 +94,7 @@ function mapStockMovementResponse(movement: StockMovementResponse): StockMovemen
   return {
     id: movement.id || '',
     productId: movement.productId || '',
-    movementType: movement.movementType as any,
+    movementType: movement.movementType as unknown as StockMovement['movementType'],
     quantity: movement.quantity || 0,
     reference: movement.reference || '',
     notes: movement.notes || '',
@@ -196,7 +211,7 @@ class InventoryService {
   async recordStockMovement(movement: Omit<StockMovement, 'id' | 'createdAt'>): Promise<StockMovement> {
     const response = await inventoryApiClient.createStockMovement({
       productId: movement.productId,
-      movementType: movement.movementType as any,
+      movementType: movement.movementType as unknown as StockMovementResponse['movementType'],
       quantity: movement.quantity,
       reference: movement.reference,
       notes: movement.notes,
@@ -313,7 +328,7 @@ class InventoryService {
     });
     if (!res.ok) throw new Error('Failed to fetch documents');
     const body = await res.json();
-    return (body.data ?? []).map((d: any): ProductDocument => ({
+    return (body.data ?? []).map((d: Record<string, unknown>): ProductDocument => ({
       id: d.id,
       productId: d.productId,
       originalFileName: d.originalFileName,

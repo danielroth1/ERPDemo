@@ -35,7 +35,7 @@ class DatabaseService {
       queryParameters: { forceRefresh, includeSampleDocuments }
     });
     if (!response) throw new Error('Failed to fetch database overview');
-    return response as any; // Type mapping between Kiota and local types
+    return response as unknown as DatabaseOverview; // Type mapping between Kiota and local types
   }
 
   /**
@@ -46,25 +46,27 @@ class DatabaseService {
       queryParameters: { forceRefresh }
     });
     if (!response) throw new Error('Failed to fetch service database');
-    return response as any;
+    return response as unknown as ServiceDatabase;
   }
 
   /**
    * Search across all databases and collections
    */
   async searchDatabases(request: SearchDatabaseRequest): Promise<DatabaseSearchResult[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await this.client.api.v1.database.search.post(request as any);
     if (!response) throw new Error('Failed to search databases');
-    return response as any;
+    return response as unknown as DatabaseSearchResult[];
   }
 
   /**
    * Execute a MongoDB query (Admin only)
    */
   async executeQuery(request: QueryExecutionRequest): Promise<QueryExecutionResponse> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const response = await this.client.api.v1.database.query.post(request as any);
     if (!response) throw new Error('Failed to execute query');
-    return response as any;
+    return response as unknown as QueryExecutionResponse;
   }
 
   /**
@@ -75,7 +77,7 @@ class DatabaseService {
       queryParameters: { onlyMyQueries, limit }
     });
     if (!response) throw new Error('Failed to fetch query history');
-    return response as any;
+    return response as unknown as QueryExecutionHistory[];
   }
 
   /**
@@ -86,7 +88,7 @@ class DatabaseService {
       queryParameters: { includeResolved }
     });
     if (!response) throw new Error('Failed to fetch alerts');
-    return response as any;
+    return response as unknown as DatabaseAlert[];
   }
 
   /**
@@ -95,7 +97,7 @@ class DatabaseService {
   async clearCache(): Promise<{ message: string }> {
     const response = await this.client.api.v1.database.cache.clear.post({});
     if (!response) throw new Error('Failed to clear cache');
-    return response as any;
+    return response as unknown as { message: string };
   }
 
   /**

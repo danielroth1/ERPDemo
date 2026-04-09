@@ -27,8 +27,8 @@ export const fetchAccounts = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       return await financialService.getAccounts();
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch accounts');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch accounts');
     }
   }
 );
@@ -38,8 +38,8 @@ export const fetchTransactions = createAsyncThunk(
   async ({ page, pageSize }: { page: number; pageSize: number }, { rejectWithValue }) => {
     try {
       return await financialService.getTransactions(page, pageSize);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch transactions');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch transactions');
     }
   }
 );
@@ -49,8 +49,8 @@ export const createTransaction = createAsyncThunk(
   async (transaction: Partial<Transaction>, { rejectWithValue }) => {
     try {
       return await financialService.createTransaction(transaction);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create transaction');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to create transaction');
     }
   }
 );
@@ -61,8 +61,8 @@ export const deleteTransaction = createAsyncThunk(
     try {
       await financialService.deleteTransaction(id);
       return id;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to delete transaction');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to delete transaction');
     }
   }
 );

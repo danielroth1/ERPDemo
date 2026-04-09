@@ -176,6 +176,10 @@ try
     // Health checks
     builder.Services.AddHealthChecks();
 
+    // Swagger / OpenAPI
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
+
     // Background service for stuck saga detection
     builder.Services.AddHostedService<SagaTimeoutService>();
 
@@ -190,6 +194,12 @@ try
 
     app.UseSerilogRequestLogging();
     app.UseCors();
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI(c => c.SwaggerEndpoint("/swagger/v1/swagger.json", "Orchestration API v1"));
+    }
     app.UseHttpMetrics();
     app.UseAuthentication();
     app.UseAuthorization();

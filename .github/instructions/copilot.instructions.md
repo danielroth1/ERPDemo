@@ -467,13 +467,14 @@ public class ProductsController : ControllerBase
   ```
 - **API Generation**: When backend APIs change or new endpoints are added:
   1. Navigate to the frontend folder
-  2. Run `npm run generate:api` to regenerate all Kiota clients
+  2. Run the VS Code task `frontend: generate-all-api-clients` to regenerate all Kiota clients
   3. **IMPORTANT**: Test that the frontend still builds:
      - If a watch task is running (e.g., `dev-frontend`), observe for compilation errors
      - Otherwise, run `npm run build` to verify the build succeeds
      - Fix any TypeScript errors that arise from API changes
   4. Always use the generated clients from `frontend/src/generated/clients/` instead of creating custom API calls
   5. If Kiota reports OpenAPI errors (e.g., invalid schema keys), fix the backend DTOs/responses causing the issue
+  6. **NEVER manually edit files inside `frontend/src/generated/clients/`** — they are fully overwritten on every generation. To add a new endpoint, add it to the backend service, ensure Swagger is enabled on that service, add the service to `kiota-config.json` if it is new, then re-run `frontend: generate-all-api-clients`.
 
 #### 🚨 MANDATORY: Kiota API Client Usage
 
@@ -546,6 +547,7 @@ class InventoryService {
 - Inventory: `frontend/src/generated/clients/inventory/`
 - Sales: `frontend/src/generated/clients/sales/`
 - Financial: `frontend/src/generated/clients/financial/`
+- Orchestration: `frontend/src/generated/clients/orchestration/`
 
 Example:
 ```typescript

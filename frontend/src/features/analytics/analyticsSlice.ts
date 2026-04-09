@@ -11,7 +11,7 @@ interface AnalyticsState {
   alerts: Alert[];
   dashboardSummary: DashboardMetricsResponse | null;
   topProducts: TopProductResponse[];
-  revenueChart: any;
+  revenueChart: unknown;
   isLoading: boolean;
   error: string | null;
 }
@@ -31,8 +31,8 @@ export const fetchKPIs = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       return await analyticsService.getKPIs();
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch KPIs');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch KPIs');
     }
   }
 );
@@ -42,8 +42,8 @@ export const fetchAlerts = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       return await analyticsService.getAlerts();
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch alerts');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch alerts');
     }
   }
 );
@@ -53,8 +53,8 @@ export const fetchDashboardSummary = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       return await analyticsService.getDashboardSummary();
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch dashboard summary');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch dashboard summary');
     }
   }
 );
@@ -64,8 +64,8 @@ export const fetchTopProducts = createAsyncThunk(
   async (limit: number = 5, { rejectWithValue }) => {
     try {
       return await analyticsService.getTopProducts(limit);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch top products');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch top products');
     }
   }
 );
@@ -97,14 +97,14 @@ const analyticsSlice = createSlice({
       })
       .addCase(fetchKPIs.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.kpis = action.payload as any;
+        state.kpis = action.payload as unknown as KPI[];
       })
       .addCase(fetchKPIs.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
       .addCase(fetchAlerts.fulfilled, (state, action) => {
-        state.alerts = action.payload as any;
+        state.alerts = action.payload as unknown as Alert[];
       })
       .addCase(fetchDashboardSummary.fulfilled, (state, action) => {
         state.dashboardSummary = action.payload;

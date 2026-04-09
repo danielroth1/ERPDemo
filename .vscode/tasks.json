@@ -31,7 +31,7 @@
       "id": "apiService",
       "type": "pickString",
       "description": "Select API service for client generation",
-      "options": ["dashboard", "user-management", "inventory", "sales", "financial"],
+      "options": ["dashboard", "user-management", "inventory", "sales", "financial", "orchestration"],
       "default": "dashboard"
     },
     {
@@ -434,6 +434,72 @@
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "shared" },
       "options": { "cwd": "${workspaceFolder}/frontend" }
+    },
+
+    // ============================================================
+    // FRONTEND TEST TASKS
+    // ============================================================
+    {
+      "label": "frontend: test",
+      "type": "shell",
+      "command": "npm run test",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "frontend" }
+    },
+    {
+      "label": "frontend: test:watch",
+      "type": "shell",
+      "command": "npm run test:watch",
+      "isBackground": true,
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "frontend" }
+    },
+    {
+      "label": "frontend: test:coverage",
+      "type": "shell",
+      "command": "npm run test:coverage",
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "frontend" }
+    },
+
+    // ============================================================
+    // E2E TEST TASKS
+    // ============================================================
+    {
+      "label": "e2e: test",
+      "type": "shell",
+      "command": "npx playwright test --project=chromium",
+      "options": { "cwd": "${workspaceFolder}/tests/e2e" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "e2e" }
+    },
+    {
+      "label": "e2e: test:all-browsers",
+      "type": "shell",
+      "command": "npx playwright test",
+      "options": { "cwd": "${workspaceFolder}/tests/e2e" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "e2e" }
+    },
+    {
+      "label": "e2e: test:ui",
+      "type": "shell",
+      "command": "npx playwright test --ui",
+      "isBackground": true,
+      "options": { "cwd": "${workspaceFolder}/tests/e2e" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "e2e" }
+    },
+    {
+      "label": "e2e: install-browsers",
+      "type": "shell",
+      "command": "npx playwright install --with-deps chromium firefox webkit",
+      "options": { "cwd": "${workspaceFolder}/tests/e2e" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "e2e" }
     },
 
     // ============================================================

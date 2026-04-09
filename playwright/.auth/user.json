@@ -1,0 +1,22 @@
+{
+  "cookies": [],
+  "origins": [
+    {
+      "origin": "http://localhost:5173",
+      "localStorage": [
+        {
+          "name": "accessToken",
+          "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1laWRlbnRpZmllciI6Ijk1ZDVkODQzLTc2YjktNDNlZC05YmZiLTllOTk2YjBmMTA0OCIsImh0dHA6Ly9zY2hlbWFzLnhtbHNvYXAub3JnL3dzLzIwMDUvMDUvaWRlbnRpdHkvY2xhaW1zL2VtYWlsYWRkcmVzcyI6ImFkbWluQGVycC5jb20iLCJodHRwOi8vc2NoZW1hcy54bWxzb2FwLm9yZy93cy8yMDA1LzA1L2lkZW50aXR5L2NsYWltcy9uYW1lIjoiQWRtaW4gVXNlciIsImp0aSI6ImMyNTYyOWNlLWQ5NWYtNDc4NS1hMzAxLTJiMTIxZmI3ZjRjZSIsImh0dHA6Ly9zY2hlbWFzLm1pY3Jvc29mdC5jb20vd3MvMjAwOC8wNi9pZGVudGl0eS9jbGFpbXMvcm9sZSI6WyJVc2VyIiwiTWFuYWdlciIsIkFkbWluIl0sImV4cCI6MTc3NTc0MzU2MywiaXNzIjoiZXJwLXN5c3RlbSIsImF1ZCI6ImVycC1jbGllbnRzIn0.Ao0N_9GEoyxg6tVolVmZ6AniRAiVbYektBRHRAGYStc"
+        },
+        {
+          "name": "user",
+          "value": "{\"id\":\"95d5d843-76b9-43ed-9bfb-9e996b0f1048\",\"email\":\"admin@erp.com\",\"firstName\":\"Admin\",\"lastName\":\"User\",\"roles\":[0,1,2],\"isActive\":true,\"createdAt\":\"2026-04-09T10:17:53.802004Z\",\"lastLoginAt\":\"2026-04-09T13:06:03.205159Z\"}"
+        },
+        {
+          "name": "refreshToken",
+          "value": "lc67UWamsjVq3yCRnpvDpQBXNn1AyG/Ct757DL4FHO/UDDTQr/XIz/5u+O+QD8hSBRdo9K+uzRXsMtwjoRF8Bw=="
+        }
+      ]
+    }
+  ]
+}

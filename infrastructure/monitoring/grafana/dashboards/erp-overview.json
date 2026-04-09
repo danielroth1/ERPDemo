@@ -128,7 +128,7 @@
       },
       "targets": [
         {
-          "expr": "up{job=~\"gateway|user-management|inventory|sales|financial|dashboard\"}",
+          "expr": "up{job=~\"gateway|orchestration|user-management|inventory|sales|financial|dashboard\"}",
           "instant": true,
           "format": "table",
           "refId": "A"

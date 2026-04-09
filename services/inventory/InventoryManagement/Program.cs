@@ -60,10 +60,10 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(postgresSettings.ConnectionString)
         .UseSnakeCaseNamingConvention());
 
-// Register DbContext factory for GraphQL DataLoaders (singleton factory, per-use context)
+// Register DbContext factory for GraphQL DataLoaders (scoped factory to match DbContext lifetime)
 builder.Services.AddDbContextFactory<AppDbContext>(options =>
     options.UseNpgsql(postgresSettings.ConnectionString)
-        .UseSnakeCaseNamingConvention());
+        .UseSnakeCaseNamingConvention(), ServiceLifetime.Scoped);
 
 // Register GraphQL server
 builder.Services

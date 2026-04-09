@@ -55,6 +55,17 @@
       "structuredMimeTypes": [
         "application/json"
       ]
+    },
+    "orchestration": {
+      "descriptionLocation": "http://localhost:5010/swagger/v1/swagger.json",
+      "includePatterns": ["**/v1/**"],
+      "excludePatterns": [],
+      "language": "typescript",
+      "outputPath": "./frontend/src/generated/clients/orchestration",
+      "clientClassName": "OrchestrationClient",
+      "structuredMimeTypes": [
+        "application/json"
+      ]
     }
   }
 }

@@ -1,5 +1,6 @@
 // Shop Service for customer-facing product operations
 import { createInventoryClient } from '../generated/clients/inventory/inventoryClient';
+import { createOrchestrationClient } from '../generated/clients/orchestration/orchestrationClient';
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
 import { BearerTokenAuthenticationProvider } from './auth/bearer-token-provider';
 import { extractErrorMessage } from '../utils/error-handler';
@@ -16,13 +17,18 @@ export type ShopProduct = ProductResponse;
 export type ShopCategory = CategoryResponse;
 
 class ShopService {
-  private client;
+  private inventoryClient;
+  private orchestrationClient;
 
   constructor() {
     const authProvider = new BearerTokenAuthenticationProvider();
     const adapter = new FetchRequestAdapter(authProvider);
     adapter.baseUrl = API_BASE_URL;
-    this.client = createInventoryClient(adapter);
+    this.inventoryClient = createInventoryClient(adapter);
+
+    const orchestrationAdapter = new FetchRequestAdapter(authProvider);
+    orchestrationAdapter.baseUrl = API_BASE_URL;
+    this.orchestrationClient = createOrchestrationClient(orchestrationAdapter);
   }
 
   /**
@@ -30,7 +36,7 @@ class ShopService {
    */
   async getAvailableProducts(categoryId?: string): Promise<ShopProduct[]> {
     try {
-      const response = await this.client.api.v1.shop.products.get({
+      const response = await this.inventoryClient.api.v1.shop.products.get({
         queryParameters: categoryId ? { categoryId } : undefined
       });
       return response?.data || [];
@@ -44,7 +50,7 @@ class ShopService {
    */
   async getCategories(): Promise<ShopCategory[]> {
     try {
-      const response = await this.client.api.v1.shop.categories.get();
+      const response = await this.inventoryClient.api.v1.shop.categories.get();
       return response?.data || [];
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Failed to load categories'));
@@ -54,9 +60,9 @@ class ShopService {
   /**
    * Purchase a product (reduces stock)
    */
-  async purchaseProduct(productId: string, quantity: number = 1): Promise<any> {
+  async purchaseProduct(productId: string, quantity: number = 1): Promise<unknown> {
     try {
-      const response = await this.client.api.v1.shop.purchase.byProductId(productId).post({
+      const response = await this.orchestrationClient.api.v1.shop.purchase.byProductId(productId).post({
         queryParameters: { quantity }
       });
       return response?.data || response;
@@ -68,9 +74,9 @@ class ShopService {
   /**
    * Return a product (increases stock)
    */
-  async returnProduct(productId: string, quantity: number = 1): Promise<any> {
+  async returnProduct(productId: string, quantity: number = 1): Promise<unknown> {
     try {
-      const response = await this.client.api.v1.shop.returnEscaped.byProductId(productId).post({
+      const response = await this.orchestrationClient.api.v1.shop.returnEscaped.byProductId(productId).post({
         queryParameters: { quantity }
       });
       return response?.data || response;

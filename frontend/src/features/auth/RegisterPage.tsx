@@ -37,8 +37,8 @@ export const RegisterPage: React.FC = () => {
       await dispatch(register(formData)).unwrap();
       toast.success('Registration successful!');
       navigate('/dashboard');
-    } catch (err: any) {
-      toast.error(err || 'Registration failed');
+    } catch (err) {
+      toast.error((err as string) || 'Registration failed');
     }
   };
 

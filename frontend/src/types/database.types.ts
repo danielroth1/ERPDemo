@@ -84,7 +84,7 @@ export interface DatabaseAlert {
   alertType: string;
   message: string;
   severity: 'Info' | 'Warning' | 'Critical';
-  metadata: Record<string, any>;
+  metadata: Record<string, unknown>;
   isResolved: boolean;
   createdAt: string;
   resolvedAt?: string;
@@ -115,5 +115,5 @@ export interface DatabaseUpdateEvent {
   eventType: string;
   collectionName: string;
   timestamp: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }

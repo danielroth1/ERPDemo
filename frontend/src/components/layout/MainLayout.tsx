@@ -58,7 +58,7 @@ export const MainLayout: React.FC = () => {
       await dispatch(logout()).unwrap();
       toast.success("Logged out successfully");
       navigate("/login");
-    } catch (error) {
+    } catch (_error) {
       toast.error("Logout failed");
     }
   };
@@ -128,7 +128,7 @@ export const MainLayout: React.FC = () => {
               ERP System
             </span>
           </div>
-          <nav className="flex-1 px-2 py-4 space-y-1">
+          <nav data-testid="sidebar" className="flex-1 px-2 py-4 space-y-1">
             {navigation.map((item) => (
               <Link
                 key={item.name}

@@ -201,7 +201,7 @@ export const ItemDetailPage: React.FC = () => {
                   <span className="text-xs font-medium uppercase tracking-wide">Cost price</span>
                 </div>
                 <p className="text-2xl font-bold text-gray-800">
-                  ${(product as any).cost?.toFixed(2) ?? '—'}
+                  ${(product as unknown as { cost?: number }).cost?.toFixed(2) ?? '—'}
                 </p>
               </div>
             )}

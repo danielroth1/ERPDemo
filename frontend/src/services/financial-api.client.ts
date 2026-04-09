@@ -35,9 +35,9 @@ class FinancialApiClient {
     try {
       const response = await this.client.api.v1.accounts.get();
       return response?.data || [];
-    } catch (error: any) {
+    } catch (error) {
       // If 404, return empty array (no accounts yet)
-      if (error?.status === 404 || error?.message?.includes('404')) {
+      if ((error as { status?: number; message?: string })?.status === 404 || (error as { message?: string })?.message?.includes('404')) {
         return [];
       }
       throw new Error(extractErrorMessage(error, 'Failed to load accounts'));
@@ -56,9 +56,9 @@ class FinancialApiClient {
     try {
       const response = await this.client.api.v1.accounts.user.byUserId(userId).get();
       return response?.data || null;
-    } catch (error: any) {
+    } catch (error) {
       // If 404, return null (no account for user)
-      if (error?.status === 404 || error?.message?.includes('404')) {
+      if ((error as { status?: number; message?: string })?.status === 404 || (error as { message?: string })?.message?.includes('404')) {
         return null;
       }
       throw error;
@@ -78,7 +78,7 @@ class FinancialApiClient {
         totalLiabilities: response?.data?.totalLiabilities || 0,
         totalEquity: response?.data?.totalEquity || 0,
       };
-    } catch (error: any) {
+    } catch (error) {
       console.error('Failed to get account balance summary:', error);
       return { totalAssets: 0, totalLiabilities: 0, totalEquity: 0 };
     }
@@ -95,7 +95,7 @@ class FinancialApiClient {
       }
       // Use unknown as intermediate type to avoid TypeScript error
       return response.data as unknown as { assetAccount: AccountResponse; expenseAccount: AccountResponse };
-    } catch (error: any) {
+    } catch (error) {
       throw new Error(extractErrorMessage(error, 'Failed to create user accounts'));
     }
   }
@@ -107,7 +107,7 @@ class FinancialApiClient {
         throw new Error('Failed to create account');
       }
       return response.data;
-    } catch (error: any) {
+    } catch (error) {
       throw new Error(extractErrorMessage(error, 'Failed to create account'));
     }
   }

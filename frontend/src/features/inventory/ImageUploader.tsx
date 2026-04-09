@@ -42,11 +42,11 @@ export const ImageUploader: React.FC<Props> = ({
       );
       onImageChange(url);
       toast.success('Image uploaded');
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') {
         toast('Upload cancelled');
       } else {
-        toast.error(err?.message ?? 'Image upload failed');
+        toast.error((err as Error)?.message ?? 'Image upload failed');
       }
     } finally {
       setProgress(null);

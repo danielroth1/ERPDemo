@@ -27,8 +27,8 @@ export const fetchProducts = createAsyncThunk(
   async ({ page, pageSize }: { page: number; pageSize: number }, { rejectWithValue }) => {
     try {
       return await inventoryService.getProducts(page, pageSize);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch products');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch products');
     }
   }
 );
@@ -38,8 +38,8 @@ export const fetchCategories = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       return await inventoryService.getCategories();
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch categories');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch categories');
     }
   }
 );
@@ -49,8 +49,8 @@ export const createProduct = createAsyncThunk(
   async (product: Omit<Product, 'id' | 'createdAt' | 'updatedAt'>, { rejectWithValue }) => {
     try {
       return await inventoryService.createProduct(product);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create product');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to create product');
     }
   }
 );
@@ -60,8 +60,8 @@ export const updateProduct = createAsyncThunk(
   async ({ id, product }: { id: string; product: Partial<Product> }, { rejectWithValue }) => {
     try {
       return await inventoryService.updateProduct(id, product);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update product');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to update product');
     }
   }
 );
@@ -72,8 +72,8 @@ export const deleteProduct = createAsyncThunk(
     try {
       await inventoryService.deleteProduct(id);
       return id;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to delete product');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to delete product');
     }
   }
 );
@@ -83,8 +83,8 @@ export const createCategory = createAsyncThunk(
   async (category: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>, { rejectWithValue }) => {
     try {
       return await inventoryService.createCategory(category);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create category');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to create category');
     }
   }
 );
@@ -94,8 +94,8 @@ export const seedProducts = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       return await inventoryService.seedProducts();
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to seed products');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to seed products');
     }
   }
 );

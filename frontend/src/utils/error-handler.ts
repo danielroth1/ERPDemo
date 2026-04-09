@@ -4,7 +4,8 @@
  * @param defaultMessage The default message to use if extraction fails
  * @returns A human-readable error message
  */
-export function extractErrorMessage(error: any, defaultMessage: string = 'An error occurred'): string {
+export function extractErrorMessage(error: unknown, defaultMessage: string = 'An error occurred'): string {
+  const err = error as Record<string, unknown> | null | undefined;
   // If it's already a simple string error
   if (typeof error === 'string') {
     return error;
@@ -13,78 +14,80 @@ export function extractErrorMessage(error: any, defaultMessage: string = 'An err
   // Try to extract from various possible error structures
   
   // Check for API response body with message
-  if (error?.response) {
+  if (err?.response) {
     try {
-      if (typeof error.response === 'object') {
+      if (typeof err.response === 'object') {
         // Response is already parsed
-        if (error.response.message || error.response.Message) {
-          return error.response.message || error.response.Message;
+        const r = err.response as Record<string, string>;
+        if (r.message || r.Message) {
+          return r.message || r.Message;
         }
-        if (error.response.title) {
-          return error.response.title;
+        if (r.title) {
+          return r.title;
         }
-      } else if (typeof error.response === 'string') {
+      } else if (typeof err.response === 'string') {
         // Try to parse response as JSON
         try {
-          const parsed = JSON.parse(error.response);
+          const parsed = JSON.parse(err.response as string) as Record<string, string>;
           if (parsed.message || parsed.Message) {
             return parsed.message || parsed.Message;
           }
-        } catch (e) {
+        } catch (_e) {
           // Not JSON, use as-is if it's meaningful
-          if (!error.response.includes('unexpected status code')) {
-            return error.response;
+          if (!(err.response as string).includes('unexpected status code')) {
+            return err.response as string;
           }
         }
       }
-    } catch (e) {
+    } catch (_e) {
       // Ignore parse errors
     }
   }
 
   // Check error body
-  if (error?.body) {
-    if (typeof error.body === 'object') {
-      if (error.body.message || error.body.Message) {
-        return error.body.message || error.body.Message;
+  if (err?.body) {
+    if (typeof err.body === 'object') {
+      const b = err.body as Record<string, string>;
+      if (b.message || b.Message) {
+        return b.message || b.Message;
       }
-    } else if (typeof error.body === 'string') {
+    } else if (typeof err.body === 'string') {
       try {
-        const parsed = JSON.parse(error.body);
+        const parsed = JSON.parse(err.body as string) as Record<string, string>;
         if (parsed.message || parsed.Message) {
           return parsed.message || parsed.Message;
         }
-      } catch (e) {
+      } catch (_e) {
         // Not JSON
-        if (!error.body.includes('unexpected status code')) {
-          return error.body;
+        if (!(err.body as string).includes('unexpected status code')) {
+          return err.body as string;
         }
       }
     }
   }
 
   // Check for direct message property
-  if (error?.message && !error.message.includes('unexpected status code')) {
-    return error.message;
+  if (err?.message && !(err.message as string).includes('unexpected status code')) {
+    return err.message as string;
   }
 
   // Check for responseText
-  if (error?.responseText) {
+  if (err?.responseText) {
     try {
-      const parsed = JSON.parse(error.responseText);
+      const parsed = JSON.parse(err.responseText as string) as Record<string, string>;
       if (parsed.message || parsed.Message) {
         return parsed.message || parsed.Message;
       }
-    } catch (e) {
+    } catch (_e) {
       // Not JSON, use as-is
-      if (!error.responseText.includes('unexpected status code')) {
-        return error.responseText;
+      if (!(err.responseText as string).includes('unexpected status code')) {
+        return err.responseText as string;
       }
     }
   }
 
   // If we have a status code, provide a better default message
-  const status = error?.status || error?.statusCode;
+  const status = err?.status || err?.statusCode;
   if (status) {
     switch (status) {
       case 400:

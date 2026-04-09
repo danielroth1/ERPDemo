@@ -73,7 +73,7 @@ class AnalyticsService {
     return alerts.map(mapAlertResponse);
   }
 
-  async getDashboardSummary(): Promise<any> {
+  async getDashboardSummary(): Promise<unknown> {
     const metrics = await dashboardApiClient.getDashboardMetrics();
     // Convert Date objects to strings for Redux serialization
     return {
@@ -86,7 +86,7 @@ class AnalyticsService {
     return await dashboardApiClient.getTopProducts(limit);
   }
 
-  async getRevenueChart(_period: string = 'month'): Promise<any> {
+  async getRevenueChart(_period: string = 'month'): Promise<unknown> {
     // TODO: Implement with Kiota client when endpoint is available
     throw new Error('Revenue chart endpoint not yet implemented');
   }

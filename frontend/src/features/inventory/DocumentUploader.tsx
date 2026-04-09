@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react';
 import {
-  DocumentArrowUpIcon,
   DocumentArrowDownIcon,
   TrashIcon,
   XMarkIcon,
@@ -53,11 +52,11 @@ export const DocumentUploader: React.FC<Props> = ({
       );
       onDocumentsChange([doc, ...documents]);
       toast.success(`"${file.name}" uploaded`);
-    } catch (err: any) {
-      if (err?.name === 'AbortError') {
+    } catch (err) {
+      if ((err as Error)?.name === 'AbortError') {
         toast('Upload cancelled');
       } else {
-        toast.error(err?.message ?? 'Document upload failed');
+        toast.error((err as Error)?.message ?? 'Document upload failed');
       }
     } finally {
       setProgress(null);

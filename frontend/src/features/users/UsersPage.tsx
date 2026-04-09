@@ -26,7 +26,7 @@ export const UsersPage: React.FC = () => {
     try {
       const accounts = await financialService.getUserAccounts(userId);
       setUserAccounts(prev => ({ ...prev, [userId]: accounts }));
-    } catch (error: any) {
+    } catch (_error) {
       toast.error('Failed to load user accounts');
     } finally {
       setLoadingAccounts(prev => ({ ...prev, [userId]: false }));
@@ -44,7 +44,7 @@ export const UsersPage: React.FC = () => {
         return newAccounts;
       });
       await loadUserAccounts(userId);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || 'Failed to create account');
     }
   };
@@ -62,7 +62,7 @@ export const UsersPage: React.FC = () => {
         return newAccounts;
       });
       await loadUserAccounts(userId);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error?.message || 'Failed to deactivate account');
     }
   };
@@ -71,7 +71,7 @@ export const UsersPage: React.FC = () => {
     try {
       await dispatch(toggleUserStatus({ id, isActive })).unwrap();
       toast.success(`User ${isActive ? 'deactivated' : 'activated'} successfully`);
-    } catch (error: any) {
+    } catch (error) {
       toast.error(error || 'Failed to update user status');
     }
   };
@@ -81,7 +81,7 @@ export const UsersPage: React.FC = () => {
       try {
         await dispatch(deleteUser(id)).unwrap();
         toast.success('User deleted successfully');
-      } catch (error: any) {
+      } catch (error) {
         toast.error(error || 'Failed to delete user');
       }
     }

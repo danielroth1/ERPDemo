@@ -74,8 +74,8 @@ export const ProductForm: React.FC<ProductFormProps> = ({ product, categories, o
         toast.success('Product created successfully');
       }
       onClose();
-    } catch (error: any) {
-      toast.error(error || 'Operation failed');
+    } catch (error) {
+      toast.error((error as string) || 'Operation failed');
     } finally {
       setIsSubmitting(false);
     }

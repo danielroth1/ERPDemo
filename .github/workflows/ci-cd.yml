@@ -9,6 +9,7 @@ on:
 env:
   DOCKER_REGISTRY: docker.io
   DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
+  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 jobs:
@@ -43,10 +44,10 @@ jobs:
             9.0.x
 
       - name: Restore dependencies
-        run: dotnet restore services/${{ matrix.service }}/*/*.csproj
+        run: dotnet restore ${{ matrix.test-project }}
 
       - name: Build
-        run: dotnet build services/${{ matrix.service }}/*/*.csproj --configuration Release
+        run: dotnet build ${{ matrix.test-project }} --configuration Release
 
       - name: Run unit tests
         run: dotnet test ${{ matrix.test-project }} --verbosity normal --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
@@ -54,7 +55,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ env.CODECOV_TOKEN }}
           files: ./coverage/**/coverage.cobertura.xml
           flags: ${{ matrix.service }}
           name: ${{ matrix.service }}-coverage
@@ -90,7 +91,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ env.CODECOV_TOKEN }}
           files: ./frontend/coverage/coverage-final.json
           flags: frontend
           name: frontend-coverage
@@ -205,14 +206,14 @@ jobs:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
 
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-${{ matrix.service }}
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-${{ matrix.service }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
@@ -225,13 +226,13 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-${{ matrix.service }}:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-${{ matrix.service }}:buildcache,mode=max
+          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-${{ matrix.service }}:buildcache
+          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-${{ matrix.service }}:buildcache,mode=max
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-${{ matrix.service }}:${{ github.sha }}
+          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-${{ matrix.service }}:${{ github.sha }}
           format: 'sarif'
           output: 'trivy-results.sarif'
 
@@ -248,6 +249,16 @@ jobs:
     environment:
       name: production
       url: https://erp.yourdomain.com
+    env:
+      SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+      SSH_HOST: ${{ secrets.SSH_HOST }}
+      SSH_USER: ${{ secrets.SSH_USER }}
+      MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      SMTP_HOST: ${{ secrets.SMTP_HOST }}
+      SMTP_PORT: ${{ secrets.SMTP_PORT }}
+      SMTP_USERNAME: ${{ secrets.SMTP_USERNAME }}
+      SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
 
     steps:
       - name: Checkout code
@@ -259,27 +270,27 @@ jobs:
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "${{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
 
       - name: Copy kubeconfig
         run: |
-          scp ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:~/.kube/config ~/.kube/config
+          scp ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/.kube/config ~/.kube/config
 
       - name: Update MongoDB secret
         run: |
           kubectl create secret generic mongodb-secret \
             --from-literal=username=admin \
-            --from-literal=password=${{ secrets.MONGODB_PASSWORD }} \
-            --from-literal=connection-string=mongodb://admin:${{ secrets.MONGODB_PASSWORD }}@mongodb-service:27017 \
+            --from-literal=password=${{ env.MONGODB_PASSWORD }} \
+            --from-literal=connection-string=mongodb://admin:${{ env.MONGODB_PASSWORD }}@mongodb-service:27017 \
             --namespace=erp-prod \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Update JWT secret
         run: |
           kubectl create secret generic jwt-secret \
-            --from-literal=secret=${{ secrets.JWT_SECRET }} \
+            --from-literal=secret=${{ env.JWT_SECRET }} \
             --from-literal=issuer=erp-system \
             --from-literal=audience=erp-clients \
             --namespace=erp-prod \
@@ -288,10 +299,10 @@ jobs:
       - name: Update SMTP secret
         run: |
           kubectl create secret generic smtp-secret \
-            --from-literal=host=${{ secrets.SMTP_HOST }} \
-            --from-literal=port=${{ secrets.SMTP_PORT }} \
-            --from-literal=username=${{ secrets.SMTP_USERNAME }} \
-            --from-literal=password=${{ secrets.SMTP_PASSWORD }} \
+            --from-literal=host=${{ env.SMTP_HOST }} \
+            --from-literal=port=${{ env.SMTP_PORT }} \
+            --from-literal=username=${{ env.SMTP_USERNAME }} \
+            --from-literal=password=${{ env.SMTP_PASSWORD }} \
             --from-literal=from-email=noreply@yourdomain.com \
             --namespace=erp-prod \
             --dry-run=client -o yaml | kubectl apply -f -
@@ -299,31 +310,31 @@ jobs:
       - name: Deploy services
         run: |
           kubectl set image deployment/user-management \
-            user-management=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-user-management:${{ github.sha }} \
+            user-management=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-user-management:${{ github.sha }} \
             -n erp-prod
           
           kubectl set image deployment/inventory \
-            inventory=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-inventory:${{ github.sha }} \
+            inventory=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-inventory:${{ github.sha }} \
             -n erp-prod
           
           kubectl set image deployment/sales \
-            sales=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-sales:${{ github.sha }} \
+            sales=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-sales:${{ github.sha }} \
             -n erp-prod
           
           kubectl set image deployment/financial \
-            financial=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-financial:${{ github.sha }} \
+            financial=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-financial:${{ github.sha }} \
             -n erp-prod
           
           kubectl set image deployment/dashboard \
-            dashboard=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-dashboard:${{ github.sha }} \
+            dashboard=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-dashboard:${{ github.sha }} \
             -n erp-prod
           
           kubectl set image deployment/gateway \
-            gateway=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-gateway:${{ github.sha }} \
+            gateway=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-gateway:${{ github.sha }} \
             -n erp-prod
           
           kubectl set image deployment/frontend \
-            frontend=${{ env.DOCKER_REGISTRY }}/${{ secrets.DOCKER_USERNAME }}/erp-frontend:${{ github.sha }} \
+            frontend=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-frontend:${{ github.sha }} \
             -n erp-prod
 
       - name: Wait for rollout

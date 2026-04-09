@@ -27,8 +27,8 @@ export const fetchOrders = createAsyncThunk(
   async ({ page, pageSize }: { page: number; pageSize: number }, { rejectWithValue }) => {
     try {
       return await salesService.getOrders(page, pageSize);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch orders');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch orders');
     }
   }
 );
@@ -38,8 +38,8 @@ export const fetchCustomers = createAsyncThunk(
   async (_, { rejectWithValue }) => {
     try {
       return await salesService.getCustomers();
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to fetch customers');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to fetch customers');
     }
   }
 );
@@ -49,8 +49,8 @@ export const createOrder = createAsyncThunk(
   async (order: Partial<Order>, { rejectWithValue }) => {
     try {
       return await salesService.createOrder(order);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to create order');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to create order');
     }
   }
 );
@@ -60,8 +60,8 @@ export const updateOrderStatus = createAsyncThunk(
   async ({ id, status }: { id: string; status: string }, { rejectWithValue }) => {
     try {
       return await salesService.updateOrderStatus(id, status);
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to update order status');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to update order status');
     }
   }
 );
@@ -72,8 +72,8 @@ export const deleteOrder = createAsyncThunk(
     try {
       await salesService.deleteOrder(id);
       return id;
-    } catch (error: any) {
-      return rejectWithValue(error.response?.data?.message || 'Failed to delete order');
+    } catch (error) {
+      return rejectWithValue((error as { response?: { data?: { message?: string } } }).response?.data?.message || 'Failed to delete order');
     }
   }
 );

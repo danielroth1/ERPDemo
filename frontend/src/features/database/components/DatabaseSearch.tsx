@@ -23,14 +23,14 @@ export const DatabaseSearch: React.FC<DatabaseSearchProps> = ({ overview }) => {
       const data = await databaseService.searchDatabases(request);
       setResults(data);
       toast.success(`Found ${data.length} results`);
-    } catch (error: any) {
+    } catch (_error) {
       toast.error('Search failed');
     } finally {
       setSearching(false);
     }
   };
 
-  const handleFilterChange = (field: keyof SearchDatabaseRequest, value: any) => {
+  const handleFilterChange = (field: keyof SearchDatabaseRequest, value: SearchDatabaseRequest[typeof field]) => {
     setFilters({ ...filters, [field]: value || undefined });
   };
 
