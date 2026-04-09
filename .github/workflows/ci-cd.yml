@@ -7,9 +7,8 @@ on:
     branches: [main]
 
 env:
-  DOCKER_REGISTRY: docker.io
-  DOCKER_USERNAME: ${{ secrets.DOCKER_USERNAME }}
-  DOCKER_PASSWORD: ${{ secrets.DOCKER_PASSWORD }}
+  REGISTRY: ghcr.io/danielroth1
+  GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
   CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
 jobs:
@@ -54,7 +53,7 @@ jobs:
             --output services/inventory/InventoryManagement/Generated/Clients/Financial \
             --class-name FinancialServiceClient \
             --namespace-name InventoryManagement.Generated.Clients.Financial \
-            --backing-store --additional-data
+            --backing-store --additional-data --clean-output
 
       - name: Generate Kiota clients (sales)
         if: matrix.service == 'sales'
@@ -64,13 +63,13 @@ jobs:
             --output services/sales/SalesManagement/Generated/Clients/Financial \
             --class-name FinancialServiceClient \
             --namespace-name SalesManagement.Generated.Clients.Financial \
-            --backing-store --additional-data
+            --backing-store --additional-data --clean-output
           dotnet kiota generate --language CSharp \
             --openapi docs/openapi/inventory.json \
             --output services/sales/SalesManagement/Generated/Clients/Inventory \
             --class-name InventoryServiceClient \
             --namespace-name SalesManagement.Generated.Clients.Inventory \
-            --backing-store --additional-data
+            --backing-store --additional-data --clean-output
 
       - name: Generate Kiota clients (dashboard)
         if: matrix.service == 'dashboard'
@@ -80,25 +79,25 @@ jobs:
             --output services/dashboard/DashboardAnalytics/Generated/Clients/UserManagement \
             --class-name UserManagementServiceClient \
             --namespace-name DashboardAnalytics.Generated.Clients.UserManagement \
-            --backing-store --additional-data
+            --backing-store --additional-data --clean-output
           dotnet kiota generate --language CSharp \
             --openapi docs/openapi/sales.json \
             --output services/dashboard/DashboardAnalytics/Generated/Clients/Sales \
             --class-name SalesServiceClient \
             --namespace-name DashboardAnalytics.Generated.Clients.Sales \
-            --backing-store --additional-data
+            --backing-store --additional-data --clean-output
           dotnet kiota generate --language CSharp \
             --openapi docs/openapi/financial.json \
             --output services/dashboard/DashboardAnalytics/Generated/Clients/Financial \
             --class-name FinancialServiceClient \
             --namespace-name DashboardAnalytics.Generated.Clients.Financial \
-            --backing-store --additional-data
+            --backing-store --additional-data --clean-output
           dotnet kiota generate --language CSharp \
             --openapi docs/openapi/inventory.json \
             --output services/dashboard/DashboardAnalytics/Generated/Clients/Inventory \
             --class-name InventoryServiceClient \
             --namespace-name DashboardAnalytics.Generated.Clients.Inventory \
-            --backing-store --additional-data
+            --backing-store --additional-data --clean-output
 
       - name: Restore dependencies
         run: dotnet restore ${{ matrix.test-project }}
@@ -110,13 +109,14 @@ jobs:
         run: dotnet test ${{ matrix.test-project }} --verbosity normal --configuration Release --collect:"XPlat Code Coverage" --results-directory ./coverage
 
       - name: Upload coverage to Codecov
+        if: env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v4
         with:
           token: ${{ env.CODECOV_TOKEN }}
           files: ./coverage/**/coverage.cobertura.xml
           flags: ${{ matrix.service }}
           name: ${{ matrix.service }}-coverage
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   test-frontend:
     name: Test Frontend
@@ -146,13 +146,14 @@ jobs:
         run: npm test -- --coverage
 
       - name: Upload coverage to Codecov
+        if: env.CODECOV_TOKEN != ''
         uses: codecov/codecov-action@v4
         with:
           token: ${{ env.CODECOV_TOKEN }}
           files: ./frontend/coverage/coverage-final.json
           flags: frontend
           name: frontend-coverage
-          fail_ci_if_error: true
+          fail_ci_if_error: false
 
   test-e2e:
     name: End-to-End Tests
@@ -168,28 +169,33 @@ jobs:
         with:
           node-version: '20'
 
+      - name: Write KinD config
+        run: |
+          cat > /tmp/kind-config.yaml << 'EOF'
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          - role: control-plane
+            kubeadmConfigPatches:
+            - |
+              kind: InitConfiguration
+              nodeRegistration:
+                kubeletExtraArgs:
+                  node-labels: "ingress-ready=true"
+            extraPortMappings:
+            - containerPort: 80
+              hostPort: 80
+              protocol: TCP
+            - containerPort: 443
+              hostPort: 443
+              protocol: TCP
+          EOF
+
       - name: Create KinD Cluster
         uses: helm/kind-action@v1.9.0
         with:
           cluster_name: erp-test
-          config: |
-            kind: Cluster
-            apiVersion: kind.x-k8s.io/v1alpha4
-            nodes:
-            - role: control-plane
-              kubeadmConfigPatches:
-              - |
-                kind: InitConfiguration
-                nodeRegistration:
-                  kubeletExtraArgs:
-                    node-labels: "ingress-ready=true"
-              extraPortMappings:
-              - containerPort: 80
-                hostPort: 80
-                protocol: TCP
-              - containerPort: 443
-                hostPort: 443
-                protocol: TCP
+          config: /tmp/kind-config.yaml
 
       - name: Load Docker images
         run: |
@@ -251,6 +257,7 @@ jobs:
           - financial
           - dashboard
           - gateway
+          - orchestration
           - frontend
 
     steps:
@@ -260,40 +267,47 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Login to Docker Hub
+      - name: Login to GHCR
+        if: env.GHCR_TOKEN != ''
         uses: docker/login-action@v3
         with:
-          username: ${{ env.DOCKER_USERNAME }}
-          password: ${{ env.DOCKER_PASSWORD }}
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ env.GHCR_TOKEN }}
 
       - name: Extract metadata
+        if: env.GHCR_TOKEN != ''
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-${{ matrix.service }}
+          images: ${{ env.REGISTRY }}/erp-${{ matrix.service }}
           tags: |
             type=ref,event=branch
             type=sha,prefix={{branch}}-
             type=raw,value=latest,enable={{is_default_branch}}
 
       - name: Build and push
+        if: env.GHCR_TOKEN != ''
         uses: docker/build-push-action@v5
         with:
           context: ./${{ matrix.service == 'frontend' && 'frontend' || format('services/{0}', matrix.service) }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-${{ matrix.service }}:buildcache
-          cache-to: type=registry,ref=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-${{ matrix.service }}:buildcache,mode=max
+          platforms: linux/amd64
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/erp-${{ matrix.service }}:buildcache
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/erp-${{ matrix.service }}:buildcache,mode=max
 
       - name: Run Trivy vulnerability scanner
+        if: env.GHCR_TOKEN != '' && github.ref == 'refs/heads/main'
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-${{ matrix.service }}:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/erp-${{ matrix.service }}:latest
           format: 'sarif'
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy results to GitHub Security
+        if: github.ref == 'refs/heads/main'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'
@@ -305,7 +319,7 @@ jobs:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     environment:
       name: production
-      url: https://erp.yourdomain.com
+      url: https://shopping-now.net
     env:
       SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
       SSH_HOST: ${{ secrets.SSH_HOST }}
@@ -321,109 +335,107 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Check required secrets
+        run: |
+          missing=()
+          [ -z "$SSH_PRIVATE_KEY" ] && missing+=("SSH_PRIVATE_KEY")
+          [ -z "$SSH_HOST" ]        && missing+=("SSH_HOST")
+          [ -z "$SSH_USER" ]        && missing+=("SSH_USER")
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "❌ Missing required secrets: ${missing[*]}"
+            echo "   Set these in GitHub → Settings → Secrets and variables → Actions"
+            exit 1
+          fi
+
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
 
       - name: Configure SSH
         run: |
           mkdir -p ~/.ssh
-          echo "${{ env.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ env.SSH_HOST }} >> ~/.ssh/known_hosts
+          ssh-keyscan -p 7878 -H "$SSH_HOST" >> ~/.ssh/known_hosts
 
-      - name: Copy kubeconfig
+      - name: Fetch kubeconfig from server
         run: |
-          scp ${{ env.SSH_USER }}@${{ env.SSH_HOST }}:~/.kube/config ~/.kube/config
+          mkdir -p ~/.kube
+          scp -P 7878 "$SSH_USER@$SSH_HOST:~/.kube/k3s-erp.yaml" ~/.kube/config
+
+      - name: Ensure namespace exists
+        run: |
+          kubectl create namespace erp-prod --dry-run=client -o yaml | kubectl apply -f -
+
+      - name: Create GHCR pull secret
+        run: |
+          kubectl create secret docker-registry ghcr-secret \
+            --docker-server=ghcr.io \
+            --docker-username=danielroth1 \
+            --docker-password="$GHCR_TOKEN" \
+            --namespace=erp-prod \
+            --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Update MongoDB secret
+        if: env.MONGODB_PASSWORD != ''
         run: |
           kubectl create secret generic mongodb-secret \
             --from-literal=username=admin \
-            --from-literal=password=${{ env.MONGODB_PASSWORD }} \
-            --from-literal=connection-string=mongodb://admin:${{ env.MONGODB_PASSWORD }}@mongodb-service:27017 \
+            --from-literal=password="$MONGODB_PASSWORD" \
+            --from-literal=connection-string="mongodb://admin:$MONGODB_PASSWORD@mongodb-service:27017" \
             --namespace=erp-prod \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Update JWT secret
+        if: env.JWT_SECRET != ''
         run: |
           kubectl create secret generic jwt-secret \
-            --from-literal=secret=${{ env.JWT_SECRET }} \
+            --from-literal=secret="$JWT_SECRET" \
             --from-literal=issuer=erp-system \
             --from-literal=audience=erp-clients \
             --namespace=erp-prod \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Update SMTP secret
+        if: env.SMTP_HOST != ''
         run: |
           kubectl create secret generic smtp-secret \
-            --from-literal=host=${{ env.SMTP_HOST }} \
-            --from-literal=port=${{ env.SMTP_PORT }} \
-            --from-literal=username=${{ env.SMTP_USERNAME }} \
-            --from-literal=password=${{ env.SMTP_PASSWORD }} \
-            --from-literal=from-email=noreply@yourdomain.com \
+            --from-literal=host="$SMTP_HOST" \
+            --from-literal=port="$SMTP_PORT" \
+            --from-literal=username="$SMTP_USERNAME" \
+            --from-literal=password="$SMTP_PASSWORD" \
+            --from-literal=from-email=noreply@shopping-now.net \
             --namespace=erp-prod \
             --dry-run=client -o yaml | kubectl apply -f -
 
       - name: Deploy services
         run: |
-          kubectl set image deployment/user-management \
-            user-management=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-user-management:${{ github.sha }} \
-            -n erp-prod
-          
-          kubectl set image deployment/inventory \
-            inventory=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-inventory:${{ github.sha }} \
-            -n erp-prod
-          
-          kubectl set image deployment/sales \
-            sales=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-sales:${{ github.sha }} \
-            -n erp-prod
-          
-          kubectl set image deployment/financial \
-            financial=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-financial:${{ github.sha }} \
-            -n erp-prod
-          
-          kubectl set image deployment/dashboard \
-            dashboard=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-dashboard:${{ github.sha }} \
-            -n erp-prod
-          
-          kubectl set image deployment/gateway \
-            gateway=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-gateway:${{ github.sha }} \
-            -n erp-prod
-          
-          kubectl set image deployment/frontend \
-            frontend=${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_USERNAME }}/erp-frontend:${{ github.sha }} \
-            -n erp-prod
+          TAG="main-${GITHUB_SHA:0:7}"
+          for svc in gateway user-management inventory sales financial dashboard frontend; do
+            kubectl set image deployment/$svc $svc=${{ env.REGISTRY }}/erp-$svc:$TAG -n erp-prod
+          done
 
       - name: Wait for rollout
         run: |
-          kubectl rollout status deployment/user-management -n erp-prod --timeout=5m
-          kubectl rollout status deployment/inventory -n erp-prod --timeout=5m
-          kubectl rollout status deployment/sales -n erp-prod --timeout=5m
-          kubectl rollout status deployment/financial -n erp-prod --timeout=5m
-          kubectl rollout status deployment/dashboard -n erp-prod --timeout=5m
-          kubectl rollout status deployment/gateway -n erp-prod --timeout=5m
-          kubectl rollout status deployment/frontend -n erp-prod --timeout=5m
+          for svc in gateway user-management inventory sales financial dashboard frontend; do
+            kubectl rollout status deployment/$svc -n erp-prod --timeout=5m
+          done
 
       - name: Verify deployment
         run: |
           kubectl get pods -n erp-prod
-          kubectl get services -n erp-prod
+          kubectl get ingress -n erp-prod
 
       - name: Run health checks
         run: |
           sleep 30
-          curl -f https://api.yourdomain.com/health/ready || exit 1
+          curl -f https://shopping-now.net/health/ready || exit 1
 
       - name: Rollback on failure
         if: failure()
         run: |
-          kubectl rollout undo deployment/user-management -n erp-prod
-          kubectl rollout undo deployment/inventory -n erp-prod
-          kubectl rollout undo deployment/sales -n erp-prod
-          kubectl rollout undo deployment/financial -n erp-prod
-          kubectl rollout undo deployment/dashboard -n erp-prod
-          kubectl rollout undo deployment/gateway -n erp-prod
-          kubectl rollout undo deployment/frontend -n erp-prod
+          for svc in gateway user-management inventory sales financial dashboard frontend; do
+            kubectl rollout undo deployment/$svc -n erp-prod
+          done
 
       - name: Notify deployment
         if: always()
