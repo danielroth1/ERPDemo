@@ -7,15 +7,19 @@ WORKDIR /src
 ENV NUGET_PACKAGES=/root/.nuget/packages \
   NUGET_HTTP_CACHE_PATH=/root/.local/share/NuGet/v3-cache
 
-# Copy csproj and restore dependencies
-COPY DashboardAnalytics/*.csproj ./DashboardAnalytics/
+# Copy csproj and restore dependencies (shared projects first for layer caching)
+COPY shared/ERP.Contracts/*.csproj ./shared/ERP.Contracts/
+COPY shared/ServiceDefaults/*.csproj ./shared/ServiceDefaults/
+COPY dashboard/DashboardAnalytics/*.csproj ./dashboard/DashboardAnalytics/
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet restore -r linux-x64 DashboardAnalytics/DashboardAnalytics.csproj
+  dotnet restore -r linux-x64 dashboard/DashboardAnalytics/DashboardAnalytics.csproj
 
 # Copy source code and build
-COPY DashboardAnalytics/. ./DashboardAnalytics/
-WORKDIR /src/DashboardAnalytics
+COPY shared/ERP.Contracts/. ./shared/ERP.Contracts/
+COPY shared/ServiceDefaults/. ./shared/ServiceDefaults/
+COPY dashboard/DashboardAnalytics/. ./dashboard/DashboardAnalytics/
+WORKDIR /src/dashboard/DashboardAnalytics
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
   dotnet build DashboardAnalytics.csproj -c Release -r linux-x64 -o /app/build --no-restore

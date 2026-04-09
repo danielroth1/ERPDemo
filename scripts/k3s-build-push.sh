@@ -45,13 +45,13 @@ VITE_API_URL=""
 
 # Services to build: <image-name>:<context-dir>:<dockerfile>
 declare -a SERVICES=(
-  "erp-gateway:services/gateway:services/gateway/Dockerfile"
-  "erp-user-management:services/user-management:services/user-management/Dockerfile"
-  "erp-inventory:services/inventory:services/inventory/Dockerfile"
-  "erp-sales:services/sales:services/sales/Dockerfile"
-  "erp-financial:services/financial:services/financial/Dockerfile"
-  "erp-dashboard:services/dashboard:services/dashboard/Dockerfile"
-  "erp-orchestration:services/orchestration:services/orchestration/Dockerfile"
+  "erp-gateway:services:services/gateway/Dockerfile"
+  "erp-user-management:services:services/user-management/Dockerfile"
+  "erp-inventory:services:services/inventory/Dockerfile"
+  "erp-sales:services:services/sales/Dockerfile"
+  "erp-financial:services:services/financial/Dockerfile"
+  "erp-dashboard:services:services/dashboard/Dockerfile"
+  "erp-orchestration:services:services/orchestration/Dockerfile"
 )
 
 echo "════════════════════════════════════════════════════════════"

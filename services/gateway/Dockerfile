@@ -7,15 +7,17 @@ WORKDIR /src
 ENV NUGET_PACKAGES=/root/.nuget/packages \
   NUGET_HTTP_CACHE_PATH=/root/.local/share/NuGet/v3-cache
 
-# Copy csproj and restore dependencies
-COPY ApiGateway/*.csproj ./ApiGateway/
+# Copy csproj and restore dependencies (shared projects first for layer caching)
+COPY shared/ServiceDefaults/*.csproj ./shared/ServiceDefaults/
+COPY gateway/ApiGateway/*.csproj ./gateway/ApiGateway/
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet restore -r linux-x64 ApiGateway/ApiGateway.csproj
+  dotnet restore -r linux-x64 gateway/ApiGateway/ApiGateway.csproj
 
 # Copy source code and build
-COPY ApiGateway/. ./ApiGateway/
-WORKDIR /src/ApiGateway
+COPY shared/ServiceDefaults/. ./shared/ServiceDefaults/
+COPY gateway/ApiGateway/. ./gateway/ApiGateway/
+WORKDIR /src/gateway/ApiGateway
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
   dotnet build ApiGateway.csproj -c Release -r linux-x64 -o /app/build --no-restore

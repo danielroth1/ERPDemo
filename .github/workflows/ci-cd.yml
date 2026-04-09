@@ -199,12 +199,12 @@ jobs:
 
       - name: Load Docker images
         run: |
-          docker build -t erp-user-management:test ./services/user-management
-          docker build -t erp-inventory:test ./services/inventory
-          docker build -t erp-sales:test ./services/sales
-          docker build -t erp-financial:test ./services/financial
-          docker build -t erp-dashboard:test ./services/dashboard
-          docker build -t erp-gateway:test ./services/gateway
+          docker build -t erp-user-management:test -f ./services/user-management/Dockerfile ./services
+          docker build -t erp-inventory:test -f ./services/inventory/Dockerfile ./services
+          docker build -t erp-sales:test -f ./services/sales/Dockerfile ./services
+          docker build -t erp-financial:test -f ./services/financial/Dockerfile ./services
+          docker build -t erp-dashboard:test -f ./services/dashboard/Dockerfile ./services
+          docker build -t erp-gateway:test -f ./services/gateway/Dockerfile ./services
           docker build -t erp-frontend:test ./frontend
           
           kind load docker-image erp-user-management:test --name erp-test
@@ -290,7 +290,8 @@ jobs:
         if: env.GHCR_TOKEN != ''
         uses: docker/build-push-action@v5
         with:
-          context: ./${{ matrix.service == 'frontend' && 'frontend' || format('services/{0}', matrix.service) }}
+          context: ${{ matrix.service == 'frontend' && './frontend' || './services' }}
+          file: ${{ matrix.service == 'frontend' && 'frontend/Dockerfile' || format('services/{0}/Dockerfile', matrix.service) }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -307,7 +308,7 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy results to GitHub Security
-        if: github.ref == 'refs/heads/main'
+        if: env.GHCR_TOKEN != '' && github.ref == 'refs/heads/main'
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: 'trivy-results.sarif'

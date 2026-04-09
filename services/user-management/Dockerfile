@@ -9,15 +9,19 @@ ARG BUILD_CONFIGURATION=Release
 ENV NUGET_PACKAGES=/root/.nuget/packages \
   NUGET_HTTP_CACHE_PATH=/root/.local/share/NuGet/v3-cache
 
-# Copy csproj and restore dependencies
-COPY UserManagement/*.csproj ./UserManagement/
+# Copy csproj and restore dependencies (shared projects first for layer caching)
+COPY shared/ERP.Contracts/*.csproj ./shared/ERP.Contracts/
+COPY shared/ServiceDefaults/*.csproj ./shared/ServiceDefaults/
+COPY user-management/UserManagement/*.csproj ./user-management/UserManagement/
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet restore -r linux-x64 UserManagement/UserManagement.csproj
+  dotnet restore -r linux-x64 user-management/UserManagement/UserManagement.csproj
 
 # Copy source code and build
-COPY UserManagement/. ./UserManagement/
-WORKDIR /src/UserManagement
+COPY shared/ERP.Contracts/. ./shared/ERP.Contracts/
+COPY shared/ServiceDefaults/. ./shared/ServiceDefaults/
+COPY user-management/UserManagement/. ./user-management/UserManagement/
+WORKDIR /src/user-management/UserManagement
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
   dotnet build UserManagement.csproj -c $BUILD_CONFIGURATION -r linux-x64 -o /app/build --no-restore \

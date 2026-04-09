@@ -7,15 +7,19 @@ WORKDIR /src
 ENV NUGET_PACKAGES=/root/.nuget/packages \
   NUGET_HTTP_CACHE_PATH=/root/.local/share/NuGet/v3-cache
 
-# Copy csproj and restore dependencies
-COPY InventoryManagement/*.csproj ./InventoryManagement/
+# Copy csproj and restore dependencies (shared projects first for layer caching)
+COPY shared/ERP.Contracts/*.csproj ./shared/ERP.Contracts/
+COPY shared/ServiceDefaults/*.csproj ./shared/ServiceDefaults/
+COPY inventory/InventoryManagement/*.csproj ./inventory/InventoryManagement/
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet restore -r linux-x64 InventoryManagement/InventoryManagement.csproj
+  dotnet restore -r linux-x64 inventory/InventoryManagement/InventoryManagement.csproj
 
 # Copy source code and build
-COPY InventoryManagement/. ./InventoryManagement/
-WORKDIR /src/InventoryManagement
+COPY shared/ERP.Contracts/. ./shared/ERP.Contracts/
+COPY shared/ServiceDefaults/. ./shared/ServiceDefaults/
+COPY inventory/InventoryManagement/. ./inventory/InventoryManagement/
+WORKDIR /src/inventory/InventoryManagement
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
   dotnet build InventoryManagement.csproj -c Release -r linux-x64 -o /app/build --no-restore

@@ -7,15 +7,19 @@ WORKDIR /src
 ENV NUGET_PACKAGES=/root/.nuget/packages \
   NUGET_HTTP_CACHE_PATH=/root/.local/share/NuGet/v3-cache
 
-# Copy csproj and restore dependencies
-COPY SalesManagement/*.csproj ./SalesManagement/
+# Copy csproj and restore dependencies (shared projects first for layer caching)
+COPY shared/ERP.Contracts/*.csproj ./shared/ERP.Contracts/
+COPY shared/ServiceDefaults/*.csproj ./shared/ServiceDefaults/
+COPY sales/SalesManagement/*.csproj ./sales/SalesManagement/
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet restore -r linux-x64 SalesManagement/SalesManagement.csproj
+  dotnet restore -r linux-x64 sales/SalesManagement/SalesManagement.csproj
 
 # Copy source code and build
-COPY SalesManagement/. ./SalesManagement/
-WORKDIR /src/SalesManagement
+COPY shared/ERP.Contracts/. ./shared/ERP.Contracts/
+COPY shared/ServiceDefaults/. ./shared/ServiceDefaults/
+COPY sales/SalesManagement/. ./sales/SalesManagement/
+WORKDIR /src/sales/SalesManagement
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
   dotnet build SalesManagement.csproj -c Release -r linux-x64 -o /app/build --no-restore
