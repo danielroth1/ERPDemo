@@ -151,11 +151,13 @@ export const DashboardPage: React.FC = () => {
     try {
       await signalRService.connect();
 
-      signalRService.on("dashboardUpdate", (data: DashboardMetrics) => {
-        setMetrics(data);
+      // SignalR.on() uses (...args: unknown[]) signature; cast via unknown[] wrapper
+      signalRService.on("dashboardUpdate", (...args: unknown[]) => {
+        setMetrics(args[0] as DashboardMetrics);
       });
 
-      signalRService.on("alert", (data: AlertType) => {
+      signalRService.on("alert", (...args: unknown[]) => {
+        const data = args[0] as AlertType;
         setAlerts((prev) => [data, ...prev]);
         toast.error(data.message);
       });

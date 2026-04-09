@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { shopService, type ShopProduct, type ShopCategory } from '../../services/shop.service';
 import { financialService } from '../../services/financial.service';
 import { useAppSelector } from '../../store/hooks';
+import { getErrorMessage } from '../../utils/errorHandling';
 
 export const ShopPage: React.FC = () => {
   const [products, setProducts] = useState<ShopProduct[]>([]);
@@ -51,7 +52,7 @@ export const ShopPage: React.FC = () => {
         setAccountId(accountData.id);
       }
     } catch (error) {
-      toast.error(error?.message || 'Failed to load shop data');
+      toast.error(getErrorMessage(error, 'Failed to load shop data'));
     } finally {
       setLoading(false);
     }
@@ -68,7 +69,7 @@ export const ShopPage: React.FC = () => {
       toast.success(`Successfully purchased ${productName}`);
       await loadData(); // Refresh products and balance
     } catch (error) {
-      toast.error(error?.message || 'Failed to purchase product');
+      toast.error(getErrorMessage(error, 'Failed to purchase product'));
     }
   };
 
@@ -78,7 +79,7 @@ export const ShopPage: React.FC = () => {
       toast.success(`Successfully returned ${productName}`);
       await loadData(); // Refresh products and balance
     } catch (error) {
-      toast.error(error?.message || 'Failed to return product');
+      toast.error(getErrorMessage(error, 'Failed to return product'));
     }
   };
 
@@ -93,7 +94,7 @@ export const ShopPage: React.FC = () => {
       toast.success('Balance increased by $100');
       await loadData();
     } catch (error) {
-      toast.error(error?.message || 'Failed to increase balance');
+      toast.error(getErrorMessage(error, 'Failed to increase balance'));
     }
   };
 
@@ -108,7 +109,7 @@ export const ShopPage: React.FC = () => {
       toast.success('Balance decreased by $100');
       await loadData();
     } catch (error) {
-      toast.error(error?.message || 'Failed to decrease balance');
+      toast.error(getErrorMessage(error, 'Failed to decrease balance'));
     }
   };
 

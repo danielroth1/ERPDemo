@@ -6,6 +6,7 @@ import { UserGroupIcon, CheckCircleIcon, XCircleIcon, TrashIcon, WalletIcon, Plu
 import { UserRole, type Account } from '../../types';
 import toast from 'react-hot-toast';
 import { financialService } from '../../services/financial.service';
+import { getErrorMessage } from '../../utils/errorHandling';
 
 export const UsersPage: React.FC = () => {
   const dispatch = useAppDispatch();
@@ -45,7 +46,7 @@ export const UsersPage: React.FC = () => {
       });
       await loadUserAccounts(userId);
     } catch (error) {
-      toast.error(error?.message || 'Failed to create account');
+      toast.error(getErrorMessage(error, 'Failed to create account'));
     }
   };
 
@@ -63,7 +64,7 @@ export const UsersPage: React.FC = () => {
       });
       await loadUserAccounts(userId);
     } catch (error) {
-      toast.error(error?.message || 'Failed to deactivate account');
+      toast.error(getErrorMessage(error, 'Failed to deactivate account'));
     }
   };
 
@@ -72,7 +73,7 @@ export const UsersPage: React.FC = () => {
       await dispatch(toggleUserStatus({ id, isActive })).unwrap();
       toast.success(`User ${isActive ? 'deactivated' : 'activated'} successfully`);
     } catch (error) {
-      toast.error(error || 'Failed to update user status');
+      toast.error(getErrorMessage(error, 'Failed to update user status'));
     }
   };
 
@@ -82,7 +83,7 @@ export const UsersPage: React.FC = () => {
         await dispatch(deleteUser(id)).unwrap();
         toast.success('User deleted successfully');
       } catch (error) {
-        toast.error(error || 'Failed to delete user');
+        toast.error(typeof error === 'string' ? error : 'Failed to delete user');
       }
     }
   };

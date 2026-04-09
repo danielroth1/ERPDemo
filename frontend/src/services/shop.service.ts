@@ -4,6 +4,7 @@ import { createOrchestrationClient } from '../generated/clients/orchestration/or
 import { FetchRequestAdapter } from '@microsoft/kiota-http-fetchlibrary';
 import { BearerTokenAuthenticationProvider } from './auth/bearer-token-provider';
 import { extractErrorMessage } from '../utils/error-handler';
+import { getResponseData } from '../utils/errorHandling';
 import { getApiBaseUrl } from './api-base-url';
 import type {
   ProductResponse,
@@ -65,7 +66,7 @@ class ShopService {
       const response = await this.orchestrationClient.api.v1.shop.purchase.byProductId(productId).post({
         queryParameters: { quantity }
       });
-      return response?.data || response;
+      return getResponseData(response) || response;
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Failed to purchase product'));
     }
@@ -79,7 +80,7 @@ class ShopService {
       const response = await this.orchestrationClient.api.v1.shop.returnEscaped.byProductId(productId).post({
         queryParameters: { quantity }
       });
-      return response?.data || response;
+      return getResponseData(response) || response;
     } catch (error) {
       throw new Error(extractErrorMessage(error, 'Failed to return product'));
     }

@@ -377,6 +377,16 @@
       "options": { "cwd": "${workspaceFolder}/frontend" }
     },
     {
+      "label": "frontend: lint",
+      "command": "npm",
+      "type": "shell",
+      "args": ["run", "lint"],
+      "problemMatcher": ["$eslint-stylish"],
+      "presentation": { "reveal": "always", "panel": "shared", "focus": true },
+      "options": { "cwd": "${workspaceFolder}/frontend" },
+      "group": { "kind": "test", "isDefault": false }
+    },
+    {
       "label": "frontend: generate-all-api-clients",
       "command": "npm",
       "type": "shell",

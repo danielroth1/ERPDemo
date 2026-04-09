@@ -329,13 +329,13 @@ class InventoryService {
     if (!res.ok) throw new Error('Failed to fetch documents');
     const body = await res.json();
     return (body.data ?? []).map((d: Record<string, unknown>): ProductDocument => ({
-      id: d.id,
-      productId: d.productId,
-      originalFileName: d.originalFileName,
-      contentType: d.contentType,
-      sizeBytes: d.sizeBytes,
-      uploadedBy: d.uploadedBy,
-      uploadedAt: d.uploadedAt,
+      id: String(d.id),
+      productId: String(d.productId),
+      originalFileName: String(d.originalFileName),
+      contentType: String(d.contentType),
+      sizeBytes: Number(d.sizeBytes),
+      uploadedBy: String(d.uploadedBy),
+      uploadedAt: String(d.uploadedAt),
     }));
   }
 

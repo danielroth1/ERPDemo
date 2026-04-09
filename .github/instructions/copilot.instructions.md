@@ -655,7 +655,13 @@ Added comprehensive tests for User model including:
    git commit -m "feat(scope): description"
    ```
 
-3. **Push to remote**
+3. **Run the frontend linter before pushing**
+   ```bash
+   cd frontend && npm run lint
+   ```
+   Fix all errors (not just warnings) before continuing. The CI pipeline will fail on lint errors.
+
+4. **Push to remote**
    ```powershell
    git push origin feature/my-feature
    ```

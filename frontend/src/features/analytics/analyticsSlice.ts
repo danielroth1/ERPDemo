@@ -26,7 +26,7 @@ const initialState: AnalyticsState = {
   error: null,
 };
 
-export const fetchKPIs = createAsyncThunk(
+export const fetchKPIs = createAsyncThunk<KPI[]>(
   'analytics/fetchKPIs',
   async (_, { rejectWithValue }) => {
     try {
@@ -37,7 +37,7 @@ export const fetchKPIs = createAsyncThunk(
   }
 );
 
-export const fetchAlerts = createAsyncThunk(
+export const fetchAlerts = createAsyncThunk<Alert[]>(
   'analytics/fetchAlerts',
   async (_, { rejectWithValue }) => {
     try {
@@ -48,7 +48,7 @@ export const fetchAlerts = createAsyncThunk(
   }
 );
 
-export const fetchDashboardSummary = createAsyncThunk(
+export const fetchDashboardSummary = createAsyncThunk<DashboardMetricsResponse>(
   'analytics/fetchDashboardSummary',
   async (_, { rejectWithValue }) => {
     try {
@@ -59,7 +59,7 @@ export const fetchDashboardSummary = createAsyncThunk(
   }
 );
 
-export const fetchTopProducts = createAsyncThunk(
+export const fetchTopProducts = createAsyncThunk<TopProductResponse[], number>(
   'analytics/fetchTopProducts',
   async (limit: number = 5, { rejectWithValue }) => {
     try {
@@ -97,14 +97,14 @@ const analyticsSlice = createSlice({
       })
       .addCase(fetchKPIs.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.kpis = action.payload as unknown as KPI[];
+        state.kpis = action.payload;
       })
       .addCase(fetchKPIs.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload as string;
       })
       .addCase(fetchAlerts.fulfilled, (state, action) => {
-        state.alerts = action.payload as unknown as Alert[];
+        state.alerts = action.payload;
       })
       .addCase(fetchDashboardSummary.fulfilled, (state, action) => {
         state.dashboardSummary = action.payload;
