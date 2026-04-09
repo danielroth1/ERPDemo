@@ -21,10 +21,10 @@ bld/
 [Oo]bj/
 [Ll]og/
 
-# Kiota Generated Files
-Generated/
+# Kiota Generated Files - exclude generated C# code but keep lock files
+Generated/**/*.cs
+Generated/**/*.kiota.log
 *.kiota.log
-kiota-lock.json
 
 # .NET Core
 project.lock.json

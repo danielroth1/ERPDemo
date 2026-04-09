@@ -84,7 +84,7 @@ dist-ssr/
 # Uncomment if you prefer to regenerate on each build
 # frontend/src/generated/clients/
 *.kiota.log
-kiota-lock.json
+# kiota-lock.json files are tracked so CI can use them for regeneration
 
 ## Environment variables
 .env

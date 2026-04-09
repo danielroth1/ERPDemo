@@ -35,6 +35,13 @@
       "default": "dashboard"
     },
     {
+      "id": "backendConsumerService",
+      "type": "pickString",
+      "description": "Backend consumer service whose Kiota clients should be updated",
+      "options": ["inventory", "sales", "dashboard"],
+      "default": "inventory"
+    },
+    {
       "id": "k8sNamespace",
       "type": "promptString",
       "description": "Kubernetes namespace",
@@ -321,50 +328,29 @@
 
     // ============================================================
     // BACKEND API CLIENT GENERATION (Kiota)
+    // Exports OpenAPI specs from running services, then regenerates
+    // Kiota C# clients — no running services needed for generation.
     // ============================================================
     {
-      "label": "backend: generate-all-api-clients",
-      "command": "dotnet",
-      "type": "process",
-      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--service", "all"],
+      // Export specs + regenerate Kiota clients for ALL consumer services.
+      // Requires the backend services that provide APIs to be running.
+      "label": "backend: update-all-api-clients",
+      "command": "node",
+      "type": "shell",
+      "args": ["${workspaceFolder}/scripts/update-api-clients.mjs"],
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "group": "kiota" },
       "options": { "cwd": "${workspaceFolder}" }
     },
     {
-      "label": "backend: generate-inventory-api-clients",
-      "command": "dotnet",
-      "type": "process",
-      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--service", "inventory"],
+      // Export specs + regenerate Kiota clients for a SINGLE consumer service.
+      // Prompts to pick: inventory | sales | dashboard
+      "label": "backend: update-api-clients",
+      "command": "node",
+      "type": "shell",
+      "args": ["${workspaceFolder}/scripts/update-api-clients.mjs", "--service", "${input:backendConsumerService}"],
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "group": "kiota" },
-      "options": { "cwd": "${workspaceFolder}" }
-    },
-    {
-      "label": "backend: generate-sales-api-clients",
-      "command": "dotnet",
-      "type": "process",
-      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--service", "sales"],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "group": "kiota" },
-      "options": { "cwd": "${workspaceFolder}" }
-    },
-    {
-      "label": "backend: generate-dashboard-api-clients",
-      "command": "dotnet",
-      "type": "process",
-      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--service", "dashboard"],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "dedicated", "focus": true, "group": "kiota" },
-      "options": { "cwd": "${workspaceFolder}" }
-    },
-    {
-      "label": "backend: check-all-service-dependencies",
-      "command": "dotnet",
-      "type": "process",
-      "args": ["run", "--project", "${workspaceFolder}/tools/ApiClientGenerator/ApiClientGenerator.csproj", "--", "--check"],
-      "problemMatcher": [],
-      "presentation": { "reveal": "always", "panel": "shared", "group": "kiota" },
       "options": { "cwd": "${workspaceFolder}" }
     },
 

@@ -43,6 +43,63 @@ jobs:
             8.0.x
             9.0.x
 
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      - name: Generate Kiota clients (inventory)
+        if: matrix.service == 'inventory'
+        run: |
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/financial.json \
+            --output services/inventory/InventoryManagement/Generated/Clients/Financial \
+            --class-name FinancialServiceClient \
+            --namespace-name InventoryManagement.Generated.Clients.Financial \
+            --backing-store --additional-data
+
+      - name: Generate Kiota clients (sales)
+        if: matrix.service == 'sales'
+        run: |
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/financial.json \
+            --output services/sales/SalesManagement/Generated/Clients/Financial \
+            --class-name FinancialServiceClient \
+            --namespace-name SalesManagement.Generated.Clients.Financial \
+            --backing-store --additional-data
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/inventory.json \
+            --output services/sales/SalesManagement/Generated/Clients/Inventory \
+            --class-name InventoryServiceClient \
+            --namespace-name SalesManagement.Generated.Clients.Inventory \
+            --backing-store --additional-data
+
+      - name: Generate Kiota clients (dashboard)
+        if: matrix.service == 'dashboard'
+        run: |
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/user-management.json \
+            --output services/dashboard/DashboardAnalytics/Generated/Clients/UserManagement \
+            --class-name UserManagementServiceClient \
+            --namespace-name DashboardAnalytics.Generated.Clients.UserManagement \
+            --backing-store --additional-data
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/sales.json \
+            --output services/dashboard/DashboardAnalytics/Generated/Clients/Sales \
+            --class-name SalesServiceClient \
+            --namespace-name DashboardAnalytics.Generated.Clients.Sales \
+            --backing-store --additional-data
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/financial.json \
+            --output services/dashboard/DashboardAnalytics/Generated/Clients/Financial \
+            --class-name FinancialServiceClient \
+            --namespace-name DashboardAnalytics.Generated.Clients.Financial \
+            --backing-store --additional-data
+          dotnet kiota generate --language CSharp \
+            --openapi docs/openapi/inventory.json \
+            --output services/dashboard/DashboardAnalytics/Generated/Clients/Inventory \
+            --class-name InventoryServiceClient \
+            --namespace-name DashboardAnalytics.Generated.Clients.Inventory \
+            --backing-store --additional-data
+
       - name: Restore dependencies
         run: dotnet restore ${{ matrix.test-project }}
 
