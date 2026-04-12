@@ -163,7 +163,8 @@ app.MapHealthChecks("/health/live", new Microsoft.AspNetCore.Diagnostics.HealthC
 });
 app.MapHealthChecks("/health/ready", new Microsoft.AspNetCore.Diagnostics.HealthChecks.HealthCheckOptions
 {
-    Predicate = check => check.Tags.Contains("ready")
+    // Exclude MassTransit checks (auto-tagged "ready" in v8) — Kafka connectivity must not block readiness
+    Predicate = check => check.Tags.Contains("ready") && !check.Name.StartsWith("masstransit", StringComparison.OrdinalIgnoreCase)
 });
 
 // Metrics endpoint

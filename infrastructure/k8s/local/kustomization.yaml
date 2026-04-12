@@ -7,3 +7,13 @@ resources:
   - namespace.yaml  # Local environment namespace
   - ../base         # Reference the entire base directory
 
+patches:
+  - path: user-management-resources.yaml
+    target:
+      kind: Deployment
+      name: user-management
+  - path: prometheus-resources.yaml
+    target:
+      kind: Deployment
+      name: prometheus
+

@@ -31,13 +31,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # Services: <image-name>:<context-dir>:<dockerfile>
 declare -a SERVICES=(
-  "erp/gateway:services/gateway:services/gateway/Dockerfile"
-  "erp/user-management:services/user-management:services/user-management/Dockerfile"
-  "erp/inventory:services/inventory:services/inventory/Dockerfile"
-  "erp/sales:services/sales:services/sales/Dockerfile"
-  "erp/financial:services/financial:services/financial/Dockerfile"
-  "erp/dashboard:services/dashboard:services/dashboard/Dockerfile"
-  "erp/orchestration:services/orchestration:services/orchestration/Dockerfile"
+  "erp/gateway:services:services/gateway/Dockerfile"
+  "erp/user-management:services:services/user-management/Dockerfile"
+  "erp/inventory:services:services/inventory/Dockerfile"
+  "erp/sales:services:services/sales/Dockerfile"
+  "erp/financial:services:services/financial/Dockerfile"
+  "erp/dashboard:services:services/dashboard/Dockerfile"
+  "erp/orchestration:services:services/orchestration/Dockerfile"
   "erp/frontend:frontend:frontend/Dockerfile"
 )
 
@@ -56,6 +56,7 @@ for entry in "${SERVICES[@]}"; do
   echo "  context:    $context"
   echo "  dockerfile: $dockerfile"
   nerdctl --namespace k8s.io build \
+    --build-arg RID=linux-arm64 \
     -t "$image" \
     -f "$dockerfile" \
     "$context"

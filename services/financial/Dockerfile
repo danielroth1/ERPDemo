@@ -2,6 +2,7 @@
 
 # Build stage – run natively on the host (ARM64 Mac) and cross-compile for linux-x64
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG RID=linux-x64
 WORKDIR /src
 
 ENV NUGET_PACKAGES=/root/.nuget/packages \
@@ -13,7 +14,7 @@ COPY shared/ServiceDefaults/*.csproj ./shared/ServiceDefaults/
 COPY financial/FinancialManagement/*.csproj ./financial/FinancialManagement/
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet restore -r linux-x64 financial/FinancialManagement/FinancialManagement.csproj
+  dotnet restore -r $RID financial/FinancialManagement/FinancialManagement.csproj
 
 # Copy source code and build
 COPY shared/ERP.Contracts/. ./shared/ERP.Contracts/
@@ -22,25 +23,23 @@ COPY financial/FinancialManagement/. ./financial/FinancialManagement/
 WORKDIR /src/financial/FinancialManagement
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet build FinancialManagement.csproj -c Release -r linux-x64 -o /app/build --no-restore
+  dotnet build FinancialManagement.csproj -c Release -r $RID -o /app/build --no-restore
 
 # Publish stage
 FROM build AS publish
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet publish FinancialManagement.csproj -c Release -r linux-x64 --self-contained false -o /app/publish --no-restore
+  dotnet publish FinancialManagement.csproj -c Release -r $RID --self-contained false -o /app/publish --no-restore
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 LABEL org.opencontainers.image.source=https://github.com/danielroth1/ERPDemo
 WORKDIR /app
 EXPOSE 8080
 
 # Enable remote debugging (VS Code) via vsdbg
-RUN apk add --no-cache bash curl \
-  && mkdir -p /vsdbg \
-  && curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg \
-  && apk del bash curl
+RUN mkdir -p /vsdbg \
+  && curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg
 
 # Copy published output
 COPY --from=publish /app/publish .

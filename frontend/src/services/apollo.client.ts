@@ -3,6 +3,7 @@ import { GraphQLWsLink } from '@apollo/client/link/subscriptions';
 import { getMainDefinition } from '@apollo/client/utilities';
 import { createClient } from 'graphql-ws';
 import { SetContextLink } from '@apollo/client/link/context';
+import { getApiBaseUrl } from './api-base-url';
 
 /**
  * Create an HTTP link for a specific GraphQL service
@@ -10,7 +11,7 @@ import { SetContextLink } from '@apollo/client/link/context';
  */
 function createHttpLink(service: string): HttpLink {
   return new HttpLink({
-    uri: `${import.meta.env.VITE_API_GATEWAY_URL || 'http://localhost:5001'}/${service}/graphql`,
+    uri: `${getApiBaseUrl()}/${service}/graphql`,
   });
 }
 
@@ -19,9 +20,17 @@ function createHttpLink(service: string): HttpLink {
  * @param service - The service name (e.g., 'dashboard', 'sales')
  */
 function createWsLink(service: string): GraphQLWsLink {
+  const wsBase = (() => {
+    if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL as string;
+    if (import.meta.env.PROD) {
+      const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      return `${proto}//${window.location.host}`;
+    }
+    return 'ws://localhost:5001';
+  })();
   return new GraphQLWsLink(
     createClient({
-      url: `${import.meta.env.VITE_WS_URL || 'ws://localhost:5006'}/${service}/graphql`,
+      url: `${wsBase}/${service}/graphql`,
       connectionParams: () => {
         const token = localStorage.getItem('accessToken');
         return {

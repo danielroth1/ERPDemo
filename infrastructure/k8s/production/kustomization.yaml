@@ -145,36 +145,39 @@ patches:
         value: ClusterIP
 
   # ── Grafana: use Kubernetes Secret for admin credentials, set production URL ─
+  # Uses JSON patch (RFC 6902) to fully replace env[0] and env[1] so that the
+  # base `value: admin` fields are removed — strategic merge would otherwise
+  # keep both `value` and `valueFrom`, which Kubernetes rejects.
   - target:
       kind: Deployment
       name: grafana
     patch: |-
-      apiVersion: apps/v1
-      kind: Deployment
-      metadata:
-        name: grafana
-      spec:
-        template:
-          spec:
-            containers:
-            - name: grafana
-              env:
-              - name: GF_SECURITY_ADMIN_USER
-                valueFrom:
-                  secretKeyRef:
-                    name: grafana-admin-secret
-                    key: admin-user
-              - name: GF_SECURITY_ADMIN_PASSWORD
-                valueFrom:
-                  secretKeyRef:
-                    name: grafana-admin-secret
-                    key: admin-password
-              - name: GF_USERS_ALLOW_SIGN_UP
-                value: "false"
-              - name: GF_SERVER_DOMAIN
-                value: "monitoring.shopping-now.net"
-              - name: GF_SERVER_ROOT_URL
-                value: "https://monitoring.shopping-now.net"
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0
+        value:
+          name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-secret
+              key: admin-user
+      - op: replace
+        path: /spec/template/spec/containers/0/env/1
+        value:
+          name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-secret
+              key: admin-password
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: GF_SERVER_DOMAIN
+          value: "monitoring.shopping-now.net"
+      - op: add
+        path: /spec/template/spec/containers/0/env/-
+        value:
+          name: GF_SERVER_ROOT_URL
+          value: "https://monitoring.shopping-now.net"
 
   # ── Alloy: always pull latest image in production ────────────────────────────
   - target:

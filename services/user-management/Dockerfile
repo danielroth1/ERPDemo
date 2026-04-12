@@ -5,6 +5,7 @@ FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
 ARG BUILD_CONFIGURATION=Release
+ARG RID=linux-x64
 
 ENV NUGET_PACKAGES=/root/.nuget/packages \
   NUGET_HTTP_CACHE_PATH=/root/.local/share/NuGet/v3-cache
@@ -15,7 +16,7 @@ COPY shared/ServiceDefaults/*.csproj ./shared/ServiceDefaults/
 COPY user-management/UserManagement/*.csproj ./user-management/UserManagement/
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet restore -r linux-x64 user-management/UserManagement/UserManagement.csproj
+  dotnet restore -r $RID user-management/UserManagement/UserManagement.csproj
 
 # Copy source code and build
 COPY shared/ERP.Contracts/. ./shared/ERP.Contracts/
@@ -24,27 +25,25 @@ COPY user-management/UserManagement/. ./user-management/UserManagement/
 WORKDIR /src/user-management/UserManagement
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet build UserManagement.csproj -c $BUILD_CONFIGURATION -r linux-x64 -o /app/build --no-restore \
+  dotnet build UserManagement.csproj -c $BUILD_CONFIGURATION -r $RID -o /app/build --no-restore \
   /p:DebugType=portable /p:DebugSymbols=true /p:EmbedAllSources=true
 
 # Publish stage
 FROM build AS publish
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet publish UserManagement.csproj -c $BUILD_CONFIGURATION -r linux-x64 --self-contained false -o /app/publish --no-restore \
+  dotnet publish UserManagement.csproj -c $BUILD_CONFIGURATION -r $RID --self-contained false -o /app/publish --no-restore \
   /p:DebugType=portable /p:DebugSymbols=true /p:EmbedAllSources=true
 
 # Runtime stage
-FROM mcr.microsoft.com/dotnet/aspnet:8.0-alpine AS runtime
+FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
 LABEL org.opencontainers.image.source=https://github.com/danielroth1/ERPDemo
 WORKDIR /app
 EXPOSE 8080
 
 # Enable remote debugging (VS Code) via vsdbg
-RUN apk add --no-cache bash curl \
-  && mkdir -p /vsdbg \
-  && curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg \
-  && apk del bash curl
+RUN mkdir -p /vsdbg \
+  && curl -sSL https://aka.ms/getvsdbgsh | bash /dev/stdin -v latest -l /vsdbg
 
 # Copy published output
 COPY --from=publish /app/publish .

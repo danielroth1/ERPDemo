@@ -2,6 +2,7 @@
 
 # Build stage – run natively on the host (ARM64 Mac) and cross-compile for linux-x64
 FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG RID=linux-x64
 WORKDIR /src
 
 ENV NUGET_PACKAGES=/root/.nuget/packages \
@@ -13,7 +14,7 @@ COPY shared/ServiceDefaults/*.csproj ./shared/ServiceDefaults/
 COPY dashboard/DashboardAnalytics/*.csproj ./dashboard/DashboardAnalytics/
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet restore -r linux-x64 dashboard/DashboardAnalytics/DashboardAnalytics.csproj
+  dotnet restore -r $RID dashboard/DashboardAnalytics/DashboardAnalytics.csproj
 
 # Copy source code and build
 COPY shared/ERP.Contracts/. ./shared/ERP.Contracts/
@@ -22,13 +23,13 @@ COPY dashboard/DashboardAnalytics/. ./dashboard/DashboardAnalytics/
 WORKDIR /src/dashboard/DashboardAnalytics
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet build DashboardAnalytics.csproj -c Release -r linux-x64 -o /app/build --no-restore
+  dotnet build DashboardAnalytics.csproj -c Release -r $RID -o /app/build --no-restore
 
 # Publish stage
 FROM build AS publish
 RUN --mount=type=cache,id=nuget-packages,target=/root/.nuget/packages,sharing=shared \
   --mount=type=cache,id=nuget-http-cache,target=/root/.local/share/NuGet/v3-cache,sharing=shared \
-  dotnet publish DashboardAnalytics.csproj -c Release -r linux-x64 --self-contained false -o /app/publish --no-restore
+  dotnet publish DashboardAnalytics.csproj -c Release -r $RID --self-contained false -o /app/publish --no-restore
 
 # Runtime stage
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS runtime
