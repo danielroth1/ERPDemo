@@ -1,0 +1,183 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+# =============================================================================
+# Azure AKS overlay
+# =============================================================================
+# Prerequisites (one-time):
+#   1. Fill in Azure variables in .env.deploy
+#   2. bash scripts/aks-provision.sh          ← creates AKS, ACR, Key Vault, PostgreSQL
+#   3. Update .env.deploy with values printed by provision script
+#   4. Point DNS A record to the LoadBalancer IP printed by aks-deploy.sh
+#   5. KUBECONFIG=~/.kube/aks-erp.yaml bash infrastructure/cert-manager/install-azure.sh
+#
+# Day-to-day:
+#   bash scripts/aks-build-push.sh && bash scripts/aks-deploy.sh
+#   OR VS Code task: azure: build-push-deploy
+#
+# Key differences from base (infrastructure/k8s/base/):
+#   - Postgres StatefulSet scaled to 0  →  Azure Database for PostgreSQL used
+#   - wait-for-postgres init containers removed (Azure DB always reachable)
+#   - images pulled from ACR instead of local erp/* names
+#   - imagePullPolicy: Always (ACR + managed identity, no pull secrets needed)
+#   - Traefik v3 Gateway API (azure/gateway.yaml) — HTTPRoute/Gateway resources
+#   - Grafana admin credentials come from Azure Key Vault via CSI driver
+#   - Services fronted by Traefik patched to ClusterIP
+#
+# Secrets:
+#   - postgres-secret  → created imperatively in aks-deploy.sh from Key Vault
+#   - grafana-admin-secret → synced from Key Vault by SecretProviderClass / secret-sync pod
+#   - rabbitmq-secret  → from base (self-hosted RabbitMQ, guest/guest unchanged)
+# =============================================================================
+
+namespace: erp-azure
+
+resources:
+  - namespace.yaml
+  - ../base
+  - gateway.yaml
+  - secret-provider.yaml
+
+# -- ACR image overrides -------------------------------------------------------
+# These are defaults; aks-deploy.sh generates a temp overlay that overrides
+# both newName and newTag with the actual ACR name and git tag at deploy time.
+# Update 'erpacr' to match your AZ_ACR_NAME from .env.deploy.
+images:
+  - name: erp/gateway
+    newName: erpacr.azurecr.io/erp-gateway
+    newTag: latest
+  - name: erp/user-management
+    newName: erpacr.azurecr.io/erp-user-management
+    newTag: latest
+  - name: erp/inventory
+    newName: erpacr.azurecr.io/erp-inventory
+    newTag: latest
+  - name: erp/sales
+    newName: erpacr.azurecr.io/erp-sales
+    newTag: latest
+  - name: erp/financial
+    newName: erpacr.azurecr.io/erp-financial
+    newTag: latest
+  - name: erp/dashboard
+    newName: erpacr.azurecr.io/erp-dashboard
+    newTag: latest
+  - name: erp/orchestration
+    newName: erpacr.azurecr.io/erp-orchestration
+    newTag: latest
+  - name: erp/frontend
+    newName: erpacr.azurecr.io/erp-frontend
+    newTag: latest
+
+patches:
+  # ── Disable self-hosted Postgres (Azure Database for PostgreSQL is used) ────
+  # Scales the StatefulSet to 0. The postgres-service ClusterIP service still
+  # exists (harmless) but has no backing pod. The wait-for-postgres init
+  # containers are removed below so services never try to wait for the local pod.
+  - target:
+      kind: StatefulSet
+      name: postgres
+    patch: |-
+      - op: replace
+        path: /spec/replicas
+        value: 0
+
+  # ── Remove wait-for-postgres init container ──────────────────────────────────
+  # Azure Database for PostgreSQL is always reachable from AKS — no need to
+  # wait for a local pod. Without this patch, pods would hang indefinitely
+  # because postgres-service has 0 endpoints.
+  - path: patches/remove-postgres-wait.yaml
+    target:
+      kind: Deployment
+      name: user-management
+  - path: patches/remove-postgres-wait.yaml
+    target:
+      kind: Deployment
+      name: inventory
+  - path: patches/remove-postgres-wait.yaml
+    target:
+      kind: Deployment
+      name: sales
+  - path: patches/remove-postgres-wait.yaml
+    target:
+      kind: Deployment
+      name: financial
+  - path: patches/remove-postgres-wait.yaml
+    target:
+      kind: Deployment
+      name: dashboard
+
+  # ── Always pull images from ACR ──────────────────────────────────────────────
+  # AKS uses a managed identity to pull from ACR — no imagePullSecrets needed.
+  # Always pull so rolling updates pick up the latest pushed image.
+  - target:
+      kind: Deployment
+    patch: |-
+      - op: add
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+  - target:
+      kind: DaemonSet
+      name: alloy
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/imagePullPolicy
+        value: Always
+
+  # ── ClusterIP services (NGINX LoadBalancer handles all external traffic) ─────
+  - target:
+      kind: Service
+      name: frontend-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+  - target:
+      kind: Service
+      name: gateway-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+  - target:
+      kind: Service
+      name: grafana-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+  - target:
+      kind: Service
+      name: prometheus-service
+    patch: |-
+      - op: replace
+        path: /spec/type
+        value: ClusterIP
+
+  # ── Grafana: use Key Vault-backed secret (grafana-admin-secret) ─────────────
+  # The grafana-admin-secret K8s Secret is created by secret-sync / CSI driver
+  # from Azure Key Vault. aks-deploy.sh waits for it to exist before deploying.
+  # GF_SERVER_DOMAIN and GF_SERVER_ROOT_URL are injected by aks-deploy.sh
+  # via a temporary overlay (they depend on the AZURE_DOMAIN var at deploy time).
+  - target:
+      kind: Deployment
+      name: grafana
+    patch: |-
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0
+        value:
+          name: GF_SECURITY_ADMIN_USER
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-secret
+              key: admin-user
+      - op: replace
+        path: /spec/template/spec/containers/0/env/1
+        value:
+          name: GF_SECURITY_ADMIN_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: grafana-admin-secret
+              key: admin-password
+
+commonLabels:
+  environment: azure

@@ -58,6 +58,18 @@
       "type": "promptString",
       "description": "Image tag (e.g. latest or a git SHA)",
       "default": "latest"
+    },
+    {
+      "id": "azureTag",
+      "type": "promptString",
+      "description": "Image tag for Azure / ACR deployment (e.g. latest or a git SHA)",
+      "default": "latest"
+    },
+    {
+      "id": "nodeCount",
+      "type": "promptString",
+      "description": "AKS node pool count (0 = scale down to save cost, 3 = normal)",
+      "default": "1"
     }
   ],
   "tasks": [
@@ -588,7 +600,7 @@
       "label": "k8s: delete-local",
       "command": "kubectl",
       "type": "shell",
-      "args": ["delete", "namespace", "erp-local"],
+      "args": ["delete", "namespace", "erp-local", "--ignore-not-found"],
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "shared" }
     },
@@ -714,6 +726,22 @@
       ],
       "problemMatcher": []
     },
+    {
+      // Kill all kubectl port-forward processes started by VS Code tasks.
+      "label": "k8s: kill-port-forwards",
+      "type": "shell",
+      "command": "pkill -f 'kubectl.*port-forward' 2>/dev/null; echo 'Port-forwards stopped'",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "k8s" }
+    },
+    {
+      // Stop the entire local cluster: kill port-forwards, delete the namespace, and wait for termination.
+      "label": "k8s: stop-local",
+      "type": "shell",
+      "command": "pkill -f 'kubectl.*port-forward' 2>/dev/null; kubectl delete namespace erp-local --ignore-not-found --wait && echo 'Local cluster stopped'",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "k8s" }
+    },
 
     // ============================================================
     // PRODUCTION / K3S TASKS  (server: ${K3S_SERVER})
@@ -815,6 +843,115 @@
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "shared", "group": "prod" }
+    },
+
+    // ============================================================
+    // AZURE / AKS TASKS  (AKS cluster, ACR registry)
+    // Kubeconfig: ~/.kube/aks-erp.yaml  (created by azure: provision)
+    // See .github/instructions/azure.instructions.md for full workflow.
+    // ============================================================
+    {
+      // ONE-TIME: provisions AKS, ACR, Key Vault, PostgreSQL, NGINX ingress.
+      // Prints AZURE_TENANT_ID, AZURE_KV_IDENTITY_CLIENT_ID, AZ_PG_HOST —
+      // copy these into .env.deploy before running azure: deploy.
+      "label": "azure: provision",
+      "type": "shell",
+      "command": "bash scripts/aks-provision.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "azure" }
+    },
+    {
+      // ONE-TIME: installs cert-manager + Let's Encrypt ClusterIssuers on AKS.
+      // Run after azure: provision, before first azure: deploy.
+      "label": "azure: install-cert-manager",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml bash infrastructure/cert-manager/install-azure.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "azure" }
+    },
+    {
+      // Builds all images for linux/amd64 and pushes them to ACR.
+      "label": "azure: build-push",
+      "type": "shell",
+      "command": "bash scripts/aks-build-push.sh",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "TAG": "${input:azureTag}" }
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "azure" }
+    },
+    {
+      // Deploys the pushed images to AKS (4-phase: apply → secret-sync → postgres-secret → restart).
+      "label": "azure: deploy",
+      "type": "shell",
+      "command": "bash scripts/aks-deploy.sh",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "TAG": "${input:azureTag}" }
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "azure" }
+    },
+    {
+      // Convenience: build + push + deploy in one go.
+      "label": "azure: build-push-deploy",
+      "type": "shell",
+      "command": "bash scripts/aks-build-push.sh && bash scripts/aks-deploy.sh",
+      "options": {
+        "cwd": "${workspaceFolder}",
+        "env": { "TAG": "${input:azureTag}" }
+      },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "azure" }
+    },
+    {
+      // Show all pod / ingress / service statuses in the Azure namespace.
+      "label": "azure: status",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml kubectl get pods,ingress,svc -n erp-azure -o wide",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }
+    },
+    {
+      // Stream logs for a specific service in the Azure namespace.
+      "label": "azure: logs",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml kubectl logs -n erp-azure -f deploy/${input:service}",
+      "options": { "cwd": "${workspaceFolder}" },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "azure" }
+    },
+    {
+      // Force-restart a deployment in Azure (picks up latest image from ACR).
+      "label": "azure: rollout-restart",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml kubectl rollout restart deploy/${input:service} -n erp-azure",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }
+    },
+    {
+      // List all Key Vault secret names (not values) for the Azure deployment.
+      "label": "azure: keyvault-list",
+      "type": "shell",
+      "command": "source .env.deploy && az keyvault secret list --vault-name $AZ_KEYVAULT_NAME --query '[].name' -o table",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }
+    },
+    {
+      // Scale AKS node pool (e.g. set to 0 to save cost when not in use).
+      "label": "azure: scale-nodes",
+      "type": "shell",
+      "command": "source .env.deploy && az aks nodepool scale --resource-group $AZ_RESOURCE_GROUP --cluster-name $AZ_AKS_NAME --name nodepool1 --node-count ${input:nodeCount}",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }
     },
 
     // ============================================================

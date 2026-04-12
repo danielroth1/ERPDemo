@@ -79,6 +79,22 @@ data:
         editable: true
         jsonData:
           maxLines: 5000
+      - name: Tempo
+        uid: tempo
+        type: tempo
+        access: proxy
+        url: http://tempo-service:3200
+        editable: true
+        jsonData:
+          httpMethod: GET
+          tracesToLogsV2:
+            datasourceUid: loki
+            spanStartTimeShift: "-1m"
+            spanEndTimeShift: "1m"
+            filterByTraceID: true
+            filterBySpanID: false
+          serviceMap:
+            datasourceUid: prometheus
 ---
 apiVersion: v1
 kind: Service

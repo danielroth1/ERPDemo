@@ -1,0 +1,156 @@
+# =============================================================================
+# Traefik Gateway API — Azure AKS
+# =============================================================================
+# Uses Kubernetes Gateway API (gateway.networking.k8s.io/v1).
+# Traefik v3 is the gateway controller, installed by aks-provision.sh.
+#
+# Traffic flow:
+#   Internet → Azure Standard LoadBalancer
+#              → Traefik pods (namespace: traefik)
+#                 ├── DOMAIN /api/*        → gateway-service:8080
+#                 ├── DOMAIN /dashboardHub → dashboard-service:8080  (WebSocket/SignalR)
+#                 ├── DOMAIN /*            → frontend-service:80      (React SPA)
+#                 ├── www.DOMAIN /*        → frontend-service:80
+#                 └── monitoring.DOMAIN /* → grafana-service:3000
+#
+# GatewayClass "traefik" is created automatically by the Traefik Helm chart.
+# Listener hostnames (AZURE_DOMAIN_PLACEHOLDER) are injected at deploy time
+# by scripts/aks-deploy.sh — do not edit those values directly here.
+#
+# TLS: cert-manager watches this Gateway (cert-manager.io/cluster-issuer annotation)
+# and issues a single SAN certificate (erp-azure-tls-cert) covering all HTTPS
+# listener hostnames automatically.
+# =============================================================================
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: erp-gateway
+  namespace: erp-azure
+  annotations:
+    # cert-manager issues and renews erp-azure-tls-cert automatically
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  gatewayClassName: traefik
+  listeners:
+    # HTTP listener: accepts ACME http01 challenge traffic and redirects everything
+    # else to HTTPS (see erp-https-redirect HTTPRoute below).
+    - name: web
+      protocol: HTTP
+      port: 80
+      allowedRoutes:
+        namespaces:
+          from: Same
+    # HTTPS listeners: Traefik terminates TLS using the cert-manager-managed secret.
+    # All three listeners share erp-azure-tls-cert — cert-manager creates one
+    # SAN certificate covering all hostnames.
+    - name: websecure
+      protocol: HTTPS
+      port: 443
+      hostname: "AZURE_DOMAIN_PLACEHOLDER"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: erp-azure-tls-cert
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: websecure-www
+      protocol: HTTPS
+      port: 443
+      hostname: "www.AZURE_DOMAIN_PLACEHOLDER"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: erp-azure-tls-cert
+      allowedRoutes:
+        namespaces:
+          from: Same
+    - name: websecure-monitoring
+      protocol: HTTPS
+      port: 443
+      hostname: "monitoring.AZURE_DOMAIN_PLACEHOLDER"
+      tls:
+        mode: Terminate
+        certificateRefs:
+          - kind: Secret
+            name: erp-azure-tls-cert
+      allowedRoutes:
+        namespaces:
+          from: Same
+---
+# HTTP -> HTTPS redirect for all traffic on port 80 (except ACME challenges,
+# which cert-manager handles by inserting its own HTTPRoute on the web listener).
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: erp-https-redirect
+  namespace: erp-azure
+spec:
+  parentRefs:
+    - name: erp-gateway
+      sectionName: web
+  rules:
+    - filters:
+        - type: RequestRedirect
+          requestRedirect:
+            scheme: https
+            statusCode: 301
+---
+# Main application routes (main domain + www)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: erp-routes
+  namespace: erp-azure
+spec:
+  parentRefs:
+    - name: erp-gateway
+      sectionName: websecure
+    - name: erp-gateway
+      sectionName: websecure-www
+  rules:
+    # /api/* -> YARP gateway service
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /api
+      backendRefs:
+        - name: gateway-service
+          port: 8080
+    # /dashboardHub -> SignalR hub (WebSocket — Traefik handles WS natively)
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /dashboardHub
+      backendRefs:
+        - name: dashboard-service
+          port: 8080
+    # /* -> React SPA
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: frontend-service
+          port: 80
+---
+# Monitoring routes (monitoring subdomain -> Grafana)
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: erp-monitoring-routes
+  namespace: erp-azure
+spec:
+  parentRefs:
+    - name: erp-gateway
+      sectionName: websecure-monitoring
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+      backendRefs:
+        - name: grafana-service
+          port: 3000

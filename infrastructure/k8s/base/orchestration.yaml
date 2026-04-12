@@ -25,6 +25,10 @@ spec:
           value: "http://+:8080"
         - name: ASPNETCORE_ENVIRONMENT
           value: "Production"
+        - name: OTEL_EXPORTER_OTLP_ENDPOINT
+          value: "http://tempo-service:4317"
+        - name: OTEL_SERVICE_NAME
+          value: "orchestration"
         - name: ConnectionStrings__erp-orchestration
           valueFrom:
             secretKeyRef:

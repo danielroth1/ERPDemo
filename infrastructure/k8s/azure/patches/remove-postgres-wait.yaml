@@ -1,0 +1,23 @@
+# Strategic merge patch: removes the wait-for-postgres init container.
+# Applied to services that wait for the self-hosted Postgres pod,
+# which is scaled to 0 in Azure (Azure Database for PostgreSQL is used instead).
+#
+# The 'name' field is the merge key — Kubernetes deletes the list item
+# whose name matches 'wait-for-postgres'.
+#
+# Usage in kustomization.yaml:
+#   patches:
+#     - path: patches/remove-postgres-wait.yaml
+#       target:
+#         kind: Deployment
+#         name: <service-name>
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: placeholder   # overridden by the target selector in kustomization.yaml
+spec:
+  template:
+    spec:
+      initContainers:
+        - name: wait-for-postgres
+          $patch: delete

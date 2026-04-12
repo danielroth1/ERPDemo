@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: erp-azure
+  labels:
+    name: erp-azure
+    environment: azure
+    app: erp-system
+  annotations:
+    description: "Azure AKS environment for ERP system"

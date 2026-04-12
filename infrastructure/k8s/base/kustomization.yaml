@@ -17,6 +17,7 @@ resources:
   - frontend.yaml
   - prometheus.yaml
   - loki.yaml
+  - tempo.yaml
   - alloy.yaml
   - grafana.yaml
   - pgadmin.yaml
