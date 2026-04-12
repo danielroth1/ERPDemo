@@ -64,9 +64,28 @@ echo ""
 echo "  To use this cluster:  export KUBECONFIG=$KUBECONFIG_LOCAL"
 echo "  Or merge with main:   KUBECONFIG=~/.kube/config:$KUBECONFIG_LOCAL kubectl config view --flatten > /tmp/merged.yaml && mv /tmp/merged.yaml ~/.kube/config"
 
-# ── Step 3: Verify ────────────────────────────────────────────────────────────
+# ── Step 3: Create production namespace and secrets ─────────────────────────
 echo ""
-echo "▶ Step 3/3 – Verifying cluster access from local machine..."
+echo "▶ Step 3/4 – Creating namespace and secrets..."
+KUBECONFIG="$KUBECONFIG_LOCAL" kubectl create namespace erp-prod --dry-run=client -o yaml \
+  | KUBECONFIG="$KUBECONFIG_LOCAL" kubectl apply -f -
+
+# grafana-admin-secret — read password from .env.deploy (GRAFANA_ADMIN_PASSWORD)
+if [ -z "${GRAFANA_ADMIN_PASSWORD:-}" ]; then
+    echo "  ⚠  GRAFANA_ADMIN_PASSWORD not set in .env.deploy — skipping grafana-admin-secret"
+else
+    KUBECONFIG="$KUBECONFIG_LOCAL" kubectl create secret generic grafana-admin-secret \
+      --from-literal=admin-user=admin \
+      --from-literal=admin-password="${GRAFANA_ADMIN_PASSWORD}" \
+      -n erp-prod \
+      --dry-run=client -o yaml \
+      | KUBECONFIG="$KUBECONFIG_LOCAL" kubectl apply -f -
+    echo "  ✓ grafana-admin-secret created/updated"
+fi
+
+# ── Step 4: Verify ────────────────────────────────────────────────────────────
+echo ""
+echo "▶ Step 4/4 – Verifying cluster access from local machine..."
 KUBECONFIG="$KUBECONFIG_LOCAL" kubectl get nodes
 echo ""
 echo "  Traefik ingress pods:"

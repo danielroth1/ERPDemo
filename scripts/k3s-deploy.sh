@@ -118,6 +118,9 @@ images:
   - name: erp/dashboard
     newName: $REGISTRY/erp-dashboard
     newTag: "$TAG"
+  - name: erp/orchestration
+    newName: $REGISTRY/erp-orchestration
+    newTag: "$TAG"
   - name: erp/frontend
     newName: $REGISTRY/erp-frontend
     newTag: "$TAG"
@@ -141,6 +144,7 @@ DEPLOYMENTS=(
   sales
   financial
   dashboard
+  orchestration
   frontend
 )
 
