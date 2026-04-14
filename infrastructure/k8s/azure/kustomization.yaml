@@ -39,34 +39,11 @@ resources:
   - secret-provider.yaml
 
 # -- ACR image overrides -------------------------------------------------------
-# These are defaults; aks-deploy.sh generates a temp overlay that overrides
-# both newName and newTag with the actual ACR name and git tag at deploy time.
-# Update 'erpacr' to match your AZ_ACR_NAME from .env.deploy.
-images:
-  - name: erp/gateway
-    newName: erpacr.azurecr.io/erp-gateway
-    newTag: latest
-  - name: erp/user-management
-    newName: erpacr.azurecr.io/erp-user-management
-    newTag: latest
-  - name: erp/inventory
-    newName: erpacr.azurecr.io/erp-inventory
-    newTag: latest
-  - name: erp/sales
-    newName: erpacr.azurecr.io/erp-sales
-    newTag: latest
-  - name: erp/financial
-    newName: erpacr.azurecr.io/erp-financial
-    newTag: latest
-  - name: erp/dashboard
-    newName: erpacr.azurecr.io/erp-dashboard
-    newTag: latest
-  - name: erp/orchestration
-    newName: erpacr.azurecr.io/erp-orchestration
-    newTag: latest
-  - name: erp/frontend
-    newName: erpacr.azurecr.io/erp-frontend
-    newTag: latest
+# Removed: aks-deploy.sh generates a temp overlay on top of this one that sets
+# concrete ACR names and tags via its own `images:` section.  Keeping a
+# placeholder `images` block here would conflict because kustomize applies the
+# parent overlay's transforms first, changing the image name so the child
+# overlay can no longer match the original `erp/*` names.
 
 patches:
   # ── Disable self-hosted Postgres (Azure Database for PostgreSQL is used) ────
@@ -115,6 +92,25 @@ patches:
       - op: add
         path: /spec/template/spec/containers/0/imagePullPolicy
         value: Always
+
+  # ── Kafka fsGroup for Azure Disks ────────────────────────────────────────────
+  # Confluent Kafka runs as UID 1000 (appuser). Azure Disks PVCs are root-owned
+  # by default. fsGroup ensures the volume is group-writable for Kafka.
+  # Also use a subdirectory for KAFKA_LOG_DIRS to avoid the ext4 lost+found
+  # directory that Kafka would try (and fail) to parse as a topic-partition.
+  - target:
+      kind: Deployment
+      name: kafka
+    patch: |-
+      - op: add
+        path: /spec/template/spec/securityContext
+        value:
+          fsGroup: 1000
+      - op: replace
+        path: /spec/template/spec/containers/0/env/0
+        value:
+          name: KAFKA_LOG_DIRS
+          value: /var/lib/kafka/data/logs
   - target:
       kind: DaemonSet
       name: alloy

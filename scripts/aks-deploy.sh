@@ -21,6 +21,21 @@
 # =============================================================================
 set -euo pipefail
 
+# ── Prefer Rancher Desktop kubectl if available (avoids stale /usr/local/bin) ─
+if [ -d "$HOME/.rd/bin" ]; then
+  export PATH="$HOME/.rd/bin:$PATH"
+fi
+
+# ── Require kubectl ≥ 1.27 (older kustomize has UTF-8 YAML bugs) ─────────────
+KUBECTL_MAJOR=$(kubectl version --client -o json 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin)['clientVersion']['major'])" 2>/dev/null || echo 0)
+KUBECTL_MINOR=$(kubectl version --client -o json 2>/dev/null | python3 -c "import sys,json;print(json.load(sys.stdin)['clientVersion']['minor'])" 2>/dev/null || echo 0)
+if [ "$KUBECTL_MAJOR" -lt 1 ] || { [ "$KUBECTL_MAJOR" -eq 1 ] && [ "$KUBECTL_MINOR" -lt 27 ]; }; then
+  echo "❌ kubectl $(kubectl version --client --short 2>/dev/null || echo 'unknown') is too old (need ≥ 1.27)."
+  echo "   Found: $(which kubectl)"
+  echo "   Install a recent kubectl or ensure Rancher Desktop's ~/.rd/bin is first in PATH."
+  exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/../.env.deploy"
 if [ ! -f "$ENV_FILE" ]; then
@@ -171,6 +186,10 @@ echo "  ✓ Manifests applied"
 # ── Phase 2: Wait for secret-sync (CSI driver syncs grafana-admin-secret) ─────
 echo ""
 echo "▶ Phase 2 — Waiting for secret-sync pod (syncs Key Vault → K8s Secrets)..."
+# Restart rollout first — if a previous deploy timed out, the deployment's
+# progress deadline is already marked as exceeded and rollout status would
+# fail immediately without actually waiting.
+kubectl rollout restart deployment/secret-sync -n "$NAMESPACE"
 kubectl rollout status deployment/secret-sync -n "$NAMESPACE" --timeout=120s
 echo "  ✓ secret-sync running — grafana-admin-secret synced from Key Vault"
 

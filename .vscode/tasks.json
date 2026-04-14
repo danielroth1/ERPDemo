@@ -851,6 +851,19 @@
     // See .github/instructions/azure.instructions.md for full workflow.
     // ============================================================
     {
+      // Run this FIRST at the start of any Azure session.
+      // Opens a browser for interactive login. Credentials are cached in
+      // ~/.azure/ and persist across terminal sessions (refresh token: ~90 days).
+      // You do NOT need to re-run this before every task — only once per session
+      // or when you see "az: not logged in" / token expiry errors.
+      "label": "azure: login",
+      "type": "shell",
+      "command": "az login && az account show --query '{subscription:name, tenantId:tenantId}' -o table",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }
+    },
+    {
       // ONE-TIME: provisions AKS, ACR, Key Vault, PostgreSQL, NGINX ingress.
       // Prints AZURE_TENANT_ID, AZURE_KV_IDENTITY_CLIENT_ID, AZ_PG_HOST —
       // copy these into .env.deploy before running azure: deploy.
@@ -949,6 +962,39 @@
       "label": "azure: scale-nodes",
       "type": "shell",
       "command": "source .env.deploy && az aks nodepool scale --resource-group $AZ_RESOURCE_GROUP --cluster-name $AZ_AKS_NAME --name nodepool1 --node-count ${input:nodeCount}",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }
+    },
+    {
+      // Stop AKS + PostgreSQL to eliminate compute costs (~€11/month residual for IP/storage/ACR).
+      // All Kubernetes state is PRESERVED — no re-deploy needed on start.
+      // Note: Azure auto-restarts stopped PostgreSQL after 7 days.
+      "label": "azure: stop",
+      "type": "shell",
+      "command": "bash scripts/aks-stop.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }
+    },
+    {
+      // Resume AKS + PostgreSQL. No re-deploy needed — K8s state is fully preserved.
+      // Wait ~3-5 min after start for nodes to come up and pods to reschedule.
+      "label": "azure: start",
+      "type": "shell",
+      "command": "bash scripts/aks-start.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }
+    },
+
+    {
+      // ⚠️  PERMANENTLY deletes the entire resource group and ALL Azure resources
+      // (AKS, ACR, Key Vault, PostgreSQL, VNet, IPs, etc.). IRREVERSIBLE.
+      // You will be prompted to type DELETE to confirm.
+      "label": "azure: delete-resource-group",
+      "type": "shell",
+      "command": "bash scripts/aks-delete.sh",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "shared", "group": "azure" }

@@ -51,15 +51,31 @@ echo "  (Using Helm so we can enable ExperimentalGatewayAPISupport feature gate)
 helm repo add jetstack https://charts.jetstack.io --force-update
 helm repo update
 
+# Install CRDs separately so they are never removed by helm uninstall
+echo "  Installing cert-manager CRDs..."
+kubectl apply -f "https://github.com/cert-manager/cert-manager/releases/download/${CERT_MANAGER_VERSION}/cert-manager.crds.yaml"
+echo "  ✓ CRDs applied"
+
+# AKS runs "admissionsenforcer" which modifies webhook namespaceSelectors and
+# causes Helm apply conflicts on re-installs. Delete the stale webhook config
+# left by any previous failed install before proceeding.
+kubectl delete validatingwebhookconfiguration cert-manager-webhook 2>/dev/null || true
+
 helm upgrade --install cert-manager jetstack/cert-manager \
   --namespace cert-manager --create-namespace \
   --version "$CERT_MANAGER_VERSION" \
-  --set crds.enabled=true \
+  --skip-crds \
   --set "extraArgs={--feature-gates=ExperimentalGatewayAPISupport=true}" \
-  --wait --timeout 5m
+  --set startupapicheck.enabled=false \
+  --wait --timeout 10m
 
 echo "  ✓ cert-manager ready"
 kubectl get pods -n cert-manager
+
+echo ""
+echo "▶ Waiting for cert-manager CRDs to be available in the API..."
+kubectl wait --for=condition=established crd/clusterissuers.cert-manager.io --timeout=60s
+echo "  ✓ CRDs ready"
 
 echo ""
 echo "▶ Creating Let's Encrypt ClusterIssuers (http01 via Traefik Gateway API)..."

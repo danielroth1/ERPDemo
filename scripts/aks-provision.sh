@@ -11,7 +11,7 @@
 #   - ACR ↔ AKS managed identity attachment (no imagePullSecrets needed)
 #   - Azure Key Vault + all required secrets
 #   - Azure Database for PostgreSQL Flexible Server + 6 databases
-#   - NGINX ingress controller (via Helm, free — standard Azure LoadBalancer)
+#   - Traefik ingress controller (via Helm, free — standard Azure LoadBalancer)
 #
 # Usage (from repo root):
 #   bash scripts/aks-provision.sh
@@ -22,6 +22,11 @@
 #   - Helm installed: brew install helm
 # =============================================================================
 set -euo pipefail
+
+# ── Prefer Rancher Desktop kubectl if available (avoids stale /usr/local/bin) ─
+if [ -d "$HOME/.rd/bin" ]; then
+  export PATH="$HOME/.rd/bin:$PATH"
+fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/../.env.deploy"
@@ -40,7 +45,9 @@ VNET="${AZ_VNET_NAME}"
 PG_SERVER="${AZ_PG_SERVER_NAME}"
 PG_ADMIN="${AZ_PG_ADMIN_USER}"
 PG_PASS="${AZ_PG_ADMIN_PASSWORD}"
+PG_LOCATION="${AZ_PG_LOCATION:-${LOCATION}}"  # Falls back to AZ_LOCATION if not set
 KUBECONFIG_LOCAL="$HOME/.kube/aks-erp.yaml"
+NAMESPACE="erp-azure"
 
 echo "════════════════════════════════════════════════════════════"
 echo " ERP Azure Provisioning"
@@ -51,22 +58,43 @@ echo " Key Vault      : $KV"
 echo " PostgreSQL     : $PG_SERVER"
 echo "════════════════════════════════════════════════════════════"
 
+# ── 0. Register required resource providers ───────────────────────────────────
+# Free/new subscriptions often have providers unregistered. Registration is
+# idempotent and free — safe to run every time.
+echo ""
+echo "▶ 0/9 — Registering Azure resource providers (once per subscription)..."
+for PROVIDER in \
+  Microsoft.ContainerRegistry \
+  Microsoft.ContainerService \
+  Microsoft.KeyVault \
+  Microsoft.DBforPostgreSQL \
+  Microsoft.Network \
+  Microsoft.Compute \
+  Microsoft.Storage; do
+  az provider register --namespace "$PROVIDER" --wait --output none
+  echo "  ✓ $PROVIDER"
+done
+
 # ── 1. Resource group ─────────────────────────────────────────────────────────
 echo ""
-echo "▶ 1/8 — Resource group..."
+echo "▶ 1/9 — Resource group..."
 az group create --name "$RG" --location "$LOCATION" --output none
 echo "  ✓ Resource group '$RG' ready"
 
 # ── 2. Virtual network ────────────────────────────────────────────────────────
 echo ""
-echo "▶ 2/8 — Virtual network..."
-az network vnet create \
-  --resource-group "$RG" --name "$VNET" \
-  --address-prefix 10.0.0.0/8 --output none
+echo "▶ 2/9 — Virtual network..."
+if ! az network vnet show --resource-group "$RG" --name "$VNET" --output none 2>/dev/null; then
+  az network vnet create \
+    --resource-group "$RG" --name "$VNET" \
+    --address-prefix 10.0.0.0/8 --output none
+fi
 
-az network vnet subnet create \
-  --resource-group "$RG" --vnet-name "$VNET" \
-  --name aks-subnet --address-prefixes 10.240.0.0/16 --output none
+if ! az network vnet subnet show --resource-group "$RG" --vnet-name "$VNET" --name aks-subnet --output none 2>/dev/null; then
+  az network vnet subnet create \
+    --resource-group "$RG" --vnet-name "$VNET" \
+    --name aks-subnet --address-prefixes 10.240.0.0/16 --output none
+fi
 
 AKS_SUBNET_ID=$(az network vnet subnet show \
   --resource-group "$RG" --vnet-name "$VNET" --name aks-subnet \
@@ -75,29 +103,50 @@ echo "  ✓ VNet '$VNET' + subnet ready"
 
 # ── 3. Azure Container Registry ───────────────────────────────────────────────
 echo ""
-echo "▶ 3/8 — Azure Container Registry..."
-az acr create --resource-group "$RG" --name "$ACR" --sku Basic --output none
+echo "▶ 3/9 — Azure Container Registry..."
+if ! az acr show --name "$ACR" --resource-group "$RG" --output none 2>/dev/null; then
+  az acr create --resource-group "$RG" --name "$ACR" --sku Basic --output none
+fi
 echo "  ✓ ACR '$ACR.azurecr.io' ready"
 
 # ── 4. AKS cluster ────────────────────────────────────────────────────────────
 echo ""
-echo "▶ 4/8 — AKS cluster (this takes ~5–8 min)..."
-az aks create \
-  --resource-group "$RG" --name "$AKS" \
-  --node-count 3 --node-vm-size Standard_D4s_v3 \
-  --network-plugin azure --vnet-subnet-id "$AKS_SUBNET_ID" \
-  --enable-managed-identity \
-  --enable-addons azure-keyvault-secrets-provider \
-  --enable-secret-rotation \
-  --rotation-poll-interval 2m \
-  --generate-ssh-keys \
-  --output none
-echo "  ✓ AKS cluster '$AKS' ready"
+echo "▶ 4/9 — AKS cluster (this takes ~5–8 min)..."
+# --node-vm-size Standard_B2s_v2 = 2 vCPU / 4 GB RAM — cheapest allowed on free subscriptions in westeurope.
+# Standard_D4s_v3 (4 / 16 GiB) would be a more appropriate choice for production.
+# --node-count 1 to save costs
+if ! az aks show --resource-group "$RG" --name "$AKS" --output none 2>/dev/null; then
+  az aks create \
+    --resource-group "$RG" --name "$AKS" \
+    --node-count 1 --node-vm-size Standard_B2s_v2 \
+    --network-plugin azure --vnet-subnet-id "$AKS_SUBNET_ID" \
+    --enable-managed-identity \
+    --enable-oidc-issuer \
+    --enable-workload-identity \
+    --enable-addons azure-keyvault-secrets-provider \
+    --enable-secret-rotation \
+    --rotation-poll-interval 2m \
+    --generate-ssh-keys \
+    --output none
+  echo "  ✓ AKS cluster '$AKS' created"
+else
+  echo "  ✓ AKS cluster '$AKS' already exists, skipping"
+fi
 
 echo ""
 echo "▶ Attaching ACR to AKS (managed identity pull — no imagePullSecrets needed)..."
-az aks update --resource-group "$RG" --name "$AKS" --attach-acr "$ACR" --output none
-echo "  ✓ AKS can pull from $ACR.azurecr.io"
+ACR_ID=$(az acr show --name "$ACR" --resource-group "$RG" --query id -o tsv)
+AKS_KUBELET_IDENTITY=$(az aks show --resource-group "$RG" --name "$AKS" \
+  --query "identityProfile.kubeletidentity.objectId" -o tsv)
+EXISTING_ROLE=$(az role assignment list \
+  --assignee "$AKS_KUBELET_IDENTITY" --scope "$ACR_ID" --role "AcrPull" \
+  --query "[0].id" -o tsv 2>/dev/null || true)
+if [ -z "$EXISTING_ROLE" ]; then
+  az aks update --resource-group "$RG" --name "$AKS" --attach-acr "$ACR" --output none
+  echo "  ✓ AKS can pull from $ACR.azurecr.io"
+else
+  echo "  ✓ AKS already has AcrPull on $ACR.azurecr.io, skipping"
+fi
 
 echo ""
 echo "▶ Fetching kubeconfig..."
@@ -111,7 +160,7 @@ echo "  ✓ Kubeconfig → $KUBECONFIG_LOCAL"
 # Traefik v3 acts as the gateway controller.
 # Standard LoadBalancer is created automatically by Azure — ~€15/month.
 echo ""
-echo "▶ 5/8 — Gateway API CRDs + Traefik v3 (Helm)..."
+echo "▶ 5/9 — Gateway API CRDs + Traefik v3 (Helm)..."
 export KUBECONFIG="$KUBECONFIG_LOCAL"
 
 # Install Gateway API standard CRDs (GatewayClass, Gateway, HTTPRoute, etc.)
@@ -126,6 +175,7 @@ helm repo update
 
 helm upgrade --install traefik traefik/traefik \
   --namespace traefik --create-namespace \
+  --skip-crds \
   --set providers.kubernetesGateway.enabled=true \
   --set providers.kubernetesIngress.enabled=false \
   --set gateway.name=traefik \
@@ -143,44 +193,79 @@ echo "     KUBECONFIG=~/.kube/aks-erp.yaml kubectl get svc -n traefik"
 
 # ── 6. Azure Key Vault ────────────────────────────────────────────────────────
 echo ""
-echo "▶ 6/8 — Azure Key Vault..."
-az keyvault create \
-  --resource-group "$RG" --name "$KV" \
-  --location "$LOCATION" --sku standard \
-  --enable-rbac-authorization false \
-  --output none
+echo "▶ 6/9 — Azure Key Vault..."
+if ! az keyvault show --name "$KV" --resource-group "$RG" --output none 2>/dev/null; then
+  az keyvault create \
+    --resource-group "$RG" --name "$KV" \
+    --location "$LOCATION" --sku standard \
+    --enable-rbac-authorization false \
+    --output none
+fi
 
 # Grant the AKS Key Vault Secrets Provider managed identity GET+LIST on secrets
 KV_IDENTITY_CLIENT_ID=$(az aks show \
   --resource-group "$RG" --name "$AKS" \
   --query "addonProfiles.azureKeyvaultSecretsProvider.identity.clientId" -o tsv)
 
+# Use object-id (more reliable than --spn for managed identities)
+KV_IDENTITY_OBJECT_ID=$(az ad sp show --id "$KV_IDENTITY_CLIENT_ID" --query id -o tsv)
+
 az keyvault set-policy --name "$KV" \
-  --spn "$KV_IDENTITY_CLIENT_ID" \
+  --object-id "$KV_IDENTITY_OBJECT_ID" \
   --secret-permissions get list \
   --output none
 
 echo "  ✓ Key Vault '$KV' ready"
 echo "  Key Vault Identity Client ID: $KV_IDENTITY_CLIENT_ID"
 
+# Create federated identity credential so the CSI Secrets Store driver can
+# authenticate to Key Vault using workload identity (OIDC token exchange).
+NODE_RG=$(az aks show -g "$RG" -n "$AKS" --query nodeResourceGroup -o tsv)
+OIDC_ISSUER=$(az aks show -g "$RG" -n "$AKS" --query "oidcIssuerProfile.issuerUrl" -o tsv)
+KV_IDENTITY_NAME="azurekeyvaultsecretsprovider-${AKS}"
+
+if ! az identity federated-credential show \
+  --name "keyvault-federated-credential-${NAMESPACE}" \
+  --identity-name "$KV_IDENTITY_NAME" \
+  --resource-group "$NODE_RG" --output none 2>/dev/null; then
+  az identity federated-credential create \
+    --name "keyvault-federated-credential-${NAMESPACE}" \
+    --identity-name "$KV_IDENTITY_NAME" \
+    --resource-group "$NODE_RG" \
+    --issuer "$OIDC_ISSUER" \
+    --subject "system:serviceaccount:${NAMESPACE}:default" \
+    --audiences "api://AzureADTokenExchange" \
+    --output none
+  echo "  ✓ Federated identity credential created for ${NAMESPACE}:default"
+else
+  echo "  ✓ Federated identity credential already exists, skipping"
+fi
+
 # ── 7. Azure Database for PostgreSQL Flexible Server ──────────────────────────
 echo ""
-echo "▶ 7/8 — PostgreSQL Flexible Server (this takes ~3–5 min)..."
-az postgres flexible-server create \
-  --resource-group "$RG" --name "$PG_SERVER" \
-  --location "$LOCATION" \
-  --admin-user "$PG_ADMIN" --admin-password "$PG_PASS" \
-  --sku-name Standard_B2ms --tier Burstable \
-  --storage-size 32 --version 16 \
-  --public-access 0.0.0.0 \
-  --output none
+echo "▶ 7/9 — PostgreSQL Flexible Server (this takes ~3–5 min)..."
+# --sku-name Standard_B1ms = Azure Database for PostgreSQL Basic tier, 1 vCore, 2 GB RAM (cheapest option, free for new accounts)
+if ! az postgres flexible-server show --resource-group "$RG" --name "$PG_SERVER" --output none 2>/dev/null; then
+  az postgres flexible-server create \
+    --resource-group "$RG" --name "$PG_SERVER" \
+    --location "$PG_LOCATION" \
+    --admin-user "$PG_ADMIN" --admin-password "$PG_PASS" \
+    --sku-name Standard_B1ms --tier Burstable \
+    --storage-size 32 --version 16 \
+    --public-access 0.0.0.0 \
+    --output none
+fi
 
 echo "▶ Creating ERP databases..."
 for DB in erp_users erp_inventory erp_sales erp_financial erp_dashboard erp_orchestration; do
-  az postgres flexible-server db create \
-    --resource-group "$RG" --server-name "$PG_SERVER" \
-    --database-name "$DB" --output none
-  echo "  ✓ $DB"
+  if ! az postgres flexible-server db show --resource-group "$RG" --server-name "$PG_SERVER" --database-name "$DB" --output none 2>/dev/null; then
+    az postgres flexible-server db create \
+      --resource-group "$RG" --server-name "$PG_SERVER" \
+      --database-name "$DB" --output none
+    echo "  ✓ $DB created"
+  else
+    echo "  ✓ $DB already exists, skipping"
+  fi
 done
 
 PG_HOST="${PG_SERVER}.postgres.database.azure.com"
@@ -188,7 +273,7 @@ echo "  ✓ PostgreSQL host: $PG_HOST"
 
 # ── 8. Store secrets in Key Vault ─────────────────────────────────────────────
 echo ""
-echo "▶ 8/8 — Populating Key Vault secrets..."
+echo "▶ 8/9 — Populating Key Vault secrets..."
 
 PG_SSL="Ssl Mode=Require;Trust Server Certificate=true"
 PG_BASE="Host=${PG_HOST};Port=5432;Username=${PG_ADMIN};Password=${PG_PASS};${PG_SSL}"
@@ -220,7 +305,7 @@ echo "  AZURE_KV_IDENTITY_CLIENT_ID=${KV_IDENTITY_CLIENT_ID}"
 echo "  AZ_PG_HOST=${PG_HOST}"
 echo ""
 echo "  ── Then run (in order) ─────────────────────────────────────"
-echo "  1. Point DNS A record:  AZURE_DOMAIN → ${NGINX_IP}"
+echo "  1. Point DNS A record:  AZURE_DOMAIN → ${TRAEFIK_IP}"
 echo "  2. bash infrastructure/cert-manager/install-azure.sh"
 echo "  3. bash scripts/aks-build-push.sh"
 echo "  4. bash scripts/aks-deploy.sh"
