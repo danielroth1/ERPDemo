@@ -34,18 +34,20 @@ spec:
   listeners:
     # HTTP listener: accepts ACME http01 challenge traffic and redirects everything
     # else to HTTPS (see erp-https-redirect HTTPRoute below).
+    # Port must match Traefik's entrypoint port (8000), NOT the external LB port (80).
     - name: web
       protocol: HTTP
-      port: 80
+      port: 8000
       allowedRoutes:
         namespaces:
           from: Same
     # HTTPS listeners: Traefik terminates TLS using the cert-manager-managed secret.
     # All three listeners share erp-azure-tls-cert — cert-manager creates one
     # SAN certificate covering all hostnames.
+    # Port must match Traefik's entrypoint port (8443), NOT the external LB port (443).
     - name: websecure
       protocol: HTTPS
-      port: 443
+      port: 8443
       hostname: "AZURE_DOMAIN_PLACEHOLDER"
       tls:
         mode: Terminate
@@ -57,7 +59,7 @@ spec:
           from: Same
     - name: websecure-www
       protocol: HTTPS
-      port: 443
+      port: 8443
       hostname: "www.AZURE_DOMAIN_PLACEHOLDER"
       tls:
         mode: Terminate
@@ -69,7 +71,7 @@ spec:
           from: Same
     - name: websecure-monitoring
       protocol: HTTPS
-      port: 443
+      port: 8443
       hostname: "monitoring.AZURE_DOMAIN_PLACEHOLDER"
       tls:
         mode: Terminate
@@ -118,7 +120,7 @@ spec:
             value: /api
       backendRefs:
         - name: gateway-service
-          port: 8080
+          port: 80
     # /dashboardHub -> SignalR hub (WebSocket — Traefik handles WS natively)
     - matches:
         - path:

@@ -178,7 +178,7 @@ helm upgrade --install traefik traefik/traefik \
   --skip-crds \
   --set providers.kubernetesGateway.enabled=true \
   --set providers.kubernetesIngress.enabled=false \
-  --set gateway.name=traefik \
+  --set gateway.enabled=false \
   --set service.type=LoadBalancer \
   --set "service.annotations.service\\.beta\\.kubernetes\\.io/azure-load-balancer-health-probe-request-path"=/ping \
   --set service.externalTrafficPolicy=Local \
