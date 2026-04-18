@@ -70,12 +70,23 @@
       "type": "promptString",
       "description": "AKS node pool count (0 = scale down to save cost, 3 = normal)",
       "default": "1"
+    },
+    {
+      "id": "mirrordKey",
+      "type": "promptString",
+      "description": "Your mirrord session key (used in header 'x-mirrord-session: <key>' and OTEL_SERVICE_NAME suffix)",
+      "default": "dev"
     }
   ],
   "tasks": [
     // ============================================================
     // ASPIRE TASKS
     // ============================================================
+    {
+      "label": "aspire",
+      "dependsOn": ["aspire: stop", "aspire: watch-apphost"],
+      "problemMatcher": []
+    },
     {
       "label": "aspire: stop",
       "type": "shell",
@@ -105,6 +116,19 @@
     // ============================================================
     // BACKEND TASKS
     // ============================================================
+    {
+      "label": "backend",
+      "dependsOn": [
+        "backend: stop-all-services",
+        "backend: restart-all-services",
+        "backend: watch-all-services",
+        "backend: build-all-services",
+        "backend: test-all",
+        "backend: update-all-api-clients",
+        "backend: update-api-clients"
+      ],
+      "problemMatcher": []
+    },
     {
       "label": "backend: stop-all-services",
       "type": "shell",
@@ -370,6 +394,23 @@
     // FRONTEND TASKS
     // ============================================================
     {
+      "label": "frontend",
+      "dependsOn": [
+        "frontend: dev",
+        "frontend: build",
+        "frontend: lint",
+        "frontend: generate-all-api-clients",
+        "frontend: generate-api-client",
+        "frontend: check-services",
+        "frontend: use-local-gateway",
+        "frontend: use-k8s-gateway",
+        "frontend: test",
+        "frontend: test:watch",
+        "frontend: test:coverage"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "frontend: dev",
       "command": "npm",
       "type": "shell",
@@ -477,6 +518,16 @@
     // E2E TEST TASKS
     // ============================================================
     {
+      "label": "e2e",
+      "dependsOn": [
+        "e2e: test",
+        "e2e: test:all-browsers",
+        "e2e: test:ui",
+        "e2e: install-browsers"
+      ],
+      "problemMatcher": []
+    },
+    {
       "label": "e2e: test",
       "type": "shell",
       "command": "npx playwright test --project=chromium",
@@ -513,6 +564,20 @@
     // ============================================================
     // INFRASTRUCTURE TASKS
     // ============================================================
+    {
+      "label": "infra",
+      "dependsOn": [
+        "infra: dev-infrastructure",
+        "infra: dev-infrastructure-offline",
+        "infra: stop-dev-infrastructure",
+        "infra: docker-compose-up",
+        "infra: docker-compose-down",
+        "infra: logs",
+        "infra: mongodb-shell",
+        "infra: kafka-topics-list"
+      ],
+      "problemMatcher": []
+    },
     {
       "label": "infra: dev-infrastructure",
       "command": "docker",
@@ -588,6 +653,29 @@
     // ============================================================
     // KUBERNETES TASKS
     // ============================================================
+    {
+      "label": "k8s",
+      "dependsOn": [
+        "k8s: deploy-local",
+        "k8s: delete-local",
+        "k8s: get-pods",
+        "k8s: get-services",
+        "k8s: logs-all",
+        "k8s: build-images",
+        "k8s: port-forward-frontend",
+        "k8s: port-forward-gateway",
+        "k8s: port-forward-postgres",
+        "k8s: port-forward-kafka",
+        "k8s: port-forward-pgadmin",
+        "k8s: deploy-service",
+        "k8s: stop-service",
+        "k8s: restart",
+        "k8s: get-pod-name",
+        "k8s: kill-port-forwards",
+        "k8s: stop-local"
+      ],
+      "problemMatcher": []
+    },
     {
       "label": "k8s: deploy-local",
       "command": "kubectl",
@@ -747,6 +835,20 @@
     // PRODUCTION / K3S TASKS  (server: ${K3S_SERVER})
     // ============================================================
     {
+      "label": "prod",
+      "dependsOn": [
+        "prod: install-cert-manager",
+        "prod: setup-server",
+        "prod: build-push",
+        "prod: deploy",
+        "prod: build-push-deploy",
+        "prod: status",
+        "prod: logs",
+        "prod: rollout-restart"
+      ],
+      "problemMatcher": []
+    },
+    {
       // One-time: installs cert-manager on the k3s cluster and creates
       // Let's Encrypt ClusterIssuers (prod + staging) for shopping-now.net.
       // Run before 'prod: deploy' when setting up TLS for the first time.
@@ -850,6 +952,26 @@
     // Kubeconfig: ~/.kube/aks-erp.yaml  (created by azure: provision)
     // See .github/instructions/azure.instructions.md for full workflow.
     // ============================================================
+    {
+      "label": "azure",
+      "dependsOn": [
+        "azure: login",
+        "azure: provision",
+        "azure: install-cert-manager",
+        "azure: build-push",
+        "azure: deploy",
+        "azure: build-push-deploy",
+        "azure: status",
+        "azure: logs",
+        "azure: rollout-restart",
+        "azure: keyvault-list",
+        "azure: scale-nodes",
+        "azure: stop",
+        "azure: start",
+        "azure: delete-resource-group"
+      ],
+      "problemMatcher": []
+    },
     {
       // Run this FIRST at the start of any Azure session.
       // Opens a browser for interactive login. Credentials are cached in
@@ -1012,6 +1134,153 @@
       ],
       "problemMatcher": [],
       "presentation": { "reveal": "always" }
+    },
+
+    // ─── mirrord: Azure (AKS) ───────────────────────────────────────────────────
+    // Run a service locally while intercepting matching cluster traffic.
+    // Prerequisites: `mirrord` CLI installed (brew install metalbear-co/mirrord/mirrord)
+    // You will be prompted for a session key (your name/alias). The same key must be used
+    // as the header value: add "x-mirrord-session: <key>" to requests you want to intercept.
+    // To also debug: run this task first, then attach via "Backend: Attach to <Service>".
+    {
+      "label": "mirrord: azure",
+      "dependsOn": [
+        "mirrord: azure: gateway",
+        "mirrord: azure: user-management",
+        "mirrord: azure: inventory",
+        "mirrord: azure: sales",
+        "mirrord: azure: financial",
+        "mirrord: azure: dashboard",
+        "mirrord: azure: orchestration"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "mirrord: azure: gateway",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/azure/gateway.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-azure" }
+    },
+    {
+      "label": "mirrord: azure: user-management",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/azure/user-management.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-azure" }
+    },
+    {
+      "label": "mirrord: azure: inventory",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/azure/inventory.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-azure" }
+    },
+    {
+      "label": "mirrord: azure: sales",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/azure/sales.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-azure" }
+    },
+    {
+      "label": "mirrord: azure: financial",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/azure/financial.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-azure" }
+    },
+    {
+      "label": "mirrord: azure: dashboard",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/azure/dashboard.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-azure" }
+    },
+    {
+      "label": "mirrord: azure: orchestration",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/azure/orchestration.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/orchestration/Orchestration/Orchestration.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-azure" }
+    },
+
+    // ─── mirrord: Contabo (k3s/prod) ────────────────────────────────────────────
+    {
+      "label": "mirrord: contabo",
+      "dependsOn": [
+        "mirrord: contabo: gateway",
+        "mirrord: contabo: user-management",
+        "mirrord: contabo: inventory",
+        "mirrord: contabo: sales",
+        "mirrord: contabo: financial",
+        "mirrord: contabo: dashboard",
+        "mirrord: contabo: orchestration"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "mirrord: contabo: gateway",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/contabo/gateway.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-contabo" }
+    },
+    {
+      "label": "mirrord: contabo: user-management",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/contabo/user-management.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-contabo" }
+    },
+    {
+      "label": "mirrord: contabo: inventory",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/contabo/inventory.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-contabo" }
+    },
+    {
+      "label": "mirrord: contabo: sales",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/contabo/sales.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-contabo" }
+    },
+    {
+      "label": "mirrord: contabo: financial",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/contabo/financial.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-contabo" }
+    },
+    {
+      "label": "mirrord: contabo: dashboard",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/contabo/dashboard.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-contabo" }
+    },
+    {
+      "label": "mirrord: contabo: orchestration",
+      "type": "shell",
+      "command": "mirrord exec --key ${input:mirrordKey} --config-file ${workspaceFolder}/.mirrord/contabo/orchestration.mirrord.json -- dotnet watch run --project ${workspaceFolder}/services/orchestration/Orchestration/Orchestration.csproj",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "mirrord-contabo" }
     }
   ]
 }

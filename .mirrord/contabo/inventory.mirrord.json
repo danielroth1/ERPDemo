@@ -1,0 +1,37 @@
+{
+  "agent": {
+    "ephemeral": true
+  },
+  "key": "REPLACE_ME",
+  "kubeconfig": "~/.kube/k3s-erp.yaml",
+  "target": {
+    "path": "deployment/inventory",
+    "namespace": "erp-prod"
+  },
+  "feature": {
+    "env": {
+      "override": {
+        "ASPNETCORE_URLS": "http://localhost:5002",
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "OTEL_SERVICE_NAME": "inventory-local-{{ key }}"
+      }
+    },
+    "network": {
+      "incoming": {
+        "mode": "steal",
+        "http_filter": {
+          "header_filter": "^x-mirrord-session: {{ key }}$"
+        },
+        "port_mapping": [
+          [
+            5002,
+            8080
+          ]
+        ]
+      }
+    },
+    "fs": {
+      "mode": "local"
+    }
+  }
+}

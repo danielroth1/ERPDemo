@@ -36,10 +36,10 @@
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.8.1" />
     <PackageReference Include="MassTransit" Version="8.4.0" />
     <PackageReference Include="MassTransit.Kafka" Version="8.4.0" />
-    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.10.1" />
-    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.10.0" />
-    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.10.0" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" Version="1.14.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.14.0" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" Version="1.14.0" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.14.0" />
 
     <!-- Kiota Dependencies for Generated API Clients -->
     <PackageReference Include="Microsoft.Kiota.Abstractions" Version="1.17.3" />
