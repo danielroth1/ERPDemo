@@ -1,0 +1,56 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+.NET Aspire is the main local orchestration entry point for this system. It lets one .NET application describe the whole development environment.
+
+== In This Repository
+
+`AppHost/Program.cs` defines infrastructure and service relationships. It is the most accurate single-file summary of the current runtime topology.
+
+== Setup Example
+
+[source,bash]
+----
+dotnet run --project AppHost/AppHost.csproj
+----
+
+[source,csharp]
+----
+var postgres = builder.AddPostgres("postgres", password: postgresPassword)
+    .WithDataVolume();
+
+var kafka = builder.AddKafka("kafka")
+    .WithDataVolume();
+
+var rabbitmq = builder.AddRabbitMQ("rabbitmq")
+    .WithDataVolume();
+
+var gateway = builder.AddProject<Projects.ApiGateway>("gateway")
+    .WithReference(kafka);
+
+builder.AddViteApp("frontend", "../frontend", "dev")
+    .WithReference(gateway);
+----
+
+== React Client Setup
+
+The frontend is included as a Vite app inside Aspire, so local frontend startup can be part of the same orchestrated environment.
+
+== Simple Example
+
+Aspire can launch infrastructure, backend services, and the Vite frontend together and gives developers one dashboard for logs and runtime status.
+
+== Advantages
+
+* Excellent local orchestration experience for a .NET-heavy system.
+* One place to describe dependencies.
+* Good local visibility through the Aspire dashboard.
+
+== Disadvantages
+
+* Mainly a development-time convenience, not a production platform.
+* Teams still need Docker and Kubernetes knowledge for later environments.

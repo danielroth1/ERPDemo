@@ -1,0 +1,41 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+The production overlay targets a self-hosted k3s environment. This is useful when you want a production-style cluster without a managed cloud control plane.
+
+== In This Repository
+
+The private server path uses:
+
+* k3s instead of a managed Kubernetes service
+* GHCR image pull secrets
+* Traefik ingress
+* production overlay patches that reduce public services to `ClusterIP`
+
+== Setup Example
+
+[source,bash]
+----
+export REGISTRY=ghcr.io/YOURUSER
+export TAG=latest
+bash scripts/k3s-build-push.sh
+bash scripts/k3s-deploy.sh
+----
+
+== React Client Setup
+
+The frontend is accessed through the ingress address or domain exposed by the private cluster. The browser should still see one public entry point, not individual pods.
+
+== Advantages
+
+* Full control over the cluster.
+* Good fit for a self-hosted deployment story.
+
+== Disadvantages
+
+* You operate the cluster yourself.
+* Secrets, backups, and upgrades remain your responsibility.

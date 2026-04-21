@@ -1,0 +1,119 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+GraphQL lets the client ask for exactly the fields it needs. In ERPDemo it is used mainly for read-heavy scenarios where the frontend wants flexible response shapes.
+
+== In This Repository
+
+GraphQL is used where rich read models matter more than plain CRUD.
+
+* Inventory uses GraphQL for product reads and combines it with projections and DataLoader.
+* Sales exposes richer GraphQL read scenarios.
+* Dashboard uses GraphQL queries, mutations, and subscriptions.
+
+== ASP.NET Server Setup
+
+The inventory service is the clearest example because it combines skill:C#[] GraphQL setup with EF Core projections.
+
+[source,csharp]
+----
+builder.Services
+    .AddGraphQLServer()
+    .AddQueryType<Query>()
+    .AddTypeExtension<ProductTypeExtension>()
+    .AddProjections()
+    .AddFiltering();
+
+[UseOffsetPaging(DefaultPageSize = 20, MaxPageSize = 100, IncludeTotalCount = true)]
+[UseProjection]
+[UseFiltering]
+public IQueryable<Product> GetProducts([Service] AppDbContext db)
+    => db.Products.OrderBy(p => p.Name);
+----
+
+=== DataLoader Example
+
+The batch DataLoader prevents one nested query per product row.
+
+[source,csharp]
+----
+public class ProductDocumentsByProductIdDataLoader
+    : BatchDataLoader<string, IReadOnlyList<ProductDocument>>
+{
+    protected override async Task<IReadOnlyDictionary<string, IReadOnlyList<ProductDocument>>> LoadBatchAsync(
+        IReadOnlyList<string> keys,
+        CancellationToken cancellationToken)
+    {
+        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+
+        var docs = await db.ProductDocuments
+            .Where(d => keys.Contains(d.ProductId))
+            .ToListAsync(cancellationToken);
+
+        return keys.ToDictionary(
+            key => key,
+            key => (IReadOnlyList<ProductDocument>)docs.Where(d => d.ProductId == key).ToList());
+    }
+}
+----
+
+== React Client Setup
+
+Each GraphQL backend gets its own Apollo client.
+
+[source,typescript]
+----
+const inventoryClient = createApolloClient('inventory');
+
+const { data } = await inventoryClient.query({
+  query: GET_PRODUCTS,
+  variables: { skip: 0, take: 10 },
+});
+----
+
+== Simple Example
+
+[source,graphql]
+----
+query GetProductWithDocuments($id: String!) {
+  product(id: $id) {
+    id
+    name
+    sku
+    price
+    documents {
+      id
+      originalFileName
+      contentType
+    }
+  }
+}
+----
+
+=== Why Projections Matter
+
+When a screen requests only `id`, `name`, and `price`, `UseProjection` lets EF Core generate narrower SQL instead of loading every column.
+
+=== Why DataLoader Matters
+
+Without DataLoader, loading 20 products with documents can easily turn into 21 database queries. With DataLoader, the nested document lookup is batched.
+
+=== Subscriptions
+
+Dashboard also uses GraphQL subscriptions so clients can receive pushed updates instead of polling for every change.
+
+== Advantages
+
+* Frontend screens can request exactly the fields they need.
+* Good fit for dashboards and nested read models.
+* Projections and batching can reduce database work.
+
+== Disadvantages
+
+* More complex than plain REST.
+* Query cost needs discipline.
+* HTTP-level caching is less straightforward.

@@ -1,0 +1,51 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+Telepresence lets you run one service locally while redirecting matching traffic from a remote Kubernetes cluster to your machine.
+
+== In This Repository
+
+The repository uses header-based personal intercepts. Each developer chooses a unique session key such as `x-telepresence-session: alice`.
+
+== Setup Example
+
+[source,bash]
+----
+brew install telepresenceio/telepresence/telepresence-oss
+telepresence version
+
+KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure
+
+telepresence intercept gateway \
+  --port 8080:http \
+  --http-header 'x-telepresence-session=alice' \
+  -- dotnet watch run --project services/gateway/ApiGateway/ApiGateway.csproj
+----
+
+== React Client Setup
+
+[source,typescript]
+----
+fetch('/api/v1/users', {
+  headers: { 'x-telepresence-session': 'alice' },
+});
+----
+
+== Simple Example
+
+You can keep the AKS cluster running, intercept only the gateway, and debug your local code against real remote dependencies.
+
+== Advantages
+
+* Very useful for debugging remote clusters.
+* Good fit for multi-developer shared environments.
+* Lets you combine local code with remote infrastructure.
+
+== Disadvantages
+
+* Adds networking complexity.
+* Missing headers can make debugging confusing.

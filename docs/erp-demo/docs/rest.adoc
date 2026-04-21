@@ -1,0 +1,88 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+REST is still the simplest and most common communication style in this repository. A client sends an HTTP request to an endpoint and gets a response back.
+
+== In This Repository
+
+REST remains the default integration style for many write paths and straightforward CRUD operations.
+
+* The API gateway routes incoming REST paths with YARP.
+* Many frontend business actions use Kiota-generated REST clients.
+* Controllers remain the main write-path for transactional operations.
+
+== ASP.NET Server Setup
+
+The gateway forwards REST paths to the correct service.
+
+[source,json]
+----
+{
+  "inventory-products-route": {
+    "ClusterId": "inventory-cluster",
+    "AuthorizationPolicy": "authenticated",
+    "Match": {
+      "Path": "/api/v1/products/{**catch-all}"
+    }
+  }
+}
+----
+
+Backend services expose controllers in the standard ASP.NET Core way.
+
+[source,csharp]
+----
+builder.Services.AddControllers();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(...);
+builder.Services.AddAuthorization();
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+----
+
+== React Client Setup
+
+The frontend mainly uses Kiota-generated clients and a shared Axios service for token-aware requests.
+
+[source,typescript]
+----
+const products = await inventoryApiClient.getProducts();
+const orders = await salesApiClient.getOrders();
+
+const me = await apiService.get('/api/v1/users/me');
+----
+
+The shop workflow also starts with a REST call into orchestration.
+
+[source,typescript]
+----
+async purchaseProduct(productId: string, quantity: number = 1) {
+  return await this.orchestrationClient.api.v1.shop.purchase
+    .byProductId(productId)
+    .post({ queryParameters: { quantity } });
+}
+----
+
+== Simple Example
+
+A product table screen can load a page of products with one authenticated `GET /api/v1/products` request and then render the results directly.
+
+== Advantages
+
+* Easy to understand and debug.
+* A good fit for commands, mutations, and CRUD endpoints.
+* Works well with generated clients and HTTP middleware.
+
+== Disadvantages
+
+* A complex screen may need several requests.
+* Clients can over-fetch or under-fetch data.
+* Cross-service read composition is awkward if every screen is pure REST.

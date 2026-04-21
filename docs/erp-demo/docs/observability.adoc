@@ -1,0 +1,89 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+Observability means being able to understand what the system is doing at runtime. This repository uses the standard three signals: metrics, logs, and traces.
+
+== In This Repository
+
+Current stack responsibilities:
+
+* Prometheus scrapes and stores metrics.
+* Alloy receives OTLP telemetry and forwards logs and traces.
+* Loki stores logs.
+* Tempo stores traces.
+* Grafana visualizes and correlates the data.
+
+== ASP.NET Server Setup
+
+Shared service defaults enable OpenTelemetry and health endpoints.
+
+[source,csharp]
+----
+public static IHostApplicationBuilder AddServiceDefaults(this IHostApplicationBuilder builder)
+{
+    builder.ConfigureOpenTelemetry();
+    builder.AddDefaultHealthChecks();
+    builder.Services.AddServiceDiscovery();
+    return builder;
+}
+----
+
+[source,csharp]
+----
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        metrics.AddAspNetCoreInstrumentation()
+               .AddHttpClientInstrumentation();
+    })
+    .WithTracing(tracing =>
+    {
+        tracing.AddAspNetCoreInstrumentation()
+               .AddHttpClientInstrumentation()
+               .AddSource("MassTransit");
+    });
+----
+
+== Infrastructure Setup
+
+[source,hcl]
+----
+otelcol.receiver.otlp "host_services" {
+  grpc {
+    endpoint = "0.0.0.0:4319"
+  }
+
+  output {
+    logs   = [otelcol.exporter.loki.default.input]
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+----
+
+== React Client Setup
+
+There is no strong browser-side telemetry pipeline in the current frontend code. Observability today is primarily backend and infrastructure focused.
+
+== Simple Example
+
+The useful operator flow is:
+
+1. open Grafana
+2. see a metric spike in Prometheus panels
+3. jump to related logs in Loki
+4. follow the trace identifier to Tempo
+
+== Advantages
+
+* Good visibility across services.
+* Metrics, logs, and traces can be correlated.
+* Helpful for debugging asynchronous workflows.
+
+== Disadvantages
+
+* The stack itself needs operation and maintenance.
+* Good telemetry only happens if services are instrumented consistently.

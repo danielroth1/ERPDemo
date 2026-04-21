@@ -1,0 +1,55 @@
+digraph k8s_topology {
+  rankdir=TB;
+  graph [nodesep=0.5, ranksep=0.8, splines=ortho];
+  node [shape=box, style="rounded", fontsize=11];
+
+  user [label="Developer / Browser"];
+  ingress [label="Traefik / Gateway API"];
+  gateway [label="API Gateway pods"];
+
+  inventory [label="Inventory pods"];
+  sales [label="Sales pods"];
+  financial [label="Financial pods"];
+  dashboard [label="Dashboard pods"];
+  orchestration [label="Orchestration pods"];
+  users [label="User Management pods"];
+
+  postgres [label="PostgreSQL\nor Azure Database", shape=cylinder];
+  kafka [label="Kafka", shape=component];
+  rabbit [label="RabbitMQ", shape=component];
+  minio [label="MinIO", shape=cylinder];
+  grafana [label="Grafana / Loki / Tempo / Prometheus", shape=folder];
+
+  user -> ingress -> gateway;
+  gateway -> inventory;
+  gateway -> sales;
+  gateway -> financial;
+  gateway -> dashboard;
+  gateway -> orchestration;
+  gateway -> users;
+
+  inventory -> postgres;
+  sales -> postgres;
+  financial -> postgres;
+  dashboard -> postgres;
+  orchestration -> postgres;
+  users -> postgres;
+
+  inventory -> minio;
+  inventory -> kafka;
+  sales -> kafka;
+  financial -> kafka;
+  dashboard -> kafka;
+  orchestration -> kafka;
+  orchestration -> rabbit;
+  inventory -> rabbit;
+  financial -> rabbit;
+
+  gateway -> grafana [style=dashed];
+  inventory -> grafana [style=dashed];
+  sales -> grafana [style=dashed];
+  financial -> grafana [style=dashed];
+  dashboard -> grafana [style=dashed];
+  orchestration -> grafana [style=dashed];
+  users -> grafana [style=dashed];
+}

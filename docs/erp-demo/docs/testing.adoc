@@ -1,0 +1,176 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+Distributed systems need several test layers. A single style of test cannot answer every important question.
+
+This repository currently uses:
+
+* Unit tests for focused service logic and saga transitions
+* Component tests for React screens with mocked dependencies
+* Integration tests for real application bootstrapping and database wiring
+* System tests with Playwright for full browser flows
+
+== Why Several Test Layers Matter
+
+Unit tests are fast but isolated. System tests are realistic but slower. Integration tests sit between those extremes and validate that framework wiring actually works.
+
+The goal is not to push everything into one test type. The goal is to answer different risks at the cheapest useful layer.
+
+== Unit Tests
+
+=== Introduction
+
+Unit tests validate one small behavior at a time. In this repository, saga logic is a good unit-test target because it exercises workflow transitions without needing a full deployed environment.
+
+=== Setup Example
+
+[source,csharp]
+----
+await _harness.Bus.Publish(new SubmitPurchase
+{
+    CorrelationId = correlationId,
+    UserId = "user-1",
+    ProductId = "prod-1",
+    Quantity = 5,
+    AuthToken = "test-token"
+});
+
+(await _sagaHarness.Exists(correlationId, x => x.ReservingStock, timeout: TimeSpan.FromSeconds(5)))
+    .Should().NotBeNull();
+----
+
+=== Advantages
+
+* Fast feedback.
+* Good for business rules and state transitions.
+* Easy to run often.
+
+=== Disadvantages
+
+* Does not prove the full application wiring works.
+* Heavy mocking can hide integration problems.
+
+== Component Tests
+
+=== Introduction
+
+Component tests validate a React screen or component while mocking service dependencies. They are useful for rendering logic, loading states, error states, and user interactions.
+
+=== Setup Example
+
+[source,typescript]
+----
+vi.mock('../../services/inventory.service', () => ({
+  inventoryService: {
+    getProducts: vi.fn().mockResolvedValue({ items: [...], totalCount: 2 }),
+  },
+}));
+
+renderWithProviders(<InventoryPage />, { preloadedState: authenticatedState });
+expect(screen.getByText('Inventory Management')).toBeInTheDocument();
+----
+
+=== Advantages
+
+* Fast UI feedback without a real backend.
+* Good for user interaction and conditional rendering.
+
+=== Disadvantages
+
+* Mocked services can drift away from real backend behavior.
+* Not enough to validate authentication, routing, or network wiring end to end.
+
+== Integration Tests
+
+=== Introduction
+
+Integration tests boot the real application with real framework pieces such as ASP.NET Core, EF Core, PostgreSQL, and MassTransit test helpers.
+
+=== Setup Example
+
+[source,csharp]
+----
+Factory = new WebApplicationFactory<Program>()
+    .WithWebHostBuilder(builder =>
+    {
+        builder.UseEnvironment("Testing");
+        Environment.SetEnvironmentVariable("ConnectionStrings__erp-inventory", Postgres.ConnectionString);
+
+        services.AddDbContext<AppDbContext>(options =>
+            options.UseNpgsql(Postgres.ConnectionString)
+                .UseSnakeCaseNamingConvention());
+
+        services.AddMassTransitTestHarness();
+    });
+----
+
+=== Advantages
+
+* Validates real ASP.NET Core and EF Core wiring.
+* Catches configuration problems unit tests miss.
+* Useful for messaging and persistence boundaries.
+
+=== Disadvantages
+
+* Slower than unit and component tests.
+* Test environment setup is more complex.
+
+== System Tests
+
+=== Introduction
+
+System tests run the application like a user would: through a real browser. In this repository, Playwright covers that role.
+
+=== Setup Example
+
+[source,typescript]
+----
+export default defineConfig({
+  testDir: './tests',
+  use: {
+    baseURL: process.env.BASE_URL ?? 'http://localhost:5173',
+  },
+  projects: [
+    { name: 'chromium' },
+    { name: 'firefox' },
+    { name: 'webkit' },
+  ],
+});
+----
+
+=== Advantages
+
+* Best proof that the user journey works.
+* Good at catching UI integration problems.
+
+=== Disadvantages
+
+* Slowest and most brittle layer.
+* Needs stable environments and test data.
+
+== Choosing The Right Layer
+
+[cols="1,3",options="header"]
+|===
+| Question | Best starting layer
+
+| Is one workflow transition correct?
+| Unit test
+
+| Does one React screen render the right state?
+| Component test
+
+| Does this service boot correctly with its real database wiring?
+| Integration test
+
+| Can a user complete the full journey in a browser?
+| System test
+|===
+
+== Recommended Habit
+
+Start with the cheapest test that can prove the behavior. Move upward only when the lower layer cannot answer the question.

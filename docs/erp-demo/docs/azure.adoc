@@ -1,0 +1,50 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+Azure is the managed-cloud deployment target in this repository. The AKS overlay shows how the same application changes when moving from self-hosted infrastructure to managed services.
+
+== In This Repository
+
+The Azure design currently uses:
+
+* AKS for Kubernetes
+* ACR for container images
+* Azure Database for PostgreSQL Flexible Server
+* Azure Key Vault and the CSI driver for secret sync
+* Traefik with Gateway API resources
+
+== Setup Example
+
+[source,bash]
+----
+bash scripts/aks-provision.sh
+bash scripts/aks-build-push.sh
+bash scripts/aks-deploy.sh
+----
+
+== What Changes In Azure
+
+* AKS replaces the self-hosted cluster.
+* ACR replaces GHCR or local images.
+* Azure Database for PostgreSQL replaces the self-hosted PostgreSQL pod.
+* Azure Key Vault handles managed secret integration.
+* Gateway API resources are used with Traefik.
+
+== React Client Setup
+
+In Azure, the frontend is consumed through the public domain configured during deployment. The browser should not need to know about individual backend pods or services.
+
+== Advantages
+
+* Managed cluster and managed database options.
+* Better cloud-native secret handling.
+* Good fit for a production-style cloud deployment story.
+
+== Disadvantages
+
+* Higher cost than purely local or self-hosted paths.
+* More provider-specific knowledge is required.

@@ -1,0 +1,44 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+mirrord solves a similar problem to Telepresence: run code locally while connecting it to a remote cluster.
+
+== In This Repository
+
+This repository supports mirrord for both Azure and Contabo environments and uses a personal header key such as `x-mirrord-session: dev`.
+
+== Setup Example
+
+[source,bash]
+----
+mirrord exec --key dev \
+  --config-file .mirrord/azure/inventory.mirrord.json \
+  -- dotnet watch run --project services/inventory/InventoryManagement/InventoryManagement.csproj
+----
+
+== React Client Setup
+
+[source,typescript]
+----
+fetch('/api/v1/products', {
+  headers: { 'x-mirrord-session': 'dev' },
+});
+----
+
+== Simple Example
+
+mirrord is a good fit when you want per-process isolation and do not want system-wide Telepresence-style networking behavior on your workstation.
+
+== Advantages
+
+* Good process-level isolation.
+* No permanent Telepresence-style manager on the workstation.
+
+== Disadvantages
+
+* Still adds remote-debugging complexity.
+* Requires correct config and header filtering.

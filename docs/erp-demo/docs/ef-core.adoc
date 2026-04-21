@@ -1,0 +1,57 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+Entity Framework Core is the data-access layer used by the backend. It maps skill:C#[] classes to PostgreSQL tables and translates LINQ queries to SQL.
+
+== In This Repository
+
+The current backend uses EF Core with Npgsql for:
+
+* code-first migrations
+* one `DbContext` per service
+* snake_case naming conventions
+* automatic migration at startup in several services
+
+== ASP.NET Server Setup
+
+[source,csharp]
+----
+builder.Services.AddDbContext<AppDbContext>(options =>
+    options.UseNpgsql(postgresConnectionString)
+        .UseSnakeCaseNamingConvention());
+
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    dbContext.Database.Migrate();
+}
+----
+
+== React Client Setup
+
+React never talks to EF Core directly. It only sees EF Core-backed results through REST or GraphQL endpoints.
+
+== Simple Example
+
+[source,csharp]
+----
+public async Task<Product?> GetProduct(string id)
+{
+    return await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == id);
+}
+----
+
+== Advantages
+
+* Strong .NET integration.
+* Built-in migrations.
+* Productive query model for common CRUD work.
+
+== Disadvantages
+
+* Query performance still requires SQL awareness.
+* Complex LINQ queries can hide expensive database behavior.

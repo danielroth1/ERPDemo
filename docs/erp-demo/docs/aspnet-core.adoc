@@ -1,0 +1,66 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+ASP.NET Core is the foundation of every backend service in this repository. It handles HTTP endpoints, middleware, dependency injection, authentication, health checks, and service startup.
+
+== In This Repository
+
+Most services follow the same hosting pattern:
+
+* shared service defaults for OpenTelemetry and health checks
+* JWT authentication and authorization
+* controllers and optional GraphQL or SignalR endpoints
+* health endpoints and Prometheus metrics
+
+== ASP.NET Server Setup
+
+[source,csharp]
+----
+var builder = WebApplication.CreateBuilder(args);
+
+builder.AddServiceDefaults();
+builder.Services.AddControllers();
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(...);
+builder.Services.AddAuthorization();
+builder.Services.AddHealthChecks();
+
+var app = builder.Build();
+
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+app.MapDefaultEndpoints();
+app.MapMetrics();
+----
+
+== React Client Setup
+
+React only needs the correct gateway base URL and a valid JWT token.
+
+[source,typescript]
+----
+const baseUrl = getApiBaseUrl();
+const response = await fetch(`${baseUrl}/api/v1/products`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
+----
+
+== Simple Example
+
+The gateway itself is also an ASP.NET Core app. It uses middleware for CORS, rate limiting, authentication, metrics, and reverse proxying.
+
+== Advantages
+
+* Mature framework for APIs and distributed services.
+* Strong middleware and dependency injection model.
+* Integrates well with EF Core, SignalR, YARP, OpenTelemetry, and MassTransit.
+
+== Disadvantages
+
+* Teams need conventions so controllers, GraphQL, and middleware stay consistent.
+* Distributed systems still require design discipline beyond the framework itself.

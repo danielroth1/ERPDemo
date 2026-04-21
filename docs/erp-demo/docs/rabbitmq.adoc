@@ -1,0 +1,58 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+RabbitMQ is the queue-based broker used for command-style workflow messages. In this system it mainly carries instructions for saga steps such as reserving stock or creating a financial transaction.
+
+== In This Repository
+
+Kafka tells the system that something happened. RabbitMQ tells another service to do something next.
+
+Typical commands include:
+
+* reserve stock
+* release stock reservation
+* create purchase transaction
+* void purchase transaction
+
+== ASP.NET Server Setup
+
+[source,csharp]
+----
+x.AddConsumer<ReserveStockConsumer>();
+x.AddConsumer<DeductStockConsumer>();
+
+x.UsingRabbitMq((context, cfg) =>
+{
+    cfg.Host(new Uri(rabbitmqUri));
+
+    cfg.UseMessageRetry(r => r.Intervals(
+        TimeSpan.FromSeconds(1),
+        TimeSpan.FromSeconds(5),
+        TimeSpan.FromSeconds(15)));
+
+    cfg.ConfigureEndpoints(context);
+});
+----
+
+== React Client Setup
+
+React does not connect to RabbitMQ directly. It starts a business action over HTTP, and backend services continue the workflow asynchronously.
+
+== Simple Example
+
+The orchestration service can send a reserve-stock command to inventory through RabbitMQ and then react to the success or failure result.
+
+== Advantages
+
+* Strong fit for queued commands and retries.
+* A natural choice for workflow steps.
+* Clear separation between request initiation and background execution.
+
+== Disadvantages
+
+* Adds another broker to operate.
+* Duplicate processing and dead-letter handling require care.

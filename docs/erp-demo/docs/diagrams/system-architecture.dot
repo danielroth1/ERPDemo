@@ -1,0 +1,60 @@
+digraph architecture {
+  rankdir=LR;
+  graph [nodesep=0.5, ranksep=0.9, splines=ortho];
+  node [shape=box, style="rounded", fontsize=11];
+
+  browser [label="Browser\nReact SPA"];
+  gateway [label="API Gateway\nYARP + Auth + Rate limiting"];
+
+  users [label="User Management"];
+  inventory [label="Inventory"];
+  sales [label="Sales"];
+  financial [label="Financial"];
+  dashboard [label="Dashboard"];
+  orchestration [label="Orchestration"];
+
+  postgres [label="PostgreSQL\nservice databases", shape=cylinder];
+  kafka [label="Kafka\ndomain events", shape=component];
+  rabbit [label="RabbitMQ\nworkflow commands", shape=component];
+  redis [label="Redis", shape=cylinder];
+  minio [label="MinIO\nS3-compatible storage", shape=cylinder];
+  obs [label="Grafana / Prometheus / Loki / Tempo", shape=folder];
+
+  browser -> gateway;
+
+  gateway -> users;
+  gateway -> inventory;
+  gateway -> sales;
+  gateway -> financial;
+  gateway -> dashboard;
+  gateway -> orchestration;
+
+  users -> postgres;
+  inventory -> postgres;
+  sales -> postgres;
+  financial -> postgres;
+  dashboard -> postgres;
+  orchestration -> postgres;
+
+  inventory -> minio;
+  dashboard -> redis;
+
+  users -> kafka;
+  inventory -> kafka;
+  sales -> kafka;
+  financial -> kafka;
+  orchestration -> kafka;
+  dashboard -> kafka;
+
+  orchestration -> rabbit;
+  inventory -> rabbit;
+  financial -> rabbit;
+
+  gateway -> obs [style=dashed];
+  users -> obs [style=dashed];
+  inventory -> obs [style=dashed];
+  sales -> obs [style=dashed];
+  financial -> obs [style=dashed];
+  dashboard -> obs [style=dashed];
+  orchestration -> obs [style=dashed];
+}

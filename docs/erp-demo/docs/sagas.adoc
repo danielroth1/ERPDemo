@@ -1,0 +1,70 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+A saga is a way to model a business workflow that spans multiple services. Instead of one large database transaction, the workflow is broken into steps. If a later step fails, compensating actions can undo earlier work.
+
+== In This Repository
+
+The orchestration service contains saga state machines for purchase and return workflows. The purchase flow is the clearest example.
+
+dotgraph::./diagrams/purchase-saga.dot[caption="Purchase saga overview",max-width=980,engine=dot]
+
+== ASP.NET Server Setup
+
+[source,csharp]
+----
+x.AddSagaStateMachine<PurchaseStateMachine, PurchaseState>()
+    .EntityFrameworkRepository(r =>
+    {
+        r.ExistingDbContext<OrchestrationDbContext>();
+        r.UsePostgres();
+    });
+----
+
+Saga state is stored in PostgreSQL, not in memory, so workflows survive process restarts.
+
+== React Client Setup
+
+The shop client starts the workflow by calling orchestration through a generated client.
+
+[source,typescript]
+----
+async purchaseProduct(productId: string, quantity: number = 1) {
+  return await this.orchestrationClient.api.v1.shop.purchase
+    .byProductId(productId)
+    .post({ queryParameters: { quantity } });
+}
+----
+
+== Simple Example
+
+Happy path:
+
+1. `SubmitPurchase`
+2. reserve stock
+3. create financial transaction
+4. deduct stock
+5. publish `PurchaseCompleted`
+
+Failure path:
+
+1. reserve stock succeeds
+2. transaction creation fails
+3. compensation releases stock
+4. publish `PurchaseFailed`
+
+== Advantages
+
+* Explicit cross-service workflow control.
+* Better alternative to fake distributed transactions.
+* Failure and compensation are first-class concepts.
+
+== Disadvantages
+
+* Harder to reason about than one local transaction.
+* Requires idempotency and careful event design.
+* Debugging state transitions takes practice.

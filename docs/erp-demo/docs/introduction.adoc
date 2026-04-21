@@ -1,0 +1,116 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+ERPDemo is a microservice-based ERP sample. Instead of one large backend, the system is split into multiple services that each own one business area such as inventory, sales, finance, dashboard analytics, or workflow orchestration.
+
+highlight::[title="Reality check",text="The live source code currently uses PostgreSQL, EF Core, Kafka, RabbitMQ, MinIO, Redis, OpenTelemetry, and .NET Aspire. Older MongoDB-oriented summaries in the repository are historical.",shadow]
+
+== System At A Glance
+
+[cols="1,3",options="header"]
+|===
+| Area | Current implementation
+
+| Frontend
+| React, TypeScript, Vite, Apollo Client, Kiota-generated REST clients, SignalR
+
+| Edge
+| ASP.NET Core API Gateway with YARP reverse proxy, JWT authentication, rate limiting, and metrics
+
+| Business services
+| User Management, Inventory, Sales, Financial, Dashboard, Orchestration
+
+| Databases
+| PostgreSQL with one logical database per service
+
+| Messaging
+| Kafka for domain events and RabbitMQ for workflow commands
+
+| Workflow coordination
+| MassTransit saga state machines in the orchestration service
+
+| File storage
+| MinIO as an S3-compatible object store for product files
+
+| Real-time updates
+| SignalR and GraphQL subscriptions
+
+| Observability
+| OpenTelemetry, Prometheus, Grafana, Alloy, Loki, and Tempo
+
+| Local orchestration
+| Docker Compose and .NET Aspire
+
+| Cluster deployment
+| Local Kubernetes, private k3s, and Azure AKS overlays
+|===
+
+== Beginner Mental Model
+
+If you are new to microservices, start with this simplified picture:
+
+* The browser runs one React application.
+* The browser usually talks to one public backend entry point: the API gateway.
+* The gateway forwards requests to the correct internal service.
+* Each service owns its own data and business rules.
+* Not every interaction is a direct HTTP call. Some services communicate through Kafka or RabbitMQ.
+* A single business workflow can cross several services, several databases, and one or more message brokers.
+
+That is the main trade-off of microservice architecture. You gain clearer service boundaries and deployment flexibility, but you also gain more moving parts.
+
+== Main Services
+
+API Gateway:: The public entry point. It handles routing, authentication, rate limiting, GraphQL exposure, and SignalR passthrough.
+
+User Management:: Authentication, authorization, and user lifecycle.
+
+Inventory:: Products, categories, stock, images, and product documents.
+
+Sales:: Customer-facing sales data and GraphQL reads.
+
+Financial:: Accounts, budgets, and financial transactions.
+
+Dashboard:: KPIs, alerts, subscriptions, and SignalR updates.
+
+Orchestration:: Long-running purchase and return workflows modeled as sagas.
+
+== Why The System Is Split This Way
+
+The service split follows business boundaries.
+
+* Inventory owns product and stock data.
+* Financial owns accounting rules.
+* Dashboard owns read models and analytics.
+* Orchestration owns cross-service workflows instead of forcing those rules into one business service.
+
+That keeps each service smaller, but it also means the system must solve distributed concerns such as eventual consistency, retries, message ordering, and compensation.
+
+== Recommended Reading Path
+
+If you want to document the system for other people, this topic order works well:
+
+1. `introduction`
+2. `architecture-overview`
+3. `react-frontend`
+4. `rest` and `graphql`
+5. `aspnet-core`, `ef-core`, and `postgresql`
+6. `kafka`, `rabbitmq`, `masstransit`, and `sagas`
+7. `minio-s3` and `observability`
+8. `docker-compose` and `aspire`
+9. `kubernetes`, `k3s-private-server`, and `azure`
+10. `telepresence` and `mirrord`
+11. `testing`
+
+== What To Emphasize In A Beginner-Friendly Walkthrough
+
+IMPORTANT: The system is not only "frontend plus API". It is frontend, gateway, business services, databases, message brokers, object storage, and observability tooling working together.
+
+When explaining the project to beginners, it usually helps to repeat three rules:
+
+* Browsers never talk directly to PostgreSQL, Kafka, RabbitMQ, or MinIO.
+* GraphQL is used mainly for flexible read models, while REST still drives many write and CRUD paths.
+* Kafka and RabbitMQ solve different problems: one broadcasts facts, the other moves workflow commands.

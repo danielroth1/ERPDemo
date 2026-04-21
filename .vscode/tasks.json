@@ -76,6 +76,12 @@
       "type": "promptString",
       "description": "Your mirrord session key (used in header 'x-mirrord-session: <key>' and OTEL_SERVICE_NAME suffix)",
       "default": "dev"
+    },
+    {
+      "id": "telepresenceKey",
+      "type": "promptString",
+      "description": "Your telepresence session key (used in header 'x-telepresence-session: <key>')",
+      "default": "dev"
     }
   ],
   "tasks": [
@@ -839,6 +845,7 @@
       "dependsOn": [
         "prod: install-cert-manager",
         "prod: setup-server",
+        "prod: install-telepresence",
         "prod: build-push",
         "prod: deploy",
         "prod: build-push-deploy",
@@ -866,6 +873,14 @@
       "label": "prod: setup-server",
       "type": "shell",
       "command": "bash scripts/k3s-setup-server.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "prod" }
+    },
+    {
+      "label": "prod: install-telepresence",
+      "type": "shell",
+      "command": "bash scripts/k3s-telepresence-install.sh",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "prod" }
@@ -957,6 +972,7 @@
       "dependsOn": [
         "azure: login",
         "azure: provision",
+        "azure: install-telepresence",
         "azure: install-cert-manager",
         "azure: build-push",
         "azure: deploy",
@@ -992,6 +1008,14 @@
       "label": "azure: provision",
       "type": "shell",
       "command": "bash scripts/aks-provision.sh",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "azure" }
+    },
+    {
+      "label": "azure: install-telepresence",
+      "type": "shell",
+      "command": "bash scripts/aks-telepresence-install.sh",
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "azure" }
@@ -1281,6 +1305,189 @@
       "options": { "cwd": "${workspaceFolder}" },
       "problemMatcher": [],
       "presentation": { "reveal": "always", "group": "mirrord-contabo" }
+    },
+
+    // ─── Telepresence: Azure (AKS) ──────────────────────────────────────────────
+    // Run a service locally while intercepting matching cluster traffic via Telepresence.
+    // Prerequisites:
+    //   1. `telepresence` CLI installed (brew install telepresenceio/telepresence/telepresence-oss)
+    //   2. Traffic Manager installed (bash scripts/telepresence-install-azure.sh)
+    // You will be prompted for a session key (your name/alias). The same key is used
+    // as the header value: add "x-telepresence-session: <key>" to requests you want intercepted.
+    // Multiple developers can intercept the same service simultaneously using different keys.
+    {
+      "label": "telepresence: azure: connect",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure --also-proxy 52.138.158.227/32",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+    {
+      "label": "telepresence: azure",
+      "dependsOn": [
+        "telepresence: azure: connect",
+        "telepresence: azure: gateway",
+        "telepresence: azure: user-management",
+        "telepresence: azure: inventory",
+        "telepresence: azure: sales",
+        "telepresence: azure: financial",
+        "telepresence: azure: dashboard",
+        "telepresence: azure: orchestration"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "telepresence: azure: gateway",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure --also-proxy 52.138.158.227/32 && KUBECONFIG=~/.kube/aks-erp.yaml telepresence intercept gateway --port 8080:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-azure-gateway.env -- dotnet watch run --project ${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:8080", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+    {
+      "label": "telepresence: azure: user-management",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure --also-proxy 52.138.158.227/32 && KUBECONFIG=~/.kube/aks-erp.yaml telepresence intercept user-management --port 5001:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-azure-user-management.env -- dotnet watch run --project ${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5001", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+    {
+      "label": "telepresence: azure: inventory",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure --also-proxy 52.138.158.227/32 && KUBECONFIG=~/.kube/aks-erp.yaml telepresence intercept inventory --port 5002:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-azure-inventory.env -- dotnet watch run --project ${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5002", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+    {
+      "label": "telepresence: azure: sales",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure --also-proxy 52.138.158.227/32 && KUBECONFIG=~/.kube/aks-erp.yaml telepresence intercept sales --port 5003:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-azure-sales.env -- dotnet watch run --project ${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5003", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+    {
+      "label": "telepresence: azure: financial",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure --also-proxy 52.138.158.227/32 && KUBECONFIG=~/.kube/aks-erp.yaml telepresence intercept financial --port 5004:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-azure-financial.env -- dotnet watch run --project ${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5004", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+    {
+      "label": "telepresence: azure: dashboard",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure --also-proxy 52.138.158.227/32 && KUBECONFIG=~/.kube/aks-erp.yaml telepresence intercept dashboard --port 5005:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-azure-dashboard.env -- dotnet watch run --project ${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5005", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+    {
+      "label": "telepresence: azure: orchestration",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure --also-proxy 52.138.158.227/32 && KUBECONFIG=~/.kube/aks-erp.yaml telepresence intercept orchestration --port 5010:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-azure-orchestration.env -- dotnet watch run --project ${workspaceFolder}/services/orchestration/Orchestration/Orchestration.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5010", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+    {
+      "label": "telepresence: azure: leave",
+      "type": "shell",
+      "command": "telepresence leave --all 2>/dev/null; telepresence quit; echo 'Telepresence disconnected'",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-azure" }
+    },
+
+    // ─── Telepresence: Contabo (k3s/prod) ───────────────────────────────────────
+    {
+      "label": "telepresence: contabo: connect",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml telepresence connect --namespace erp-prod --manager-namespace erp-prod",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
+    },
+    {
+      "label": "telepresence: contabo",
+      "dependsOn": [
+        "telepresence: contabo: connect",
+        "telepresence: contabo: gateway",
+        "telepresence: contabo: user-management",
+        "telepresence: contabo: inventory",
+        "telepresence: contabo: sales",
+        "telepresence: contabo: financial",
+        "telepresence: contabo: dashboard",
+        "telepresence: contabo: orchestration"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "telepresence: contabo: gateway",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml telepresence connect --namespace erp-prod --manager-namespace erp-prod && KUBECONFIG=~/.kube/k3s-erp.yaml telepresence intercept gateway --port 8080:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-contabo-gateway.env -- dotnet watch run --project ${workspaceFolder}/services/gateway/ApiGateway/ApiGateway.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:8080", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
+    },
+    {
+      "label": "telepresence: contabo: user-management",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml telepresence connect --namespace erp-prod --manager-namespace erp-prod && KUBECONFIG=~/.kube/k3s-erp.yaml telepresence intercept user-management --port 5001:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-contabo-user-management.env -- dotnet watch run --project ${workspaceFolder}/services/user-management/UserManagement/UserManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5001", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
+    },
+    {
+      "label": "telepresence: contabo: inventory",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml telepresence connect --namespace erp-prod --manager-namespace erp-prod && KUBECONFIG=~/.kube/k3s-erp.yaml telepresence intercept inventory --port 5002:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-contabo-inventory.env -- dotnet watch run --project ${workspaceFolder}/services/inventory/InventoryManagement/InventoryManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5002", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
+    },
+    {
+      "label": "telepresence: contabo: sales",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml telepresence connect --namespace erp-prod --manager-namespace erp-prod && KUBECONFIG=~/.kube/k3s-erp.yaml telepresence intercept sales --port 5003:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-contabo-sales.env -- dotnet watch run --project ${workspaceFolder}/services/sales/SalesManagement/SalesManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5003", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
+    },
+    {
+      "label": "telepresence: contabo: financial",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml telepresence connect --namespace erp-prod --manager-namespace erp-prod && KUBECONFIG=~/.kube/k3s-erp.yaml telepresence intercept financial --port 5004:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-contabo-financial.env -- dotnet watch run --project ${workspaceFolder}/services/financial/FinancialManagement/FinancialManagement.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5004", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
+    },
+    {
+      "label": "telepresence: contabo: dashboard",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml telepresence connect --namespace erp-prod --manager-namespace erp-prod && KUBECONFIG=~/.kube/k3s-erp.yaml telepresence intercept dashboard --port 5005:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-contabo-dashboard.env -- dotnet watch run --project ${workspaceFolder}/services/dashboard/DashboardAnalytics/DashboardAnalytics.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5005", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
+    },
+    {
+      "label": "telepresence: contabo: orchestration",
+      "type": "shell",
+      "command": "KUBECONFIG=~/.kube/k3s-erp.yaml telepresence connect --namespace erp-prod --manager-namespace erp-prod && KUBECONFIG=~/.kube/k3s-erp.yaml telepresence intercept orchestration --port 5010:http --http-header 'x-telepresence-session=${input:telepresenceKey}' --env-file /tmp/tp-contabo-orchestration.env -- dotnet watch run --project ${workspaceFolder}/services/orchestration/Orchestration/Orchestration.csproj",
+      "options": { "cwd": "${workspaceFolder}", "env": { "ASPNETCORE_URLS": "http://localhost:5010", "ASPNETCORE_ENVIRONMENT": "Development" } },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
+    },
+    {
+      "label": "telepresence: contabo: leave",
+      "type": "shell",
+      "command": "telepresence leave --all 2>/dev/null; telepresence quit; echo 'Telepresence disconnected'",
+      "options": { "cwd": "${workspaceFolder}" },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "group": "telepresence-contabo" }
     }
   ]
 }

@@ -1,0 +1,59 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+This page explains how the major services fit together and why the system uses more than one API style.
+
+== Runtime Topology
+
+dotgraph::./diagrams/system-architecture.dot[caption="Runtime architecture overview",max-width=980,engine=dot]
+
+== Request Styles In This System
+
+The system does not rely on one communication style. It uses several, each for a different reason.
+
+* REST is still the default for many commands and CRUD endpoints.
+* GraphQL is used where the frontend needs flexible read models.
+* SignalR and GraphQL subscriptions are used for real-time updates.
+* Kafka and RabbitMQ handle asynchronous work between services.
+
+== What The Diagram Shows
+
+The runtime diagram is the shortest accurate explanation of the whole system.
+
+* The browser talks to the gateway.
+* The gateway routes requests to specialized backend services.
+* Services persist their own data in PostgreSQL.
+* Inventory also uses MinIO for product assets.
+* Dashboard also uses Redis for caching.
+* Services exchange asynchronous information through Kafka and RabbitMQ.
+* Every important runtime component emits telemetry into the observability stack.
+
+== Why The Architecture Uses Several Communication Styles
+
+One of the easiest beginner mistakes is to assume the project is only a REST API with some databases behind it. The source code shows a more mixed design.
+
+* REST handles many writes and CRUD operations.
+* GraphQL handles flexible reads and nested data selection.
+* SignalR and GraphQL subscriptions push live updates.
+* Kafka broadcasts facts that other services may care about.
+* RabbitMQ moves workflow commands between services.
+
+Those topics each have their own dedicated page because they solve different problems.
+
+== Why This Architecture Is Useful
+
+=== Advantages
+
+* Service boundaries match business boundaries.
+* Read-heavy screens can use GraphQL while command-heavy paths stay on REST.
+* Sagas and messaging let workflows survive partial failures better than one giant synchronous call chain.
+
+=== Disadvantages
+
+* The architecture is harder to debug than a monolith.
+* Consistency becomes eventual in some flows.
+* Teams need to understand several integration styles instead of only HTTP.

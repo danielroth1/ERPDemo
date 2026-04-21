@@ -1,0 +1,71 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+Docker Compose is the easiest way to run the supporting infrastructure locally. It gives developers a repeatable environment without installing every dependency by hand.
+
+== In This Repository
+
+The root `docker-compose.yml` includes:
+
+* PostgreSQL
+* Kafka
+* RabbitMQ
+* Kafka UI
+* MinIO
+* Prometheus
+* Grafana
+* Loki
+* Alloy
+* Tempo
+* backend services
+* API gateway
+
+== Setup Example
+
+[source,bash]
+----
+docker compose up -d
+----
+
+[source,yaml]
+----
+inventory:
+  environment:
+    PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_inventory;...
+    RabbitMQ__Host: rabbitmq
+    Kafka__BootstrapServers: kafka:9092
+    Minio__Endpoint: minio:9000
+----
+
+== React Client Setup
+
+[source,bash]
+----
+cd frontend
+npm install
+npm run dev
+----
+
+== Simple Example
+
+Typical local workflow:
+
+1. start Compose infrastructure
+2. start backend services with `dotnet watch` or Aspire
+3. start the React dev server
+4. open the frontend and work against local services
+
+== Advantages
+
+* Fast and reproducible local setup.
+* Good for onboarding.
+* Good for running shared infrastructure dependencies.
+
+== Disadvantages
+
+* Still different from real cluster behavior.
+* Large stacks can consume significant memory and CPU.

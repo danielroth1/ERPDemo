@@ -1,0 +1,26 @@
+digraph purchase_saga {
+  rankdir=LR;
+  graph [nodesep=0.5, ranksep=0.8, splines=ortho];
+  node [shape=box, style="rounded", fontsize=11];
+
+  browser [label="Frontend\nPOST /shop/purchase"];
+  saga [label="Orchestration\nPurchase saga"];
+  reserve [label="RabbitMQ command\nReserve stock"];
+  inventory [label="Inventory"];
+  charge [label="RabbitMQ command\nCreate transaction"];
+  financial [label="Financial"];
+  deduct [label="RabbitMQ command\nDeduct stock"];
+  success [label="Kafka event\nPurchaseCompleted", shape=component];
+  failure [label="Compensation\nRelease stock / Void transaction", shape=box];
+
+  browser -> saga;
+  saga -> reserve;
+  reserve -> inventory;
+  inventory -> charge;
+  charge -> financial;
+  financial -> deduct;
+  deduct -> inventory;
+  inventory -> success;
+  financial -> failure [style=dashed, label="if charge fails"];
+  inventory -> failure [style=dashed, label="if reserve or deduct fails"];
+}

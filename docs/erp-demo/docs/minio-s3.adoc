@@ -1,0 +1,61 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+The repository does not currently use AWS S3 directly. Instead, it uses MinIO, which is an S3-compatible object store. That means the programming model is similar to S3, but the runtime is self-hosted.
+
+== In This Repository
+
+Inventory uses MinIO for:
+
+* product images
+* product documents
+
+== ASP.NET Server Setup
+
+[source,csharp]
+----
+var minioSettings = builder.Configuration.GetSection("Minio").Get<MinioSettings>() ?? new MinioSettings();
+
+builder.Services.AddMinio(configureClient => configureClient
+    .WithEndpoint(minioSettings.Endpoint)
+    .WithCredentials(minioSettings.AccessKey, minioSettings.SecretKey)
+    .WithSSL(minioSettings.UseSSL)
+    .Build());
+
+builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
+----
+
+== React Client Setup
+
+The frontend uploads files through the backend, not directly to MinIO.
+
+[source,typescript]
+----
+const form = new FormData();
+form.append('file', file);
+
+await fetch(`${getApiBaseUrl()}/api/v1/productfiles/${productId}/image`, {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}` },
+  body: form,
+});
+----
+
+== Simple Example
+
+Inventory creates buckets in development and stores uploaded product assets there. Images can then be served through public URLs or presigned URLs.
+
+== Advantages
+
+* Good fit for binary files.
+* Keeps large blobs out of PostgreSQL.
+* Keeps the programming model close to S3.
+
+== Disadvantages
+
+* Another service to run and secure.
+* File lifecycle and access control need careful handling.

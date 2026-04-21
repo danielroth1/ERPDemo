@@ -1,0 +1,62 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+Kafka is the event-streaming platform used for domain events. It is a good fit when one service wants to publish a fact that several other services may care about.
+
+== In This Repository
+
+Kafka is used for domain events, not for saga command-and-control.
+
+Examples:
+
+* user management publishes lifecycle events
+* inventory publishes product and stock events
+* financial publishes transaction and budget events
+* dashboard consumes multiple Kafka topics to build analytics
+
+== ASP.NET Server Setup
+
+The services use the MassTransit Kafka Rider.
+
+[source,csharp]
+----
+x.AddRider(rider =>
+{
+    rider.AddProducer<TransactionCreated>(KafkaTopics.TransactionCreatedEvent);
+    rider.AddProducer<BudgetExceeded>(KafkaTopics.BudgetExceededEvent);
+
+    rider.UsingKafka((context, k) =>
+    {
+        k.Host(kafkaBootstrap);
+
+        k.TopicEndpoint<UserCreated>(KafkaTopics.UserCreatedEvent, "financial-user-created", e =>
+        {
+            e.AutoOffsetReset = AutoOffsetReset.Earliest;
+            e.ConfigureConsumer<UserCreatedConsumer>(context);
+        });
+    });
+});
+----
+
+== React Client Setup
+
+React does not consume Kafka directly. The effect of Kafka appears through updated REST and GraphQL reads, dashboard subscriptions, or SignalR notifications.
+
+== Simple Example
+
+If inventory publishes a low-stock event, dashboard can consume it and update alerts without inventory calling dashboard directly.
+
+== Advantages
+
+* Good for fan-out and asynchronous analytics.
+* Looser coupling between producers and consumers.
+* Helpful for audit-style event flows.
+
+== Disadvantages
+
+* Debugging asynchronous flows is harder than tracing direct HTTP.
+* Ordering and schema changes need care.

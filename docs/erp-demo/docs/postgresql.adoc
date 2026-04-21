@@ -1,0 +1,46 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+PostgreSQL is the main relational database in the current system. It stores business data, read models, and saga state.
+
+== In This Repository
+
+The architecture follows the common microservice rule that each service owns its own data. In local development, one PostgreSQL instance hosts multiple logical databases such as `erp_users`, `erp_inventory`, and `erp_orchestration`.
+
+== ASP.NET Server Setup
+
+[source,csharp]
+----
+var postgresConnectionString = builder.Configuration.GetConnectionString("erp-financial")
+    ?? builder.Configuration["PostgreSQL:ConnectionString"]
+    ?? throw new InvalidOperationException("PostgreSQL not configured");
+----
+
+== Infrastructure Setup
+
+[source,yaml]
+----
+postgres:
+  image: postgres:16-alpine
+  environment:
+    POSTGRES_MULTIPLE_DATABASES: erp_users,erp_inventory,erp_sales,erp_financial,erp_dashboard,erp_orchestration
+----
+
+== React Client Setup
+
+There is no direct React-to-PostgreSQL access. The browser always goes through the gateway and backend services.
+
+== Advantages
+
+* Strong transactional guarantees.
+* Good fit for financial data and workflow state.
+* Works well with EF Core and Npgsql.
+
+== Disadvantages
+
+* Schema evolution must be managed carefully across versions.
+* Cross-service reporting should not bypass service boundaries.

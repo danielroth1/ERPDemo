@@ -1,0 +1,59 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+
+== Overview
+
+MassTransit is the messaging framework that hides much of the low-level RabbitMQ and Kafka plumbing from application code.
+
+== In This Repository
+
+MassTransit is central to the current design.
+
+* RabbitMQ transport
+* Kafka Rider
+* EF Core outbox
+* saga state machine registration
+* test harness support
+
+== ASP.NET Server Setup
+
+[source,csharp]
+----
+builder.Services.AddMassTransit(x =>
+{
+    x.SetKebabCaseEndpointNameFormatter();
+
+    x.AddEntityFrameworkOutbox<AppDbContext>(o =>
+    {
+        o.UsePostgres();
+        o.UseBusOutbox();
+        o.QueryDelay = TimeSpan.FromMilliseconds(50);
+    });
+
+    x.AddConfigureEndpointsCallback((context, name, cfg) =>
+    {
+        cfg.UseEntityFrameworkOutbox<AppDbContext>(context);
+    });
+});
+----
+
+== React Client Setup
+
+There is no direct React integration. The frontend benefits indirectly because workflow actions become more reliable and retriable.
+
+== Simple Example
+
+The financial service uses MassTransit both to consume RabbitMQ commands and to publish Kafka events behind one programming model.
+
+== Advantages
+
+* Consistent abstraction over different brokers.
+* Built-in support for retries, outbox, sagas, and tests.
+* Less low-level transport boilerplate in application code.
+
+== Disadvantages
+
+* Developers still need to understand the underlying transport semantics.
+* The framework adds its own concepts, configuration, and failure modes.
