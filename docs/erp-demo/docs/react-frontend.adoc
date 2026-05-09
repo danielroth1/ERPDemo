@@ -3,85 +3,87 @@
 :sectnums:
 :icons: font
 
-== Overview
+== The frontend as the user's single entry point
 
-The frontend is a skill:React[] and skill:TypeScript[] single-page application built with Vite. From the user's perspective it feels like one web app, but it talks to several backend capabilities through the API gateway and service-specific clients.
+The frontend is a skill:React[] and skill:TypeScript[] single-page application built with Vite. From the user's perspective it behaves like one application, but internally it coordinates several backend capabilities exposed through the gateway and service-specific APIs. That distinction is important because the frontend is where the architectural choices of the entire system become visible: REST is used for straightforward commands, GraphQL powers flexible read models, and real-time channels update the UI when background work completes.
 
-IMPORTANT: The browser never talks directly to PostgreSQL, Kafka, RabbitMQ, or MinIO. Those systems stay behind backend APIs.
+The browser is intentionally kept away from internal infrastructure. It never connects directly to PostgreSQL, Kafka, RabbitMQ, or MinIO. Those systems remain behind backend APIs so the application can enforce authorization, validation, workflow rules, and data ownership in one place. That is the safest and most portable pattern for distributed web applications.
 
-== Frontend Foundation
+== Applying the frontend pattern
 
-=== Introduction
+The application usually starts by composing the major client-side providers: routing, GraphQL, authentication, and global state or context. A simplified initialization looks like this:
 
-React is responsible for UI rendering, local component state, forms, navigation, and user interaction. Vite provides the development server and build pipeline.
-
-=== Setup Example
-
-[source,bash]
+[source,tsx]
 ----
-cd frontend
-npm install
-npm run dev
+const apolloClient = new ApolloClient({
+	uri: `${getApiBaseUrl()}/graphql/dashboard`,
+	cache: new InMemoryCache(),
+});
+
+createRoot(document.getElementById('root')!).render(
+	<StrictMode>
+		<BrowserRouter>
+			<ApolloProvider client={apolloClient}>
+				<AuthProvider>
+					<App />
+				</AuthProvider>
+			</ApolloProvider>
+		</BrowserRouter>
+	</StrictMode>,
+);
 ----
 
-=== Base URL Example
+Feature code then chooses the right backend integration style for the job. A typical screen might load a read model through GraphQL, execute a mutation or CRUD action through REST, and listen for background updates through SignalR.
+
+[source,tsx]
+----
+export function InventoryPage() {
+	const [products, setProducts] = useState<ProductSummary[]>([]);
+
+	useEffect(() => {
+		void inventoryApiClient.api.v1.products.get().then(response => {
+			setProducts(response?.items ?? []);
+		});
+	}, []);
+
+	return (
+		<section>
+			<h1>Inventory</h1>
+			<ProductTable products={products} />
+		</section>
+	);
+}
+----
+
+For real-time experiences such as dashboards, the browser connects to a SignalR hub or GraphQL subscription endpoint after authentication so updates arrive without constant polling.
 
 [source,typescript]
 ----
-import { getApiBaseUrl } from './api-base-url';
+const connection = new HubConnectionBuilder()
+	.withUrl(`${getApiBaseUrl()}/dashboardHub`, {
+		accessTokenFactory: () => token,
+	})
+	.withAutomaticReconnect()
+	.build();
 
-const baseUrl = getApiBaseUrl();
-console.log(baseUrl);
+await connection.start();
+connection.on('lowStockAlert', alert => {
+	console.log('Received live alert', alert);
+});
 ----
 
-=== Advantages
+== Analysis
 
-* Fast local development with Vite.
-* Clean separation between UI and backend services.
-* React tooling works well with REST, GraphQL, and real-time patterns.
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-=== Disadvantages
-
-* Frontend state, loading, and authentication flows still need discipline.
-* Mixing several API styles can become confusing if the rules are not explicit.
-
-== Real-Time Updates
-
-=== Introduction
-
-The frontend currently uses two real-time mechanisms:
-
-* SignalR for hub-based dashboard updates.
-* GraphQL subscriptions for pushed GraphQL events.
-
-=== Client Setup
-
-[source,typescript]
-----
-const wsUrl = `${getApiBaseUrl()}/dashboardHub`;
-await signalRService.connect(wsUrl, token);
-----
-
-=== Simple Example
-
-Dashboard users can receive low-stock alerts or updated KPI data without manually refreshing the page because the backend pushes updates to connected clients.
-
-=== Advantages
-
-* Better user experience for dashboards and monitoring screens.
-* Reduces wasteful polling.
-
-=== Disadvantages
-
-* Reconnection and authorization logic add complexity.
-* Debugging intermittent real-time issues is harder than debugging plain HTTP.
-
-== A Practical Frontend Pattern In This Repository
-
-One screen often mixes several techniques at the same time:
-
-* GraphQL for a flexible read model.
-* REST for create or update actions.
-* SignalR or subscriptions for background updates.
-
-That combination is normal in this codebase. The important rule is not to force one technology everywhere, but to match the user interaction to the right backend pattern.
+|
+* *One cohesive user experience*: the browser hides the complexity of many backend services behind one application shell.
+* *Technology flexibility*: React works well with REST, GraphQL, and real-time channels in the same UI.
+* *Fast local loop*: Vite keeps the inner development cycle fast even when the backend is distributed.
+|
+* *State management needs discipline*: mixing several API styles can become confusing without clear conventions.
+* *Authentication and real-time logic add complexity*: token renewal and reconnect behavior must be handled deliberately.
+* *Frontend simplicity is partly an illusion*: the browser looks simple because the backend absorbs a lot of architectural complexity.
+|===

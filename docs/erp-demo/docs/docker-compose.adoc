@@ -3,69 +3,79 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Docker Compose as the local infrastructure baseline
 
-Docker Compose is the easiest way to run the supporting infrastructure locally. It gives developers a repeatable environment without installing every dependency by hand.
+Docker Compose is the most approachable way to bootstrap a distributed system on one machine because it turns a set of infrastructure dependencies into a single declarative file. That is valuable in this ERP demo because local development requires much more than one application process. The system depends on PostgreSQL for persistence, Kafka and RabbitMQ for messaging, MinIO for object storage, and several observability components. Asking every developer to install and configure those tools by hand would make onboarding slow and fragile.
 
-== In This Repository
+Compose solves that problem well for local work because it defines containers, networks, ports, environment variables, and startup relationships in one place. It does not behave exactly like Kubernetes, and it should not be treated as a production orchestration platform, but it is still the fastest way to give a team a shared baseline. In practice, many developers use Compose for infrastructure and then run application services with `dotnet watch`, Vite, or Aspire.
 
-The root `docker-compose.yml` includes:
+== Applying the pattern
 
-* PostgreSQL
-* Kafka
-* RabbitMQ
-* Kafka UI
-* MinIO
-* Prometheus
-* Grafana
-* Loki
-* Alloy
-* Tempo
-* backend services
-* API gateway
+A useful Compose setup usually separates shared infrastructure from application services, then injects hostnames and ports into the services through environment variables. A stripped-down example looks like this:
 
-== Setup Example
+[source,yaml]
+----
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: changeme
+    ports:
+      - "5432:5432"
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  kafka:
+    image: bitnami/kafka:latest
+    ports:
+      - "9092:9092"
+
+  inventory:
+    build: ./services/inventory
+    depends_on:
+      - postgres
+      - rabbitmq
+      - kafka
+    environment:
+      ConnectionStrings__inventory-db: Host=postgres;Port=5432;Database=inventory;Username=erp;Password=changeme
+      RabbitMQ__Host: rabbitmq
+      Kafka__BootstrapServers: kafka:9092
+----
+
+Starting the environment is intentionally simple:
 
 [source,bash]
 ----
 docker compose up -d
 ----
 
-[source,yaml]
-----
-inventory:
-  environment:
-    PostgreSQL__ConnectionString: Host=postgres;Port=5432;Database=erp_inventory;...
-    RabbitMQ__Host: rabbitmq
-    Kafka__BootstrapServers: kafka:9092
-    Minio__Endpoint: minio:9000
-----
+From there, application code consumes those values through normal configuration APIs. The frontend usually remains outside the Compose file during active development so it keeps hot reload and a lightweight inner loop.
 
-== React Client Setup
-
-[source,bash]
+[source,typescript]
 ----
-cd frontend
-npm install
-npm run dev
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080';
+
+const products = await fetch(`${apiBaseUrl}/api/v1/products`);
+const data = await products.json();
 ----
 
-== Simple Example
+== Analysis
 
-Typical local workflow:
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-1. start Compose infrastructure
-2. start backend services with `dotnet watch` or Aspire
-3. start the React dev server
-4. open the frontend and work against local services
-
-== Advantages
-
-* Fast and reproducible local setup.
-* Good for onboarding.
-* Good for running shared infrastructure dependencies.
-
-== Disadvantages
-
-* Still different from real cluster behavior.
-* Large stacks can consume significant memory and CPU.
+|
+* *Fast reproducibility*: developers can start a full local dependency set with one command.
+* *Good onboarding tool*: infrastructure details become inspectable rather than tribal knowledge.
+* *Clear service wiring*: hostnames, ports, and environment variables are easy to see.
+|
+* *Not production-equivalent*: scheduling, ingress, secrets, and service discovery differ from Kubernetes.
+* *Resource heavy at scale*: a large local stack can consume significant CPU and memory.
+* *Can encourage false confidence*: passing locally in Compose does not guarantee cluster correctness.
+|===

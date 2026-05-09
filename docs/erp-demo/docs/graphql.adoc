@@ -3,117 +3,104 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Why GraphQL exists alongside REST
 
-GraphQL lets the client ask for exactly the fields it needs. In ERPDemo it is used mainly for read-heavy scenarios where the frontend wants flexible response shapes.
+GraphQL is useful when the client needs flexible read models rather than rigid endpoint-specific response shapes. In a system like this ERP demo, some screens are simple enough for REST, but others need nested data, optional fields, filtered collections, paging, and live updates without forcing the backend to create a dedicated endpoint for every UI variation. GraphQL addresses that by letting the client describe the data shape it wants while the server controls how that data is resolved.
 
-== In This Repository
+That does not make GraphQL a universal replacement for REST. In this architecture it is primarily a read-side tool. The most successful GraphQL usage in real projects usually appears where the frontend benefits from flexible composition and where the server team is willing to invest in projection, batching, and query-governance discipline. This repository follows that pattern in inventory, sales, and dashboard scenarios.
 
-GraphQL is used where rich read models matter more than plain CRUD.
+== Applying GraphQL in code
 
-* Inventory uses GraphQL for product reads and combines it with projections and DataLoader.
-* Sales exposes richer GraphQL read scenarios.
-* Dashboard uses GraphQL queries, mutations, and subscriptions.
-
-== ASP.NET Server Setup
-
-The inventory service is the clearest example because it combines skill:C#[] GraphQL setup with EF Core projections.
+On the server, a useful setup combines the GraphQL schema, EF Core projections, filtering, and DataLoader-based batching. That prevents the API from becoming flexible but inefficient.
 
 [source,csharp]
 ----
 builder.Services
     .AddGraphQLServer()
     .AddQueryType<Query>()
-    .AddTypeExtension<ProductTypeExtension>()
+    .AddTypeExtension<ProductQueries>()
     .AddProjections()
-    .AddFiltering();
+    .AddFiltering()
+    .AddSorting()
+    .AddDataLoader<ProductDocumentsByProductIdDataLoader>();
 
-[UseOffsetPaging(DefaultPageSize = 20, MaxPageSize = 100, IncludeTotalCount = true)]
-[UseProjection]
-[UseFiltering]
-public IQueryable<Product> GetProducts([Service] AppDbContext db)
-    => db.Products.OrderBy(p => p.Name);
+public sealed class ProductQueries
+{
+    [UseOffsetPaging(DefaultPageSize = 20, IncludeTotalCount = true)]
+    [UseProjection]
+    [UseFiltering]
+    [UseSorting]
+    public IQueryable<Product> GetProducts([Service] InventoryDbContext dbContext)
+        => dbContext.Products.AsNoTracking().OrderBy(product => product.Name);
+}
 ----
 
-=== DataLoader Example
-
-The batch DataLoader prevents one nested query per product row.
+When nested data is involved, a DataLoader batches lookups so the resolver layer does not create one database query per row.
 
 [source,csharp]
 ----
-public class ProductDocumentsByProductIdDataLoader
+public sealed class ProductDocumentsByProductIdDataLoader
     : BatchDataLoader<string, IReadOnlyList<ProductDocument>>
 {
     protected override async Task<IReadOnlyDictionary<string, IReadOnlyList<ProductDocument>>> LoadBatchAsync(
         IReadOnlyList<string> keys,
         CancellationToken cancellationToken)
     {
-        await using var db = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
+        await using var dbContext = await _dbContextFactory.CreateDbContextAsync(cancellationToken);
 
-        var docs = await db.ProductDocuments
-            .Where(d => keys.Contains(d.ProductId))
+        var documents = await dbContext.ProductDocuments
+            .Where(document => keys.Contains(document.ProductId))
             .ToListAsync(cancellationToken);
 
         return keys.ToDictionary(
             key => key,
-            key => (IReadOnlyList<ProductDocument>)docs.Where(d => d.ProductId == key).ToList());
+            key => (IReadOnlyList<ProductDocument>)documents.Where(document => document.ProductId == key).ToList());
     }
 }
 ----
 
-== React Client Setup
-
-Each GraphQL backend gets its own Apollo client.
+On the client, GraphQL is typically initialized through Apollo Client or another GraphQL client, then used with strongly named operations.
 
 [source,typescript]
 ----
-const inventoryClient = createApolloClient('inventory');
+const inventoryGraphQlClient = new ApolloClient({
+  uri: `${getApiBaseUrl()}/graphql/inventory`,
+  cache: new InMemoryCache(),
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+});
 
-const { data } = await inventoryClient.query({
-  query: GET_PRODUCTS,
-  variables: { skip: 0, take: 10 },
+const { data } = await inventoryGraphQlClient.query({
+  query: gql`
+    query GetProductWithDocuments($id: String!) {
+      product(id: $id) {
+        id
+        name
+        price
+        documents {
+          id
+          originalFileName
+        }
+      }
+    }
+  `,
+  variables: { id: productId },
 });
 ----
 
-== Simple Example
+== Analysis
 
-[source,graphql]
-----
-query GetProductWithDocuments($id: String!) {
-  product(id: $id) {
-    id
-    name
-    sku
-    price
-    documents {
-      id
-      originalFileName
-      contentType
-    }
-  }
-}
-----
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-=== Why Projections Matter
-
-When a screen requests only `id`, `name`, and `price`, `UseProjection` lets EF Core generate narrower SQL instead of loading every column.
-
-=== Why DataLoader Matters
-
-Without DataLoader, loading 20 products with documents can easily turn into 21 database queries. With DataLoader, the nested document lookup is batched.
-
-=== Subscriptions
-
-Dashboard also uses GraphQL subscriptions so clients can receive pushed updates instead of polling for every change.
-
-== Advantages
-
-* Frontend screens can request exactly the fields they need.
-* Good fit for dashboards and nested read models.
-* Projections and batching can reduce database work.
-
-== Disadvantages
-
-* More complex than plain REST.
-* Query cost needs discipline.
-* HTTP-level caching is less straightforward.
+|
+* *Flexible read models*: screens can ask for exactly the fields they need.
+* *Strong fit for nested UI data*: related entities can be composed in one round trip.
+* *Projection and batching can be efficient*: the backend can avoid over-fetching when implemented carefully.
+|
+* *More complex than REST*: schema design, query governance, and resolver performance need active care.
+* *Poor defaults can be expensive*: missing DataLoader or projection rules quickly lead to N+1 problems.
+* *Caching is less obvious*: HTTP-level caching is harder than with simple resource endpoints.
+|===

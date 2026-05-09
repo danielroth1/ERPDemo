@@ -3,86 +3,87 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Why REST remains the default tool
 
-REST is still the simplest and most common communication style in this repository. A client sends an HTTP request to an endpoint and gets a response back.
+REST is still the simplest and most widely useful communication style in this repository. A client sends an HTTP request to a resource-oriented endpoint and receives a structured response. That model remains valuable even in a system that also uses GraphQL and messaging because many business actions are naturally request-response operations: create a product, update a budget, retrieve the current user, or start a workflow. Those tasks benefit from explicit routes, familiar HTTP semantics, middleware support, and strong client-generation tooling.
 
-== In This Repository
+In this ERP demo, REST is especially important on write paths and straightforward CRUD paths. The gateway routes incoming requests to the correct service, ASP.NET Core controllers implement the API surface, and the frontend often uses generated clients so it can call those endpoints with a typed developer experience. REST is not the answer to every read-model problem, but it is still the most direct way to represent transactional commands and simple resources.
 
-REST remains the default integration style for many write paths and straightforward CRUD operations.
+== Applying REST in code
 
-* The API gateway routes incoming REST paths with YARP.
-* Many frontend business actions use Kiota-generated REST clients.
-* Controllers remain the main write-path for transactional operations.
-
-== ASP.NET Server Setup
-
-The gateway forwards REST paths to the correct service.
+At the edge, the gateway matches public routes and forwards them to the right backend service. That keeps the browser focused on one entry point instead of many service URLs.
 
 [source,json]
 ----
 {
-  "inventory-products-route": {
-    "ClusterId": "inventory-cluster",
-    "AuthorizationPolicy": "authenticated",
-    "Match": {
-      "Path": "/api/v1/products/{**catch-all}"
+  "routes": {
+    "inventory-products": {
+      "clusterId": "inventory",
+      "authorizationPolicy": "authenticated",
+      "match": {
+        "path": "/api/v1/products/{**catch-all}"
+      }
     }
   }
 }
 ----
 
-Backend services expose controllers in the standard ASP.NET Core way.
+Inside the service, a controller expresses the business action in the usual ASP.NET Core way.
 
 [source,csharp]
 ----
-builder.Services.AddControllers();
-builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(...);
-builder.Services.AddAuthorization();
+[ApiController]
+[Route("api/v1/products")]
+public sealed class ProductsController : ControllerBase
+{
+    private readonly IProductService _productService;
 
-var app = builder.Build();
+    public ProductsController(IProductService productService)
+    {
+        _productService = productService;
+    }
 
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-----
+    [HttpPost]
+    [Authorize]
+    public async Task<ActionResult<ProductResponse>> Create(CreateProductRequest request, CancellationToken cancellationToken)
+    {
+        var product = await _productService.CreateAsync(request, cancellationToken);
+        return CreatedAtAction(nameof(GetById), new { id = product.Id }, product);
+    }
 
-== React Client Setup
-
-The frontend mainly uses Kiota-generated clients and a shared Axios service for token-aware requests.
-
-[source,typescript]
-----
-const products = await inventoryApiClient.getProducts();
-const orders = await salesApiClient.getOrders();
-
-const me = await apiService.get('/api/v1/users/me');
-----
-
-The shop workflow also starts with a REST call into orchestration.
-
-[source,typescript]
-----
-async purchaseProduct(productId: string, quantity: number = 1) {
-  return await this.orchestrationClient.api.v1.shop.purchase
-    .byProductId(productId)
-    .post({ queryParameters: { quantity } });
+    [HttpGet("{id}")]
+    public Task<ProductResponse?> GetById(string id, CancellationToken cancellationToken)
+        => _productService.GetByIdAsync(id, cancellationToken);
 }
 ----
 
-== Simple Example
+On the frontend, generated REST clients make usage concise while preserving typing and shared authentication behavior.
 
-A product table screen can load a page of products with one authenticated `GET /api/v1/products` request and then render the results directly.
+[source,typescript]
+----
+const authProvider = new BearerTokenAuthenticationProvider(tokenProvider);
+const requestAdapter = new FetchRequestAdapter(authProvider);
+requestAdapter.baseUrl = getApiBaseUrl();
 
-== Advantages
+const inventoryClient = new InventoryApiClient(requestAdapter);
 
-* Easy to understand and debug.
-* A good fit for commands, mutations, and CRUD endpoints.
-* Works well with generated clients and HTTP middleware.
+const products = await inventoryClient.api.v1.products.get({
+  queryParameters: { pageNumber: 1, pageSize: 20 },
+});
+----
 
-== Disadvantages
+== Analysis
 
-* A complex screen may need several requests.
-* Clients can over-fetch or under-fetch data.
-* Cross-service read composition is awkward if every screen is pure REST.
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
+
+|
+* *Easy to reason about*: routes, verbs, and status codes are familiar to most teams.
+* *Strong fit for commands and CRUD*: transactional operations map naturally to endpoints.
+* *Excellent tooling*: gateways, client generators, middleware, caching, and observability all work well with HTTP.
+|
+* *Complex screens may need many calls*: a pure REST design can under-serve read-heavy UIs.
+* *Over-fetching is common*: fixed response shapes do not always match the needs of a specific screen.
+* *Cross-service composition gets awkward*: read models that span many services often need something more flexible.
+|===

@@ -3,55 +3,88 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Entity Framework Core in a service-oriented system
 
-Entity Framework Core is the data-access layer used by the backend. It maps skill:C#[] classes to PostgreSQL tables and translates LINQ queries to SQL.
+Entity Framework Core is the main data-access technology used by the backend services. It maps domain classes to relational tables, tracks changes, executes migrations, and translates LINQ expressions into SQL. In a microservice architecture, that is useful because each service can keep its own persistence model close to its domain logic instead of writing hand-crafted data access code for every query and command.
 
-== In This Repository
+That convenience comes with an important architectural rule: EF Core should reinforce service boundaries, not bypass them. In this project, each service owns its own `DbContext`, migrations, and schema. That keeps data ownership local. The frontend never touches EF Core directly, and other services should not couple themselves to another service's tables. Once that separation is respected, EF Core becomes a productive way to model aggregates, execute transactions, and evolve schemas through code.
 
-The current backend uses EF Core with Npgsql for:
+== Applying EF Core in code
 
-* code-first migrations
-* one `DbContext` per service
-* snake_case naming conventions
-* automatic migration at startup in several services
-
-== ASP.NET Server Setup
+The usual setup starts by registering a service-specific `DbContext`, choosing the database provider, and applying conventions such as snake_case naming. The example below captures the same pattern used throughout the ERP demo:
 
 [source,csharp]
 ----
-builder.Services.AddDbContext<AppDbContext>(options =>
-    options.UseNpgsql(postgresConnectionString)
+builder.Services.AddDbContext<InventoryDbContext>(options =>
+    options.UseNpgsql(builder.Configuration.GetConnectionString("inventory-db"))
         .UseSnakeCaseNamingConvention());
+
+var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-    dbContext.Database.Migrate();
+    var dbContext = scope.ServiceProvider.GetRequiredService<InventoryDbContext>();
+    await dbContext.Database.MigrateAsync();
 }
 ----
 
-== React Client Setup
-
-React never talks to EF Core directly. It only sees EF Core-backed results through REST or GraphQL endpoints.
-
-== Simple Example
+Inside the `DbContext`, entity configuration expresses the relational model explicitly so that the database shape stays intentional and readable.
 
 [source,csharp]
 ----
-public async Task<Product?> GetProduct(string id)
+public sealed class InventoryDbContext : DbContext
 {
-    return await _dbContext.Products.FirstOrDefaultAsync(p => p.Id == id);
+    public DbSet<Product> Products => Set<Product>();
+
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    {
+        modelBuilder.Entity<Product>(entity =>
+        {
+            entity.ToTable("products");
+            entity.HasKey(x => x.Id);
+            entity.Property(x => x.Name).HasMaxLength(200).IsRequired();
+            entity.Property(x => x.Price).HasColumnType("numeric(18,2)");
+            entity.HasIndex(x => x.Sku).IsUnique();
+        });
+    }
 }
 ----
 
-== Advantages
+Usage then becomes ordinary application code. A domain service can query, mutate, and save changes through the `DbContext` without leaking SQL details into controllers.
 
-* Strong .NET integration.
-* Built-in migrations.
-* Productive query model for common CRUD work.
+[source,csharp]
+----
+public sealed class ProductService
+{
+    private readonly InventoryDbContext _dbContext;
 
-== Disadvantages
+    public ProductService(InventoryDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
 
-* Query performance still requires SQL awareness.
-* Complex LINQ queries can hide expensive database behavior.
+    public async Task<ProductResponse?> GetByIdAsync(string id, CancellationToken cancellationToken)
+    {
+        return await _dbContext.Products
+            .Where(product => product.Id == id)
+            .Select(product => new ProductResponse(product.Id, product.Name, product.Price))
+            .FirstOrDefaultAsync(cancellationToken);
+    }
+}
+----
+
+== Analysis
+
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
+
+|
+* *Strong .NET integration*: EF Core fits naturally into ASP.NET Core dependency injection and configuration.
+* *Migration-driven schema evolution*: the database model can evolve in a versioned, reviewable way.
+* *Productive query model*: common CRUD and projection scenarios become concise.
+|
+* *SQL still matters*: developers must understand indexing, joins, and query plans to avoid hidden performance problems.
+* *Large LINQ queries can become opaque*: a readable C# query is not automatically an efficient SQL query.
+* *Boundary discipline is required*: each service should own its own context and schema instead of sharing tables across the system.
+|===

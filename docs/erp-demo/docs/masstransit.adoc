@@ -3,21 +3,15 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Why MassTransit is central to the architecture
 
-MassTransit is the messaging framework that hides much of the low-level RabbitMQ and Kafka plumbing from application code.
+MassTransit is the messaging abstraction that keeps the application's broker code from fragmenting into transport-specific plumbing. That matters in this ERP demo because the system uses both RabbitMQ and Kafka, and it also relies on higher-level messaging patterns such as retries, outbox delivery, test harnesses, and saga state machines. Without a consistent abstraction, every service would need to solve connection management, endpoint naming, retry behavior, and message dispatching in slightly different ways.
 
-== In This Repository
+The real benefit is not simply convenience. MassTransit gives the codebase a common mental model for asynchronous workflows. Whether a service is sending a RabbitMQ command, publishing a Kafka event, or progressing a saga, the surrounding application code stays recognizable. That consistency reduces accidental complexity, especially when the system grows and more teams contribute to the messaging layer.
 
-MassTransit is central to the current design.
+== Applying the pattern
 
-* RabbitMQ transport
-* Kafka Rider
-* EF Core outbox
-* saga state machine registration
-* test harness support
-
-== ASP.NET Server Setup
+A useful baseline setup configures endpoint naming, consumers, persistence-backed outbox behavior, and transport-specific details in one place. The example below captures the essential structure:
 
 [source,csharp]
 ----
@@ -25,35 +19,68 @@ builder.Services.AddMassTransit(x =>
 {
     x.SetKebabCaseEndpointNameFormatter();
 
-    x.AddEntityFrameworkOutbox<AppDbContext>(o =>
+    x.AddConsumer<ReserveStockConsumer>();
+    x.AddConsumer<CreatePurchaseTransactionConsumer>();
+
+    x.AddEntityFrameworkOutbox<AppDbContext>(outbox =>
     {
-        o.UsePostgres();
-        o.UseBusOutbox();
-        o.QueryDelay = TimeSpan.FromMilliseconds(50);
+        outbox.UsePostgres();
+        outbox.UseBusOutbox();
+        outbox.QueryDelay = TimeSpan.FromMilliseconds(100);
     });
 
-    x.AddConfigureEndpointsCallback((context, name, cfg) =>
+    x.UsingRabbitMq((context, cfg) =>
     {
-        cfg.UseEntityFrameworkOutbox<AppDbContext>(context);
+        cfg.Host(builder.Configuration["RabbitMQ:Host"], host =>
+        {
+            host.Username(builder.Configuration["RabbitMQ:Username"]);
+            host.Password(builder.Configuration["RabbitMQ:Password"]);
+        });
+
+        cfg.ConfigureEndpoints(context);
     });
 });
 ----
 
-== React Client Setup
+Once configured, application code should depend on interfaces such as `IPublishEndpoint`, `ISendEndpointProvider`, or typed producers instead of talking directly to the broker SDK. That keeps business logic focused on intent.
 
-There is no direct React integration. The frontend benefits indirectly because workflow actions become more reliable and retriable.
+[source,csharp]
+----
+public sealed class PurchaseWorkflowStarter
+{
+    private readonly IPublishEndpoint _publishEndpoint;
 
-== Simple Example
+    public PurchaseWorkflowStarter(IPublishEndpoint publishEndpoint)
+    {
+        _publishEndpoint = publishEndpoint;
+    }
 
-The financial service uses MassTransit both to consume RabbitMQ commands and to publish Kafka events behind one programming model.
+    public Task StartAsync(Guid correlationId, string productId, int quantity, CancellationToken cancellationToken)
+    {
+        return _publishEndpoint.Publish(new SubmitPurchase
+        {
+            CorrelationId = correlationId,
+            ProductId = productId,
+            Quantity = quantity,
+        }, cancellationToken);
+    }
+}
+----
 
-== Advantages
+The frontend has no direct MassTransit integration. It benefits indirectly because backend messaging becomes more reliable, testable, and easier to evolve.
 
-* Consistent abstraction over different brokers.
-* Built-in support for retries, outbox, sagas, and tests.
-* Less low-level transport boilerplate in application code.
+== Analysis
 
-== Disadvantages
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-* Developers still need to understand the underlying transport semantics.
-* The framework adds its own concepts, configuration, and failure modes.
+|
+* *One programming model for many messaging patterns*: commands, events, sagas, retries, and tests stay coherent.
+* *Outbox and retry support are built in*: reliability patterns become easier to apply consistently.
+* *Transport details stay contained*: application code depends on messaging intent rather than low-level broker APIs.
+|
+* *You still need transport knowledge*: RabbitMQ and Kafka semantics do not disappear just because the API is unified.
+* *Framework concepts add learning cost*: consumers, state machines, riders, and outbox behavior need to be understood.
+* *Misconfiguration can be subtle*: endpoint naming, retries, and persistence behavior must be reviewed carefully.
+|===

@@ -3,48 +3,82 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Azure as the managed deployment path
 
-Azure is the managed-cloud deployment target in this repository. The AKS overlay shows how the same application changes when moving from self-hosted infrastructure to managed services.
+Azure shows how the same architecture evolves when the team moves from self-hosted infrastructure to managed cloud services. That shift matters because the application itself does not fundamentally change: the gateway still fronts the system, services still run as containers, PostgreSQL still stores business data, and message brokers still coordinate asynchronous work. What changes is who operates the underlying platform. In Azure, responsibility for cluster control plane management, managed database operations, image storage, secret delivery, and public ingress moves partly to the cloud provider.
 
-== In This Repository
+For a project like this ERP demo, Azure is a useful teaching environment because it illustrates a common production migration path. A local stack might start with Docker Compose and a self-hosted Kubernetes cluster, but a production-grade system usually benefits from managed building blocks such as AKS, Azure Container Registry, Azure Database for PostgreSQL, and Azure Key Vault. Understanding that mapping helps teams design applications that are portable without pretending all environments are identical.
 
-The Azure design currently uses:
+== Applying the pattern
 
-* AKS for Kubernetes
-* ACR for container images
-* Azure Database for PostgreSQL Flexible Server
-* Azure Key Vault and the CSI driver for secret sync
-* Traefik with Gateway API resources
+The most important design rule is to keep applications configuration-driven. If services read connection strings, secret values, and broker settings from configuration, the same service image can run locally, on a private cluster, or on AKS without code changes. A representative cloud wiring pattern looks like this:
 
-== Setup Example
-
-[source,bash]
+[source,yaml]
 ----
-bash scripts/aks-provision.sh
-bash scripts/aks-build-push.sh
-bash scripts/aks-deploy.sh
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+	name: erp-secrets
+spec:
+	provider: azure
+	parameters:
+		keyvaultName: erp-demo-kv
+		tenantId: <tenant-id>
+		useVMManagedIdentity: "true"
+		objects: |
+			array:
+				- |
+					objectName: postgres-connection-string
+					objectType: secret
+				- |
+					objectName: rabbitmq-password
+					objectType: secret
+	secretObjects:
+		- secretName: erp-runtime-secrets
+			type: Opaque
+			data:
+				- key: ConnectionStrings__inventory-db
+					objectName: postgres-connection-string
+				- key: RabbitMQ__Password
+					objectName: rabbitmq-password
 ----
 
-== What Changes In Azure
+Once the secret is synchronized into the cluster, a service can consume it exactly like any other Kubernetes secret. That keeps application startup code clean and environment-agnostic.
 
-* AKS replaces the self-hosted cluster.
-* ACR replaces GHCR or local images.
-* Azure Database for PostgreSQL replaces the self-hosted PostgreSQL pod.
-* Azure Key Vault handles managed secret integration.
-* Gateway API resources are used with Traefik.
+[source,yaml]
+----
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+	name: inventory
+spec:
+	template:
+		spec:
+			containers:
+				- name: inventory
+					image: myregistry.azurecr.io/inventory:1.0.0
+					envFrom:
+						- secretRef:
+								name: erp-runtime-secrets
+					env:
+						- name: ASPNETCORE_URLS
+							value: http://+:8080
+----
 
-== React Client Setup
+From the browser perspective, nothing should become more complicated in Azure. The frontend should still talk to one public domain, and that domain should hide the internal topology behind the gateway or ingress layer.
 
-In Azure, the frontend is consumed through the public domain configured during deployment. The browser should not need to know about individual backend pods or services.
+== Analysis
 
-== Advantages
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-* Managed cluster and managed database options.
-* Better cloud-native secret handling.
-* Good fit for a production-style cloud deployment story.
-
-== Disadvantages
-
-* Higher cost than purely local or self-hosted paths.
-* More provider-specific knowledge is required.
+|
+* *Managed operations*: AKS, ACR, Key Vault, and managed PostgreSQL reduce the amount of infrastructure the team must run directly.
+* *Production realism*: the environment mirrors how many real distributed systems are operated in the cloud.
+* *Better secret and identity integration*: managed identity and Key Vault improve the secret story compared to hand-managed files.
+|
+* *Provider-specific knowledge*: teams must understand Azure networking, IAM, managed identity, and AKS deployment details.
+* *Higher cost profile*: managed services are convenient, but they are rarely the cheapest environment.
+* *Abstraction boundaries still matter*: cloud-managed infrastructure does not remove the need for sound application configuration and failure handling.
+|===

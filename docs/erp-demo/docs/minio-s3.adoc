@@ -3,59 +3,77 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Why object storage belongs beside the database
 
-The repository does not currently use AWS S3 directly. Instead, it uses MinIO, which is an S3-compatible object store. That means the programming model is similar to S3, but the runtime is self-hosted.
+Object storage solves a different problem from a relational database. PostgreSQL is excellent for structured business data and transactional updates, but it is not the best place to store large binary files such as product images, PDFs, or other uploaded documents. Those assets are better handled by a blob store that is optimized for large objects, simple retrieval, and HTTP-friendly access patterns. In this ERP demo, MinIO fills that role while keeping the API model compatible with S3-style storage.
 
-== In This Repository
+That compatibility is useful beyond the project itself. Teams can learn the object-storage pattern locally with MinIO and later move to AWS S3 or another compatible provider with minimal application changes. The architectural lesson is the important part: store metadata and ownership rules in the business database, but store the binary payload itself in object storage.
 
-Inventory uses MinIO for:
+== Applying the pattern
 
-* product images
-* product documents
-
-== ASP.NET Server Setup
+Backend setup usually starts by configuring an S3-compatible client and wrapping it in an application-facing storage service. That hides bucket names, naming conventions, and error handling behind a domain-specific interface.
 
 [source,csharp]
 ----
-var minioSettings = builder.Configuration.GetSection("Minio").Get<MinioSettings>() ?? new MinioSettings();
+var settings = builder.Configuration.GetSection("ObjectStorage").Get<ObjectStorageSettings>()
+    ?? throw new InvalidOperationException("Object storage settings are missing.");
 
-builder.Services.AddMinio(configureClient => configureClient
-    .WithEndpoint(minioSettings.Endpoint)
-    .WithCredentials(minioSettings.AccessKey, minioSettings.SecretKey)
-    .WithSSL(minioSettings.UseSSL)
+builder.Services.AddMinio(configure => configure
+    .WithEndpoint(settings.Endpoint)
+    .WithCredentials(settings.AccessKey, settings.SecretKey)
+    .WithSSL(settings.UseSsl)
     .Build());
 
-builder.Services.AddScoped<IFileStorageService, MinioFileStorageService>();
+builder.Services.AddScoped<IProductFileStorage, MinioProductFileStorage>();
 ----
 
-== React Client Setup
+The storage service is where uploads become useful application behavior rather than raw SDK calls.
 
-The frontend uploads files through the backend, not directly to MinIO.
+[source,csharp]
+----
+public async Task<string> UploadImageAsync(string productId, Stream content, string contentType, CancellationToken cancellationToken)
+{
+    var objectName = $"products/{productId}/image";
+
+    await _minioClient.PutObjectAsync(new PutObjectArgs()
+        .WithBucket(_bucketName)
+        .WithObject(objectName)
+        .WithStreamData(content)
+        .WithObjectSize(content.Length)
+        .WithContentType(contentType), cancellationToken);
+
+    return objectName;
+}
+----
+
+From the frontend, the safest pattern is usually to upload through the backend so authorization, validation, and metadata updates stay in one place.
 
 [source,typescript]
 ----
-const form = new FormData();
-form.append('file', file);
+const formData = new FormData();
+formData.append('file', file);
 
-await fetch(`${getApiBaseUrl()}/api/v1/productfiles/${productId}/image`, {
+await fetch(`${getApiBaseUrl()}/api/v1/products/${productId}/image`, {
   method: 'POST',
-  headers: { Authorization: `Bearer ${token}` },
-  body: form,
+  headers: {
+    Authorization: `Bearer ${token}`,
+  },
+  body: formData,
 });
 ----
 
-== Simple Example
+== Analysis
 
-Inventory creates buckets in development and stores uploaded product assets there. Images can then be served through public URLs or presigned URLs.
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-== Advantages
-
-* Good fit for binary files.
-* Keeps large blobs out of PostgreSQL.
-* Keeps the programming model close to S3.
-
-== Disadvantages
-
-* Another service to run and secure.
-* File lifecycle and access control need careful handling.
+|
+* *Correct storage fit*: binary payloads stay out of the relational database.
+* *Portable programming model*: MinIO teaches the same architecture used with S3-compatible cloud storage.
+* *Better scaling characteristics*: file storage and business data can evolve independently.
+|
+* *Another subsystem to secure*: buckets, credentials, and public access rules need careful control.
+* *Metadata coordination is required*: database records and object-store contents must stay aligned.
+* *Lifecycle rules matter*: retention, deletion, and presigned URL handling need deliberate design.
+|===

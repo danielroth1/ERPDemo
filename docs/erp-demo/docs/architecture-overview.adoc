@@ -3,57 +3,38 @@
 :sectnums:
 :icons: font
 
-== Overview
+== System Architecture Overview
 
-This page explains how the major services fit together and why the system uses more than one API style.
+Designing a modern distributed system involves making critical decisions about how decoupled services communicate and share data. This architecture uses a polyglot integration pattern—meaning it embraces several distinct communication styles, utilizing each where it naturally fits the system's technical requirements and the frontend's functional needs. By combining HTTP APIs with asynchronous message-oriented middleware and bi-directional streaming protocols, the architecture optimizes resilience, responsiveness, and horizontal scalability across its subdomains.
 
-== Runtime Topology
+The runtime topology provides the foundation for the entire software ecosystem:
 
 dotgraph::./diagrams/system-architecture.dot[caption="Runtime architecture overview",max-width=980,engine=dot]
 
-== Request Styles In This System
+== Request Styles and Domain Modality
 
-The system does not rely on one communication style. It uses several, each for a different reason.
+One of the easiest design mistakes when building a polyglot system is attempting to solve every communication challenge with a standard synchronous REST API. The architecture inside a complex software application necessitates varying request-response paradigms corresponding to different non-functional demands (throughput, consistency, real-time availability).
 
-* REST is still the default for many commands and CRUD endpoints.
-* GraphQL is used where the frontend needs flexible read models.
-* SignalR and GraphQL subscriptions are used for real-time updates.
-* Kafka and RabbitMQ handle asynchronous work between services.
+This system splits integration styles deliberately depending on the scenario's demands:
+* *REST* remains the default for standard Command Query Responsibility Segregation (CQRS) flows involving direct, synchronous write operations and foundational CRUD endpoints where predictable schema contracts naturally fit.
+* *GraphQL* orchestrates complex graph-like read patterns. This pattern excels when the frontend must query deeply nested data structures spanning multiple entities without causing "over-fetching" or triggering the N+1 execution problem.
+* *SignalR / WebSockets* pushes real-time telemetry, live alerts, and dashboard updates from the server layers down to the web client, bypassing the latency of periodic HTTP polling.
+* *Event-Driven Messaging (Kafka & RabbitMQ)* anchors the asynchronous backbone of the microservice ecosystem. Kafka broadcasts durable, replayable facts about the business domain (e.g., `OrderPlaced`), allowing downstream services to independently consume and interpret facts. RabbitMQ reliably queues specific inter-service workflow commands for immediate action, providing robust routing guarantees during distributed orchestrations (Sagas).
 
-== What The Diagram Shows
+== Design Analysis
 
-The runtime diagram is the shortest accurate explanation of the whole system.
+Implementing diverse networking layers significantly impacts the system lifecycle, influencing how teams write code, monitor infrastructure, and design error-handling strategies.
 
-* The browser talks to the gateway.
-* The gateway routes requests to specialized backend services.
-* Services persist their own data in PostgreSQL.
-* Inventory also uses MinIO for product assets.
-* Dashboard also uses Redis for caching.
-* Services exchange asynchronous information through Kafka and RabbitMQ.
-* Every important runtime component emits telemetry into the observability stack.
+[cols="1a,1a", options="header"]
+|===
+| Architectonic Strengths | Design Trade-Offs
 
-== Why The Architecture Uses Several Communication Styles
-
-One of the easiest beginner mistakes is to assume the project is only a REST API with some databases behind it. The source code shows a more mixed design.
-
-* REST handles many writes and CRUD operations.
-* GraphQL handles flexible reads and nested data selection.
-* SignalR and GraphQL subscriptions push live updates.
-* Kafka broadcasts facts that other services may care about.
-* RabbitMQ moves workflow commands between services.
-
-Those topics each have their own dedicated page because they solve different problems.
-
-== Why This Architecture Is Useful
-
-=== Advantages
-
-* Service boundaries match business boundaries.
-* Read-heavy screens can use GraphQL while command-heavy paths stay on REST.
-* Sagas and messaging let workflows survive partial failures better than one giant synchronous call chain.
-
-=== Disadvantages
-
-* The architecture is harder to debug than a monolith.
-* Consistency becomes eventual in some flows.
-* Teams need to understand several integration styles instead of only HTTP.
+| 
+* *Optimized Sub-Domain Boundaries*: Each service independently scales and operates with the technology pattern that suits its precise workload (e.g., using messaging for asynchronous tasks vs routing GraphQL queries for heavy reads).
+* *Graceful Degradation Component Resilience*: Core services leveraging decoupled event buses (Sagas) avoid catastrophic failures that typically occur alongside massive blocking API calls traversing multiple services synchronously.
+* *Rich Frontend Capability*: Using SignalR and GraphQL gives client applications the flexible tools required to construct deeply interactive user experiences with extremely efficient data loading.
+| 
+* *Diagnostic Complexity*: Debugging requests tracing across API gateways, asynchronous message queues, and back into synchronous databases is notoriously harder than diagnosing simple application monoliths.
+* *Eventual Consistency Hurdles*: Engineers face challenges maintaining logical coherence across databases when using asynchronous messaging formats since distributed commits are abandoned.
+* *Operational Overhead*: DevOps and infrastructure teams must maintain complex hybrid networks and multiple service types (e.g., Redis, MinIO, RabbitMQ, Kafka) over standard SQL servers.
+|===

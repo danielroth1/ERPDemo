@@ -3,129 +3,64 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Why distributed systems need several test layers
 
-Distributed systems need several test layers. A single style of test cannot answer every important question.
+A distributed system cannot be tested well with one technique alone. Unit tests are fast and precise, but they do not prove that ASP.NET Core, EF Core, message brokers, and the frontend are wired together correctly. End-to-end tests are realistic, but they are slower and more brittle. The right strategy is therefore layered: use the cheapest test that can answer the question, and only move to a heavier layer when the lower one cannot prove the behavior.
 
-This repository currently uses:
+That principle matters even more in this ERP demo because the system spans synchronous APIs, asynchronous messaging, databases, and browser behavior. A saga transition, a React loading state, a database migration, and a full purchase journey are not the same testing problem. Treating them as if they were leads either to over-mocked tests that prove too little or to expensive system tests that teams stop running regularly.
 
-* Unit tests for focused service logic and saga transitions
-* Component tests for React screens with mocked dependencies
-* Integration tests for real application bootstrapping and database wiring
-* System tests with Playwright for full browser flows
+== Applying the test pyramid
 
-== Why Several Test Layers Matter
+The repository uses four complementary layers, each answering a different risk.
 
-Unit tests are fast but isolated. System tests are realistic but slower. Integration tests sit between those extremes and validate that framework wiring actually works.
-
-The goal is not to push everything into one test type. The goal is to answer different risks at the cheapest useful layer.
-
-== Unit Tests
-
-=== Introduction
-
-Unit tests validate one small behavior at a time. In this repository, saga logic is a good unit-test target because it exercises workflow transitions without needing a full deployed environment.
-
-=== Setup Example
+Unit tests:: Use these for focused business rules, pure services, and saga transitions. They should be fast and narrow.
 
 [source,csharp]
 ----
 await _harness.Bus.Publish(new SubmitPurchase
 {
     CorrelationId = correlationId,
-    UserId = "user-1",
     ProductId = "prod-1",
     Quantity = 5,
-    AuthToken = "test-token"
 });
 
-(await _sagaHarness.Exists(correlationId, x => x.ReservingStock, timeout: TimeSpan.FromSeconds(5)))
+(await _sagaHarness.Exists(correlationId, state => state.ReservingStock, TimeSpan.FromSeconds(5)))
     .Should().NotBeNull();
 ----
 
-=== Advantages
-
-* Fast feedback.
-* Good for business rules and state transitions.
-* Easy to run often.
-
-=== Disadvantages
-
-* Does not prove the full application wiring works.
-* Heavy mocking can hide integration problems.
-
-== Component Tests
-
-=== Introduction
-
-Component tests validate a React screen or component while mocking service dependencies. They are useful for rendering logic, loading states, error states, and user interactions.
-
-=== Setup Example
+Component tests:: Use these for React screens and UI state transitions with mocked dependencies.
 
 [source,typescript]
 ----
 vi.mock('../../services/inventory.service', () => ({
   inventoryService: {
-    getProducts: vi.fn().mockResolvedValue({ items: [...], totalCount: 2 }),
+    getProducts: vi.fn().mockResolvedValue({ items: [{ id: '1', name: 'Keyboard' }], totalCount: 1 }),
   },
 }));
 
-renderWithProviders(<InventoryPage />, { preloadedState: authenticatedState });
-expect(screen.getByText('Inventory Management')).toBeInTheDocument();
+renderWithProviders(<InventoryPage />);
+expect(screen.getByText('Keyboard')).toBeInTheDocument();
 ----
 
-=== Advantages
-
-* Fast UI feedback without a real backend.
-* Good for user interaction and conditional rendering.
-
-=== Disadvantages
-
-* Mocked services can drift away from real backend behavior.
-* Not enough to validate authentication, routing, or network wiring end to end.
-
-== Integration Tests
-
-=== Introduction
-
-Integration tests boot the real application with real framework pieces such as ASP.NET Core, EF Core, PostgreSQL, and MassTransit test helpers.
-
-=== Setup Example
+Integration tests:: Use these when the real application host, database wiring, or messaging infrastructure integration must be validated.
 
 [source,csharp]
 ----
-Factory = new WebApplicationFactory<Program>()
+var factory = new WebApplicationFactory<Program>()
     .WithWebHostBuilder(builder =>
     {
         builder.UseEnvironment("Testing");
-        Environment.SetEnvironmentVariable("ConnectionStrings__erp-inventory", Postgres.ConnectionString);
+        builder.ConfigureServices(services =>
+        {
+            services.AddDbContext<InventoryDbContext>(options =>
+                options.UseNpgsql(testDatabaseConnectionString));
 
-        services.AddDbContext<AppDbContext>(options =>
-            options.UseNpgsql(Postgres.ConnectionString)
-                .UseSnakeCaseNamingConvention());
-
-        services.AddMassTransitTestHarness();
+            services.AddMassTransitTestHarness();
+        });
     });
 ----
 
-=== Advantages
-
-* Validates real ASP.NET Core and EF Core wiring.
-* Catches configuration problems unit tests miss.
-* Useful for messaging and persistence boundaries.
-
-=== Disadvantages
-
-* Slower than unit and component tests.
-* Test environment setup is more complex.
-
-== System Tests
-
-=== Introduction
-
-System tests run the application like a user would: through a real browser. In this repository, Playwright covers that role.
-
-=== Setup Example
+System tests:: Use these for end-user flows in a real browser with Playwright or a similar tool.
 
 [source,typescript]
 ----
@@ -142,18 +77,6 @@ export default defineConfig({
 });
 ----
 
-=== Advantages
-
-* Best proof that the user journey works.
-* Good at catching UI integration problems.
-
-=== Disadvantages
-
-* Slowest and most brittle layer.
-* Needs stable environments and test data.
-
-== Choosing The Right Layer
-
 [cols="1,3",options="header"]
 |===
 | Question | Best starting layer
@@ -161,16 +84,28 @@ export default defineConfig({
 | Is one workflow transition correct?
 | Unit test
 
-| Does one React screen render the right state?
+| Does one React screen show the correct state?
 | Component test
 
-| Does this service boot correctly with its real database wiring?
+| Does this service boot and talk to its database correctly?
 | Integration test
 
 | Can a user complete the full journey in a browser?
 | System test
 |===
 
-== Recommended Habit
+== Analysis
 
-Start with the cheapest test that can prove the behavior. Move upward only when the lower layer cannot answer the question.
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
+
+|
+* *Risk is tested at the right level*: business rules, framework wiring, and user journeys each get the right kind of proof.
+* *Faster feedback overall*: most regressions can be caught before the slowest tests are needed.
+* *Better confidence in distributed behavior*: messaging, persistence, and browser flows are all covered in the right place.
+|
+* *More tooling to maintain*: test harnesses, browsers, databases, and mock layers all need care.
+* *Poor boundaries create duplication*: the same scenario can end up rewritten at every layer if the strategy is unclear.
+* *System tests remain expensive*: they are necessary, but they should not carry the entire quality burden.
+|===

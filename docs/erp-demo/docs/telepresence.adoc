@@ -3,49 +3,66 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Telepresence overview and concepts
 
-Telepresence lets you run one service locally while redirecting matching traffic from a remote Kubernetes cluster to your machine.
+Telepresence is a powerful open-source tool built for Kubernetes that allows developers to run a single service locally while redirecting matching traffic from a remote Kubernetes cluster to their local machine. This provides a "local-to-cloud" debugging experience. By acting as a transparent network bridge, Telepresence allows the locally running service to seamlessly interact with remote dependencies—such as databases, internal APIs, and external integrations—without requiring you to run the entire backend infrastructure on your laptop. 
 
-== In This Repository
+This approach minimizes resource consumption on local development machines, avoids the "works on my machine" problem by running against real infrastructure, and drastically speeds up the feedback loop compared to building and pushing container images continuously. By specifying session headers, a developer can ensure that only their own traffic is routed to their local machine, ensuring they don't break the environment for other teammates sharing the same development cluster.
 
-The repository uses header-based personal intercepts. Each developer chooses a unique session key such as `x-telepresence-session: alice`.
+[WARNING]
+====
+Event Streaming Limitations:
+While Telepresence excels at intercepting and routing HTTP/gRPC traffic based on headers, it is fundamentally an HTTP proxying tool. It *does not intercept message broker events*.
 
-== Setup Example
+If your service consumes events from RabbitMQ, Kafka, or other event buses, both your locally running service and the remote cluster service will compete to process those messages. Because events lack HTTP headers and broker connections operate on persistent TCP streams rather than HTTP requests, the events will be randomly forwarded to either the server-side instance or the locally running instance. Telepresence is not suitable for debugging message consumption in event-driven systems like the ones used in this architecture.
+====
+
+== Implementation and Setup
+
+To use Telepresence effectively, it requires an installed CLI on the developer machine and a traffic manager deployed in the remote Kubernetes cluster.
+
+Below is a generic example of how to connect and intercept a service. Ensure you define a unique HTTP header (e.g., `x-telepresence-session=your-name`) so you only capture your own debugging traffic.
 
 [source,bash]
 ----
-brew install telepresenceio/telepresence/telepresence-oss
-telepresence version
+# 1. Connect your local machine to the remote Kubernetes cluster
+telepresence connect --namespace your-app-namespace
 
-KUBECONFIG=~/.kube/aks-erp.yaml telepresence connect --namespace erp-azure --manager-namespace erp-azure
-
-telepresence intercept gateway \
+# 2. Start an intercept for a specific deployment
+# We route HTTP traffic with a matching header to our local port 8080
+telepresence intercept your-service-deployment \
   --port 8080:http \
-  --http-header 'x-telepresence-session=alice' \
-  -- dotnet watch run --project services/gateway/ApiGateway/ApiGateway.csproj
+  --http-header 'x-telepresence-session=your-name' \
+  -- your-local-run-command
 ----
 
-== React Client Setup
+On the client side (e.g., a React Frontend or API consumer), you simply attach the matching session header to your outgoing requests.
 
 [source,typescript]
 ----
-fetch('/api/v1/users', {
-  headers: { 'x-telepresence-session': 'alice' },
+// By passing this header, the Telepresence manager inside the cluster 
+// knows to forward this specific request to your local machine.
+fetch('https://api.yourcluster.com/v1/users', {
+  headers: { 
+    'x-telepresence-session': 'your-name' 
+  },
 });
 ----
 
-== Simple Example
+== Analysis
 
-You can keep the AKS cluster running, intercept only the gateway, and debug your local code against real remote dependencies.
+The local-to-cloud debugging model introduces trade-offs that teams must consider before adopting it as their primary development workflow.
 
-== Advantages
+[cols="1a,1a", options="header"]
+|===
+| Advantages | Disadvantages
 
-* Very useful for debugging remote clusters.
-* Good fit for multi-developer shared environments.
-* Lets you combine local code with remote infrastructure.
-
-== Disadvantages
-
-* Adds networking complexity.
-* Missing headers can make debugging confusing.
+| 
+* *Fast Feedback Loop*: Code changes are tested instantly without building containers or waiting for CI/CD pipelines.
+* *Low Resource Usage*: Eliminates the need to run heavy databases or dozens of microservices on a local laptop.
+* *Shared Environments*: Personal intercepts (headers) allow multiple developers to safely share and debug against the same cluster simultaneously.
+| 
+* *Networking Complexity*: Modifies local workstation DNS and routing, which can sometimes interfere with VPNs or strict corporate firewalls.
+* *Event Broker Incompatibility*: Cannot target or intercept message queue traffic (RabbitMQ/Kafka).
+* *Debugging Confusion*: Forgetting to attach the session header in the client results in traffic bypassing the local machine, confusing developers.
+|===

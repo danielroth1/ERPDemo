@@ -3,64 +3,100 @@
 :sectnums:
 :icons: font
 
-== Overview
+== ASP.NET Core as the service foundation
 
-ASP.NET Core is the foundation of every backend service in this repository. It handles HTTP endpoints, middleware, dependency injection, authentication, health checks, and service startup.
+ASP.NET Core is the runtime foundation for every backend service in this repository, including the gateway. That is important because it means each service shares the same hosting model even when the service exposes different capabilities such as REST controllers, GraphQL endpoints, SignalR hubs, health probes, or background messaging consumers. For a microservice system, that consistency matters: teams can reuse middleware patterns, authentication conventions, telemetry registration, and deployment habits instead of reinventing service startup for every business area.
 
-== In This Repository
+The framework is also a good fit for this project because it handles more than plain HTTP routing. It provides dependency injection, configuration, hosted services, authentication, authorization, request pipeline composition, and observability hooks. Once those concerns are composed correctly in `Program.cs`, feature code can stay focused on domain behavior rather than infrastructure wiring.
 
-Most services follow the same hosting pattern:
+== Applying ASP.NET Core in code
 
-* shared service defaults for OpenTelemetry and health checks
-* JWT authentication and authorization
-* controllers and optional GraphQL or SignalR endpoints
-* health endpoints and Prometheus metrics
-
-== ASP.NET Server Setup
+A typical service starts by building the host, registering cross-cutting capabilities, then mapping endpoints. The example below shows the same kind of initialization pattern used throughout the ERP demo:
 
 [source,csharp]
 ----
 var builder = WebApplication.CreateBuilder(args);
 
 builder.AddServiceDefaults();
+
 builder.Services.AddControllers();
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
-    .AddJwtBearer(...);
+    .AddJwtBearer(options =>
+    {
+        options.Authority = builder.Configuration["Jwt:Authority"];
+        options.Audience = builder.Configuration["Jwt:Audience"];
+    });
 builder.Services.AddAuthorization();
-builder.Services.AddHealthChecks();
+builder.Services.AddProblemDetails();
 
 var app = builder.Build();
 
+app.UseExceptionHandler();
 app.UseAuthentication();
 app.UseAuthorization();
+
 app.MapControllers();
 app.MapDefaultEndpoints();
 app.MapMetrics();
+
+app.Run();
 ----
 
-== React Client Setup
+Once the host exists, application behavior is usually expressed through controllers or endpoint handlers. This is where ASP.NET Core becomes practical rather than theoretical: it takes authenticated HTTP input, resolves domain services from dependency injection, and returns structured results to the caller.
 
-React only needs the correct gateway base URL and a valid JWT token.
+[source,csharp]
+----
+[ApiController]
+[Route("api/v1/products")]
+public sealed class ProductsController : ControllerBase
+{
+    private readonly IProductService _productService;
+
+    public ProductsController(IProductService productService)
+    {
+        _productService = productService;
+    }
+
+    [HttpGet("{id}")]
+    [Authorize]
+    public async Task<ActionResult<ProductResponse>> GetById(string id, CancellationToken cancellationToken)
+    {
+        var product = await _productService.GetByIdAsync(id, cancellationToken);
+        return product is null ? NotFound() : Ok(product);
+    }
+}
+----
+
+From the frontend, usage stays straightforward. The browser sends an authenticated request to the gateway, and the gateway forwards it to the correct ASP.NET Core service.
 
 [source,typescript]
 ----
-const baseUrl = getApiBaseUrl();
-const response = await fetch(`${baseUrl}/api/v1/products`, {
-  headers: { Authorization: `Bearer ${token}` },
+const response = await fetch(`${getApiBaseUrl()}/api/v1/products/42`, {
+  headers: {
+    Authorization: `Bearer ${token}`,
+    Accept: 'application/json',
+  },
 });
+
+if (!response.ok) {
+  throw new Error('Failed to load product details.');
+}
+
+const product = await response.json();
 ----
 
-== Simple Example
+== Analysis
 
-The gateway itself is also an ASP.NET Core app. It uses middleware for CORS, rate limiting, authentication, metrics, and reverse proxying.
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-== Advantages
-
-* Mature framework for APIs and distributed services.
-* Strong middleware and dependency injection model.
-* Integrates well with EF Core, SignalR, YARP, OpenTelemetry, and MassTransit.
-
-== Disadvantages
-
-* Teams need conventions so controllers, GraphQL, and middleware stay consistent.
-* Distributed systems still require design discipline beyond the framework itself.
+|
+* *Unified hosting model*: one framework supports controllers, GraphQL, SignalR, middleware, metrics, and background integration.
+* *Excellent ecosystem fit*: EF Core, YARP, OpenTelemetry, and MassTransit integrate naturally.
+* *Strong composition model*: dependency injection and middleware make cross-cutting concerns reusable.
+|
+* *Convention discipline is required*: without shared standards, services drift and startup code becomes inconsistent.
+* *Framework power can hide complexity*: developers still need to understand authentication flow, middleware order, and async failure behavior.
+* *Not a distributed-systems shortcut*: ASP.NET Core helps host services, but it does not remove the need for sound messaging and data design.
+|===

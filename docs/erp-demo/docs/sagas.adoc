@@ -3,68 +3,61 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Distributed Workflows with Sagas
 
-A saga is a way to model a business workflow that spans multiple services. Instead of one large database transaction, the workflow is broken into steps. If a later step fails, compensating actions can undo earlier work.
+A saga is a sophisticated pattern for managing complex business workflows that span multiple independent microservices. In traditional monolithic architectures, these workflows are often handled using large, single-database transactions that guarantee ACID (Atomicity, Consistency, Isolation, Durability) properties. However, when transitioning to decentralized microservices, relying on remote distributed transactions using concepts like two-phase commit (2PC) introduces severe latency, performance bottlenecks, and single points of failure.
 
-== In This Repository
+Sagas solve this by explicitly breaking the workflow down into a sequential series of local database transactions or steps. If one step in the sequence fails—such as a failure to charge a credit card after reserving an item—the saga executes "compensating actions" to gracefully undo or reverse the preceding successful steps (like releasing the inventory reservation). This orchestration creates robust, predictable models for handling eventual consistency across bounded contexts.
 
-The orchestration service contains saga state machines for purchase and return workflows. The purchase flow is the clearest example.
+== Orchestrating the Purchase Flow
+
+The orchestration service maintains standard saga state machines. The purchase flow is the clearest example because it touches the frontend, orchestration, inventory, financial processing, and the message brokers used to coordinate the workflow.
 
 dotgraph::./diagrams/purchase-saga.dot[caption="Purchase saga overview",max-width=980,engine=dot]
 
-== ASP.NET Server Setup
+State machines govern these flows and ensure states are saved asynchronously (typically to PostgreSQL with persistence tools like Entity Framework Core), guaranteeing that workflows survive process restarts.
 
 [source,csharp]
 ----
-x.AddSagaStateMachine<PurchaseStateMachine, PurchaseState>()
+// The Orchestrator registers the generic state machine against a persistent database.
+// This allows the saga instances to be queried or resumed across reboots.
+x.AddSagaStateMachine<OrderStateMachine, OrderState>()
     .EntityFrameworkRepository(r =>
     {
-        r.ExistingDbContext<OrchestrationDbContext>();
+        // Leveraging EF Core to store correlation IDs and the workflow's current state.
+        r.ExistingDbContext<PlatformOrchestrationDbContext>();
         r.UsePostgres();
     });
 ----
 
-Saga state is stored in PostgreSQL, not in memory, so workflows survive process restarts.
-
-== React Client Setup
-
-The shop client starts the workflow by calling orchestration through a generated client.
+Client initialization acts as the launch point for a saga. By emitting an event or calling the orchestration orchestrator API point, a frontend client effectively instantiates a new saga instance.
 
 [source,typescript]
 ----
-async purchaseProduct(productId: string, quantity: number = 1) {
-  return await this.orchestrationClient.api.v1.shop.purchase
+// The frontend starts the saga asynchronously by initiating the purchase command.
+// We pass the required initial metadata so the StateMachine has context to execute 
+// all subsequent workflow steps across diverse microservices.
+async executePurchaseCommand(productId: string, quantity: number = 1) {
+  return await this.apiClient.v1.orders.checkout
     .byProductId(productId)
     .post({ queryParameters: { quantity } });
 }
 ----
 
-== Simple Example
+== Analysis
 
-Happy path:
+Moving away from blocking synchronous communication to saga-driven event orchestration is a paradigm shift that solves deep distributed challenges but requires rigorous engineering discipline.
 
-1. `SubmitPurchase`
-2. reserve stock
-3. create financial transaction
-4. deduct stock
-5. publish `PurchaseCompleted`
+[cols="1a,1a", options="header"]
+|===
+| Advantages | Disadvantages
 
-Failure path:
-
-1. reserve stock succeeds
-2. transaction creation fails
-3. compensation releases stock
-4. publish `PurchaseFailed`
-
-== Advantages
-
-* Explicit cross-service workflow control.
-* Better alternative to fake distributed transactions.
-* Failure and compensation are first-class concepts.
-
-== Disadvantages
-
-* Harder to reason about than one local transaction.
-* Requires idempotency and careful event design.
-* Debugging state transitions takes practice.
+| 
+* *Long-Running Process Resilience*: Workflows span temporal boundaries gracefully, surviving transient network errors and restarts without locking distributed databases.
+* *Service Independence*: Services retain data isolation and high throughput because they perform fast local transactions instead of blocking distributed ones.
+* *Failure as a First-Class Concept*: Compensation models force teams to proactively design error handling natively within the workflow.
+| 
+* *High Complexity*: Orchestration logic requires rigorous state management. It is inherently harder to debug a sequence of asynchronous compensating events than a simple synchronous HTTP chain.
+* *Eventual Consistency Guarantees*: A system midway through a saga exposes intermediate data fragments to consumers.
+* *Requires Idempotency*: System APIs and event consumers must handle exact duplicate messages flawlessly ensuring side-effects happen only once.
+|===

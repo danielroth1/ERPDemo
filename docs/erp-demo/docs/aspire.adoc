@@ -3,54 +3,88 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Why .NET Aspire matters in this project
 
-.NET Aspire is the main local orchestration entry point for this system. It lets one .NET application describe the whole development environment.
+.NET Aspire is the local orchestration layer that turns a distributed application into a versioned piece of code instead of a loose collection of terminal commands. In a microservice system like this one, the hard part of local development is rarely compiling a single backend service. The hard part is coordinating everything around it: databases, message brokers, the gateway, frontend development servers, health checks, and the connection details that tie them together. Aspire addresses that problem by letting the team declare the local topology inside one AppHost project.
 
-== In This Repository
+That approach is especially useful in this ERP demo because the runtime is not a simple "API plus database" setup. A realistic local session requires PostgreSQL, Kafka, RabbitMQ, the gateway, several business services, and the React frontend. Aspire makes those dependencies visible, starts them in a controlled way, injects configuration into each service, and exposes a dashboard for logs and health. The result is not a production deployment model, but it is an excellent way to keep local distributed development understandable.
 
-`AppHost/Program.cs` defines infrastructure and service relationships. It is the most accurate single-file summary of the current runtime topology.
+highlight::[title="Key idea",text="Aspire treats the local environment as code. Infrastructure, service references, and startup relationships live in source control instead of in manual setup notes.",shadow]
 
-== Setup Example
+== Applying Aspire in code
+
+In practice, an Aspire AppHost defines infrastructure resources first, then registers application projects, then wires references between them. A simplified version of the pattern used in this repository looks like this:
+
+[source,csharp]
+----
+var builder = DistributedApplication.CreateBuilder(args);
+
+var postgres = builder.AddPostgres("postgres")
+    .WithDataVolume();
+
+var kafka = builder.AddKafka("kafka")
+    .WithDataVolume();
+
+var rabbitMq = builder.AddRabbitMQ("rabbitmq")
+    .WithDataVolume();
+
+var inventoryDb = postgres.AddDatabase("inventory-db");
+
+var inventory = builder.AddProject<Projects.InventoryManagement>("inventory")
+    .WithReference(inventoryDb)
+    .WithReference(kafka)
+    .WithReference(rabbitMq);
+
+var gateway = builder.AddProject<Projects.ApiGateway>("gateway")
+    .WithReference(inventory);
+
+builder.AddViteApp("frontend", "../frontend", "dev")
+    .WithReference(gateway);
+
+builder.Build().Run();
+----
+
+The important detail is what happens in the application itself. Aspire does not force services to use a special coding style after startup. Services still read normal configuration values such as connection strings and broker endpoints. That means the business application remains portable to Docker Compose, Kubernetes, or cloud environments.
+
+[source,csharp]
+----
+var builder = WebApplication.CreateBuilder(args);
+
+var connectionString = builder.Configuration.GetConnectionString("inventory-db")
+    ?? throw new InvalidOperationException("Database connection not configured.");
+
+builder.Services.AddDbContext<InventoryDbContext>(options =>
+    options.UseNpgsql(connectionString));
+
+builder.Services.AddMassTransit(x =>
+{
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(builder.Configuration["ConnectionStrings:rabbitmq"]);
+        cfg.ConfigureEndpoints(context);
+    });
+});
+----
+
+Running the stack is intentionally simple because the real complexity lives in AppHost code rather than in manual instructions:
 
 [source,bash]
 ----
 dotnet run --project AppHost/AppHost.csproj
 ----
 
-[source,csharp]
-----
-var postgres = builder.AddPostgres("postgres", password: postgresPassword)
-    .WithDataVolume();
+== Analysis
 
-var kafka = builder.AddKafka("kafka")
-    .WithDataVolume();
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-var rabbitmq = builder.AddRabbitMQ("rabbitmq")
-    .WithDataVolume();
-
-var gateway = builder.AddProject<Projects.ApiGateway>("gateway")
-    .WithReference(kafka);
-
-builder.AddViteApp("frontend", "../frontend", "dev")
-    .WithReference(gateway);
-----
-
-== React Client Setup
-
-The frontend is included as a Vite app inside Aspire, so local frontend startup can be part of the same orchestrated environment.
-
-== Simple Example
-
-Aspire can launch infrastructure, backend services, and the Vite frontend together and gives developers one dashboard for logs and runtime status.
-
-== Advantages
-
-* Excellent local orchestration experience for a .NET-heavy system.
-* One place to describe dependencies.
-* Good local visibility through the Aspire dashboard.
-
-== Disadvantages
-
-* Mainly a development-time convenience, not a production platform.
-* Teams still need Docker and Kubernetes knowledge for later environments.
+|
+* *Versioned local topology*: service dependencies and startup relationships live in source control.
+* *Better onboarding*: new developers can start a realistic distributed environment with fewer manual steps.
+* *Strong visibility*: the Aspire dashboard makes health, logs, and failures much easier to inspect.
+|
+* *Development focus only*: Aspire improves local orchestration, but it is not the production deployment platform.
+* *Still requires platform knowledge*: developers must still understand Docker, Kubernetes, and cloud deployment for later environments.
+* *Mostly strongest in .NET-centric stacks*: it fits this repository well, but it is less universal than plain container tooling.
+|===

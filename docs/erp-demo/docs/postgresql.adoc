@@ -3,44 +3,70 @@
 :sectnums:
 :icons: font
 
-== Overview
+== PostgreSQL as the durable system of record
 
-PostgreSQL is the main relational database in the current system. It stores business data, read models, and saga state.
+PostgreSQL is the primary relational database used across the system. It stores transactional business data, read-model data, and saga state. That choice is significant because the ERP domain is full of entities that benefit from relational guarantees: products, users, budgets, stock movements, financial transactions, and workflow state all require consistency, indexing, and a well-understood query model.
 
-== In This Repository
+In a microservice architecture, the key principle is not simply "use PostgreSQL". The more important rule is "each service owns its own schema or database". This repository follows that pattern by letting each service manage its own logical database and migrations. That preserves service autonomy and reduces the temptation to solve cross-service needs with direct SQL joins between unrelated domains.
 
-The architecture follows the common microservice rule that each service owns its own data. In local development, one PostgreSQL instance hosts multiple logical databases such as `erp_users`, `erp_inventory`, and `erp_orchestration`.
+== Applying the pattern
 
-== ASP.NET Server Setup
-
-[source,csharp]
-----
-var postgresConnectionString = builder.Configuration.GetConnectionString("erp-financial")
-    ?? builder.Configuration["PostgreSQL:ConnectionString"]
-    ?? throw new InvalidOperationException("PostgreSQL not configured");
-----
-
-== Infrastructure Setup
+At the infrastructure level, PostgreSQL can host several logical databases while still being one shared server in development. That keeps local setup simple without abandoning data ownership.
 
 [source,yaml]
 ----
-postgres:
-  image: postgres:16-alpine
-  environment:
-    POSTGRES_MULTIPLE_DATABASES: erp_users,erp_inventory,erp_sales,erp_financial,erp_dashboard,erp_orchestration
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: erp
+      POSTGRES_PASSWORD: changeme
+      POSTGRES_MULTIPLE_DATABASES: users,inventory,sales,financial,dashboard,orchestration
+    ports:
+      - "5432:5432"
 ----
 
-== React Client Setup
+Application code should then read a service-specific connection string and use migrations to keep the schema in sync.
 
-There is no direct React-to-PostgreSQL access. The browser always goes through the gateway and backend services.
+[source,csharp]
+----
+var connectionString = builder.Configuration.GetConnectionString("financial-db")
+    ?? throw new InvalidOperationException("The financial database is not configured.");
 
-== Advantages
+builder.Services.AddDbContext<FinancialDbContext>(options =>
+    options.UseNpgsql(connectionString));
+----
 
-* Strong transactional guarantees.
-* Good fit for financial data and workflow state.
-* Works well with EF Core and Npgsql.
+When database design becomes explicit, teams can also explain their model clearly. A table definition for a financial transaction might look like this:
 
-== Disadvantages
+[source,sql]
+----
+CREATE TABLE financial_transactions (
+    id uuid PRIMARY KEY,
+    account_id uuid NOT NULL,
+    amount numeric(18,2) NOT NULL,
+    currency_code varchar(3) NOT NULL,
+    created_at_utc timestamp with time zone NOT NULL
+);
 
-* Schema evolution must be managed carefully across versions.
-* Cross-service reporting should not bypass service boundaries.
+CREATE INDEX ix_financial_transactions_account_id
+    ON financial_transactions (account_id);
+----
+
+The browser never connects to PostgreSQL directly. It consumes data through REST, GraphQL, and real-time endpoints exposed by backend services.
+
+== Analysis
+
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
+
+|
+* *Strong transactional model*: ideal for financial data, workflow state, and core business records.
+* *Mature tooling*: migrations, backups, indexing, and monitoring are well understood.
+* *Good fit with EF Core*: application code and relational storage integrate cleanly.
+|
+* *Schema evolution needs discipline*: migrations must be ordered, reviewed, and deployed carefully.
+* *Shared server is not shared ownership*: each service still needs clear boundaries around its data.
+* *Cross-service reporting requires design*: direct database coupling is tempting but usually the wrong solution.
+|===

@@ -3,56 +3,82 @@
 :sectnums:
 :icons: font
 
-== Overview
+== RabbitMQ as the command channel for workflows
 
-RabbitMQ is the queue-based broker used for command-style workflow messages. In this system it mainly carries instructions for saga steps such as reserving stock or creating a financial transaction.
+RabbitMQ is used here for messages that represent an instruction or a unit of work that another service should perform next. That makes it fundamentally different from Kafka. If Kafka answers the question "what already happened?", RabbitMQ answers the question "what should happen now?". In saga-driven workflows, that distinction is extremely useful because orchestration logic often needs to queue the next step, retry when a service is temporarily unavailable, and keep commands isolated from public HTTP request lifetimes.
 
-== In This Repository
+This ERP demo uses RabbitMQ heavily in purchase and return workflows. Commands such as reserve stock, release reservation, create transaction, or void transaction move between services through the broker. That allows the workflow to continue even when the initiating HTTP request has already completed, and it keeps long-running business coordination out of the browser and out of synchronous call chains.
 
-Kafka tells the system that something happened. RabbitMQ tells another service to do something next.
+== Applying the pattern
 
-Typical commands include:
-
-* reserve stock
-* release stock reservation
-* create purchase transaction
-* void purchase transaction
-
-== ASP.NET Server Setup
+RabbitMQ is typically configured through MassTransit consumers and endpoints. A service registers the message handlers it can execute, then configures retries and endpoint creation during startup.
 
 [source,csharp]
 ----
-x.AddConsumer<ReserveStockConsumer>();
-x.AddConsumer<DeductStockConsumer>();
-
-x.UsingRabbitMq((context, cfg) =>
+builder.Services.AddMassTransit(x =>
 {
-    cfg.Host(new Uri(rabbitmqUri));
+    x.AddConsumer<ReserveStockConsumer>();
+    x.AddConsumer<ReleaseStockReservationConsumer>();
 
-    cfg.UseMessageRetry(r => r.Intervals(
-        TimeSpan.FromSeconds(1),
-        TimeSpan.FromSeconds(5),
-        TimeSpan.FromSeconds(15)));
+    x.UsingRabbitMq((context, cfg) =>
+    {
+        cfg.Host(builder.Configuration["RabbitMQ:Host"], host =>
+        {
+            host.Username(builder.Configuration["RabbitMQ:Username"]);
+            host.Password(builder.Configuration["RabbitMQ:Password"]);
+        });
 
-    cfg.ConfigureEndpoints(context);
+        cfg.UseMessageRetry(retry => retry.Intervals(
+            TimeSpan.FromSeconds(1),
+            TimeSpan.FromSeconds(5),
+            TimeSpan.FromSeconds(15)));
+
+        cfg.ConfigureEndpoints(context);
+    });
 });
 ----
 
-== React Client Setup
+Sending a command should express clear intent and include enough correlation data for the workflow to continue safely.
 
-React does not connect to RabbitMQ directly. It starts a business action over HTTP, and backend services continue the workflow asynchronously.
+[source,csharp]
+----
+public sealed class PurchaseOrchestrator
+{
+    private readonly ISendEndpointProvider _sendEndpointProvider;
 
-== Simple Example
+    public PurchaseOrchestrator(ISendEndpointProvider sendEndpointProvider)
+    {
+        _sendEndpointProvider = sendEndpointProvider;
+    }
 
-The orchestration service can send a reserve-stock command to inventory through RabbitMQ and then react to the success or failure result.
+    public async Task RequestStockReservationAsync(Guid correlationId, string productId, int quantity, CancellationToken cancellationToken)
+    {
+        var endpoint = await _sendEndpointProvider.GetSendEndpoint(new Uri("queue:reserve-stock"));
 
-== Advantages
+        await endpoint.Send(new ReserveStock
+        {
+            CorrelationId = correlationId,
+            ProductId = productId,
+            Quantity = quantity,
+        }, cancellationToken);
+    }
+}
+----
 
-* Strong fit for queued commands and retries.
-* A natural choice for workflow steps.
-* Clear separation between request initiation and background execution.
+The frontend still interacts through HTTP. It starts a business action, and RabbitMQ carries the asynchronous continuation of the workflow behind the scenes.
 
-== Disadvantages
+== Analysis
 
-* Adds another broker to operate.
-* Duplicate processing and dead-letter handling require care.
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
+
+|
+* *Strong fit for queued work*: commands can be retried and processed outside the original request lifetime.
+* *Good workflow semantics*: saga steps map naturally to directed commands.
+* *Clear separation of concerns*: browsers trigger workflows, services execute them asynchronously.
+|
+* *Another broker to run and monitor*: queue depth, dead letters, and consumer health become operational concerns.
+* *Duplicate handling is mandatory*: commands can be retried and consumers must be idempotent.
+* *Observability must be deliberate*: asynchronous command chains are harder to follow than synchronous HTTP calls.
+|===

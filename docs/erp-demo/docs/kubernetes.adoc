@@ -3,58 +3,79 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Kubernetes in the context of this architecture
 
-Kubernetes is the platform used to run the system as containers in a cluster. If you are new to it, remember four building blocks:
+Kubernetes is the deployment platform that turns the system from a set of locally running processes into a cluster of independently managed services. For teams new to the technology, the most useful mental model is simple: a *Deployment* keeps pods running, a *Service* gives those pods a stable network identity, and an ingress or gateway publishes selected routes to the outside world. Everything else in the platform builds on those foundations.
 
-* a node is a machine in the cluster
-* a pod is one running application unit
-* a service gives stable networking to pods
-* an ingress or gateway exposes traffic into the cluster
-
-This repository uses a shared base plus overlays for local development, a private k3s server, and Azure AKS.
+This ERP demo uses Kubernetes because the application is already shaped like a cluster-native system. Services are independently deployable, each service owns its own configuration, observability is centralized, and asynchronous infrastructure such as Kafka and RabbitMQ fits naturally into a shared platform. The repository uses a common manifest base plus overlays so the same architecture can target local clusters, private k3s environments, and AKS with environment-specific changes layered on top.
 
 dotgraph::./diagrams/kubernetes-topology.dot[caption="Kubernetes topology",max-width=980,engine=dot]
 
-== Local Kubernetes
+== Applying the pattern
 
-=== Introduction
+The core implementation pattern is straightforward: package each service as a container, deploy it with a Deployment, expose it with a Service, and route public traffic through a gateway or ingress. A minimal example for a backend service looks like this:
 
-The local overlay is useful when you want to validate manifests, service discovery, and cluster-style networking on your workstation.
-
-=== Setup Example
-
-[source,bash]
+[source,yaml]
 ----
-kubectl apply -k infrastructure/k8s/local
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+	name: inventory
+spec:
+	replicas: 2
+	selector:
+		matchLabels:
+			app: inventory
+	template:
+		metadata:
+			labels:
+				app: inventory
+		spec:
+			containers:
+				- name: inventory
+					image: ghcr.io/example/inventory:1.0.0
+					ports:
+						- containerPort: 8080
+					env:
+						- name: ASPNETCORE_URLS
+							value: http://+:8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+	name: inventory
+spec:
+	selector:
+		app: inventory
+	ports:
+		- port: 80
+			targetPort: 8080
 ----
 
-You can also use the existing development helpers.
+In this repository, the gateway remains the main public entry point, so frontend code should still talk to one stable base URL rather than directly to internal services. That keeps service discovery inside the cluster where it belongs.
 
-[source,text]
+[source,typescript]
 ----
-k8s: deploy-local
-k8s: port-forward-frontend
-k8s: port-forward-gateway
-----
+const apiBaseUrl = import.meta.env.VITE_API_BASE_URL ?? 'https://erp.example.com';
 
-Or use Skaffold for a faster inner loop.
-
-[source,bash]
-----
-skaffold dev
+const response = await fetch(`${apiBaseUrl}/api/v1/products`);
+const products = await response.json();
 ----
 
-=== Advantages
+For local experimentation, it is common to apply an overlay or use a tool such as Skaffold to shorten the build-and-deploy loop, but the underlying Kubernetes concepts stay the same.
 
-* Good for validating manifests and service-to-service behavior.
-* Closer to production than plain Docker Compose.
+== Analysis
 
-=== Disadvantages
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-* Still not identical to a managed cloud cluster.
-* Cluster networking and image build loops add complexity.
-
-== Related Deployment Topics
-
-This page focuses on Kubernetes basics and the local cluster path. The private k3s environment, Azure AKS deployment, Telepresence, and mirrord each have their own page because they introduce extra operational and routing concerns.
+|
+* *Operational consistency*: deployments, scaling, health probes, and service discovery follow one platform model.
+* *Good fit for microservices*: independent services can scale and restart without bringing down the whole system.
+* *Environment layering*: overlays make it possible to adapt one manifest base to several runtimes.
+|
+* *Steep learning curve*: debugging pods, networking, and rollout behavior is harder than running local processes.
+* *More moving parts*: ingress, secrets, storage, and service discovery add operational depth.
+* *Inner-loop cost*: build and deploy cycles are slower than plain local development unless extra tooling is added.
+|===

@@ -3,60 +3,81 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Kafka as the event-streaming backbone
 
-Kafka is the event-streaming platform used for domain events. It is a good fit when one service wants to publish a fact that several other services may care about.
+Kafka is used in this architecture for domain events: messages that describe something that *already happened*. That distinction is essential. An event such as `StockReserved`, `ProductUpdated`, or `TransactionCreated` is not telling another service what to do next. It is publishing a fact so that interested services can react independently. That makes Kafka a good fit for analytics, integration, notifications, and any workflow where several consumers may care about the same business occurrence.
 
-== In This Repository
+In this ERP demo, Kafka supports loose coupling between services. Inventory can publish stock-related events, financial can publish accounting events, and dashboard can consume multiple streams to build read models and alerts. The value is not just scale. The larger benefit is that producers do not need to know who is listening. That keeps the system extensible as new consumers appear over time.
 
-Kafka is used for domain events, not for saga command-and-control.
+== Applying the pattern
 
-Examples:
-
-* user management publishes lifecycle events
-* inventory publishes product and stock events
-* financial publishes transaction and budget events
-* dashboard consumes multiple Kafka topics to build analytics
-
-== ASP.NET Server Setup
-
-The services use the MassTransit Kafka Rider.
+The services use the MassTransit Kafka Rider so producers and consumers can be configured through the same messaging abstraction used elsewhere in the system. A typical setup registers producers for outbound events and topic endpoints for inbound streams.
 
 [source,csharp]
 ----
-x.AddRider(rider =>
+builder.Services.AddMassTransit(x =>
 {
-    rider.AddProducer<TransactionCreated>(KafkaTopics.TransactionCreatedEvent);
-    rider.AddProducer<BudgetExceeded>(KafkaTopics.BudgetExceededEvent);
+    x.AddConsumer<LowStockConsumer>();
 
-    rider.UsingKafka((context, k) =>
+    x.AddRider(rider =>
     {
-        k.Host(kafkaBootstrap);
+        rider.AddProducer<ProductUpdated>("inventory.product-updated");
+        rider.AddProducer<StockReserved>("inventory.stock-reserved");
 
-        k.TopicEndpoint<UserCreated>(KafkaTopics.UserCreatedEvent, "financial-user-created", e =>
+        rider.UsingKafka((context, kafka) =>
         {
-            e.AutoOffsetReset = AutoOffsetReset.Earliest;
-            e.ConfigureConsumer<UserCreatedConsumer>(context);
+            kafka.Host(builder.Configuration["Kafka:BootstrapServers"]);
+
+            kafka.TopicEndpoint<StockReserved>("inventory.stock-reserved", "dashboard-stock-reserved", endpoint =>
+            {
+                endpoint.ConfigureConsumer<LowStockConsumer>(context);
+            });
         });
     });
 });
 ----
 
-== React Client Setup
+Publishing an event should happen after the local business action succeeds. That keeps the event meaningful: it tells the rest of the system about a committed change, not about an intention that might still fail.
 
-React does not consume Kafka directly. The effect of Kafka appears through updated REST and GraphQL reads, dashboard subscriptions, or SignalR notifications.
+[source,csharp]
+----
+public sealed class InventoryService
+{
+    private readonly ITopicProducer<StockReserved> _stockReservedProducer;
 
-== Simple Example
+    public InventoryService(ITopicProducer<StockReserved> stockReservedProducer)
+    {
+        _stockReservedProducer = stockReservedProducer;
+    }
 
-If inventory publishes a low-stock event, dashboard can consume it and update alerts without inventory calling dashboard directly.
+    public async Task ReserveAsync(string productId, int quantity, CancellationToken cancellationToken)
+    {
+        // Local database update omitted for brevity.
 
-== Advantages
+        await _stockReservedProducer.Produce(new StockReserved
+        {
+            ProductId = productId,
+            Quantity = quantity,
+            OccurredAtUtc = DateTime.UtcNow,
+        }, cancellationToken);
+    }
+}
+----
 
-* Good for fan-out and asynchronous analytics.
-* Looser coupling between producers and consumers.
-* Helpful for audit-style event flows.
+The frontend never talks to Kafka directly. Instead, the results of Kafka-driven processing appear through APIs, subscriptions, or dashboard updates.
 
-== Disadvantages
+== Analysis
 
-* Debugging asynchronous flows is harder than tracing direct HTTP.
-* Ordering and schema changes need care.
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
+
+|
+* *Natural fan-out*: one event can drive many consumers without direct producer awareness.
+* *Loose coupling*: services can evolve independently as long as event contracts stay stable.
+* *Strong fit for analytics and integration*: downstream systems can build read models from the event stream.
+|
+* *Asynchronous debugging is harder*: cause and effect are not as obvious as a synchronous HTTP request chain.
+* *Schema evolution needs discipline*: event contracts must be versioned carefully.
+* *Ordering and idempotency still matter*: consumers must handle retries and duplicates safely.
+|===

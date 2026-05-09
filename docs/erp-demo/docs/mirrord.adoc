@@ -3,42 +3,60 @@
 :sectnums:
 :icons: font
 
-== Overview
+== mirrord Overview
 
-mirrord solves a similar problem to Telepresence: run code locally while connecting it to a remote cluster.
+mirrord is a dynamic local-to-cloud development tool that solves the problem of running code locally while connecting it to a remote Kubernetes cluster. Unlike traditional VPN-based or network-level tunneling tools, mirrord operates at the process level. It hooks into your application process and intercepts system calls, redirecting network traffic, environment variables, and file system reads from the remote cluster pod directly into your local process.
 
-== In This Repository
+Because mirrord guarantees process-level isolation, it doesn't pollute your workstation's global network interfaces or DNS resolution. This makes it an excellent choice for developers who want to avoid system-wide routing modifications. You can clone the environment of an existing pod, and by leveraging HTTP header filtering, you can intercept specific traffic flows directed at that pod, ensuring your local code only processes requests intended for your debugging session.
 
-This repository supports mirrord for both Azure and Contabo environments and uses a personal header key such as `x-mirrord-session: dev`.
+[WARNING]
+====
+Message Broker Limitations:
+mirrord primarily intercepts incoming HTTP traffic based on HTTP headers and network system calls. It *cannot intercept or filter event broker traffic* used in message-driven systems (e.g., RabbitMQ, Kafka).
 
-== Setup Example
+If your microservice consumes topics from Kafka or queues from RabbitMQ, mirrord will not be able to selectively route those events to your local machine. In fact, since the remote pod is still active, both your local process and the remote pod may compete to consume the events synchronously. Events will randomly be handled by either the cluster or the local machine, making it impossible to reliably debug saga workflows or event handlers using this tool.
+====
+
+== Implementation and Usage
+
+mirrord is configured either via a CLI or a direct IDE extension. Below is a generic setup using the CLI. The command wraps your local execution (like starting a Node server, Spring app, or Python script) and points to a configuration file that dictates which pod to impersonate and which HTTP headers to filter by.
 
 [source,bash]
 ----
-mirrord exec --key dev \
-  --config-file .mirrord/azure/inventory.mirrord.json \
-  -- dotnet watch run --project services/inventory/InventoryManagement/InventoryManagement.csproj
+# Run your local application within the mirrord context.
+# We pass a specific key to ensure only traffic with matching headers is intercepted.
+mirrord exec --key your-dev-name \
+  --config-file .mirrord/config.json \
+  -- your-local-run-command
 ----
 
-== React Client Setup
+To ensure your local workstation processes the requests, the consumer (which could be a frontend application or another API) must attach the defined session header to all asynchronous requests:
 
 [source,typescript]
 ----
-fetch('/api/v1/products', {
-  headers: { 'x-mirrord-session': 'dev' },
+// The frontend client attaches the session key to guarantee
+// the traffic is hijacked by mirrord and funneled to the local process.
+fetch('https://api.yourcluster.app/v1/products', {
+  headers: { 
+    'x-mirrord-session': 'your-dev-name' 
+  },
 });
 ----
 
-== Simple Example
+== Analysis
 
-mirrord is a good fit when you want per-process isolation and do not want system-wide Telepresence-style networking behavior on your workstation.
+Using mirrord to debug remotely can significantly improve the developer experience by removing the bottleneck of cluster deployments, but it comes with distinct architectural boundaries.
 
-== Advantages
+[cols="1a,1a", options="header"]
+|===
+| Advantages | Disadvantages
 
-* Good process-level isolation.
-* No permanent Telepresence-style manager on the workstation.
-
-== Disadvantages
-
-* Still adds remote-debugging complexity.
-* Requires correct config and header filtering.
+| 
+* *Process-Level Isolation*: Does not modify global workstation networking rules, routing, or DNS, making it much safer and less prone to breaking local VPNs.
+* *No Persistent In-Cluster Daemons*: mirrord spins up ephemeral agents when you run it and cleans them up automatically. It doesn't require a permanent heavy traffic manager on the cluster.
+* *Mirrors Environment Variables*: Seamlessly inherits environment variables and file configuration from the target pod, streamlining local setup.
+| 
+* *Remote Debugging Complexity*: Finding the correct configuration syntax to filter traffic properly can be error-prone for beginners.
+* *Event Broker Incompatibility*: Completely ineffective for debugging asynchronous message ingestion (RabbitMQ/Kafka) due to random event consumption.
+* *Tooling Overhead*: Wrapping the executable process may occasionally interfere with complex local debugging setups in certain IDEs.
+|===

@@ -3,39 +3,66 @@
 :sectnums:
 :icons: font
 
-== Overview
+== Why a private k3s cluster is useful
 
-The production overlay targets a self-hosted k3s environment. This is useful when you want a production-style cluster without a managed cloud control plane.
+k3s is a lightweight Kubernetes distribution that keeps the Kubernetes programming model while reducing operational overhead. That makes it a strong option for teams that want a production-like cluster but do not want the cost or platform dependency of a managed cloud offering. In the context of this ERP demo, the private k3s path demonstrates an important architectural lesson: the application should be portable enough to run on both managed and self-hosted clusters without redesigning the services themselves.
 
-== In This Repository
+Running on k3s also makes the operational boundaries clearer. The team gets full control over ingress, storage, image pulling, secret handling, and upgrades. That freedom is useful for learning and for self-hosted environments, but it also means the team becomes responsible for tasks that Azure or another managed provider would otherwise absorb.
 
-The private server path uses:
+== Applying the pattern
 
-* k3s instead of a managed Kubernetes service
-* GHCR image pull secrets
-* Traefik ingress
-* production overlay patches that reduce public services to `ClusterIP`
+The essential setup is the same as any Kubernetes deployment: install the cluster, make images available through a registry, and expose public traffic through an ingress controller such as Traefik. A representative service manifest looks like this:
 
-== Setup Example
-
-[source,bash]
+[source,yaml]
 ----
-export REGISTRY=ghcr.io/YOURUSER
-export TAG=latest
-bash scripts/k3s-build-push.sh
-bash scripts/k3s-deploy.sh
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+	name: gateway
+spec:
+	template:
+		spec:
+			imagePullSecrets:
+				- name: ghcr-pull-secret
+			containers:
+				- name: gateway
+					image: ghcr.io/example/gateway:1.0.0
+					ports:
+						- containerPort: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+	name: erp-ingress
+spec:
+	ingressClassName: traefik
+	rules:
+		- host: erp.example.internal
+			http:
+				paths:
+					- path: /
+						pathType: Prefix
+						backend:
+							service:
+								name: gateway
+								port:
+									number: 80
 ----
 
-== React Client Setup
+From the frontend point of view, the rule stays unchanged: one public entry point, no knowledge of pod names, and no direct access to internal services. That keeps the browser layer portable across local, self-hosted, and cloud runtimes.
 
-The frontend is accessed through the ingress address or domain exposed by the private cluster. The browser should still see one public entry point, not individual pods.
+== Analysis
 
-== Advantages
+[cols="1a,1a",options="header"]
+|===
+| Advantages | Trade-offs
 
-* Full control over the cluster.
-* Good fit for a self-hosted deployment story.
-
-== Disadvantages
-
-* You operate the cluster yourself.
-* Secrets, backups, and upgrades remain your responsibility.
+|
+* *Full operational control*: the team owns the cluster, registry strategy, ingress, and network topology.
+* *Production-like learning environment*: developers work with real Kubernetes behavior instead of only local emulation.
+* *Lower platform lock-in*: the deployment stays closer to standard Kubernetes than to a cloud-specific stack.
+|
+* *You operate everything*: upgrades, node health, backups, certificates, and recovery plans are your responsibility.
+* *Security work increases*: image pull secrets, ingress hardening, and secret management require disciplined operations.
+* *Infrastructure skill threshold is higher*: self-hosting is flexible, but it is not the easiest path for most teams.
+|===
