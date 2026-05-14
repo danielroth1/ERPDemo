@@ -37,8 +37,16 @@ echo "════════════════════════�
 echo ""
 
 echo "▶ Starting PostgreSQL..."
-az postgres flexible-server start --resource-group "$AZ_RESOURCE_GROUP" --name "$AZ_PG_SERVER_NAME"
-echo "  ✓ PostgreSQL started"
+PG_STATE=$(az postgres flexible-server show \
+  --resource-group "$AZ_RESOURCE_GROUP" \
+  --name "$AZ_PG_SERVER_NAME" \
+  --query "state" -o tsv 2>/dev/null || echo "Unknown")
+if [ "$PG_STATE" = "Stopped" ]; then
+  az postgres flexible-server start --resource-group "$AZ_RESOURCE_GROUP" --name "$AZ_PG_SERVER_NAME"
+  echo "  ✓ PostgreSQL started"
+else
+  echo "  ℹ PostgreSQL is already in '$PG_STATE' state — skipping start"
+fi
 
 echo ""
 echo "▶ Starting AKS cluster (takes ~3-5 min)..."

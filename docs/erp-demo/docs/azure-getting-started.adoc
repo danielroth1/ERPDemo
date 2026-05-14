@@ -1,0 +1,132 @@
+== Getting started without Azure experience
+
+This chapter assumes that Azure is new to you. The deployment path is intentionally script-first: you prepare a small set of variables, authenticate once, and then let the scripts create and operate the environment. Azure Portal usage is optional.
+
+IMPORTANT: Run `az login` before any Azure operation. Do it again after restarting your system, after opening a fresh development session, or whenever the Azure CLI token has expired.
+
+=== 1. Create an Azure account and select the right subscription
+
+If you do not already have an Azure account, create one first. Once the account exists, authenticate the Azure CLI:
+
+[source,bash]
+----
+az login
+az account list -o table
+az account set --subscription "<subscription-name-or-id>"
+----
+
+The first command authenticates you. The second lets you inspect the subscriptions available to your user. The third is important if you have more than one subscription, because every resource created by the provisioning script will be billed to the currently selected subscription.
+
+=== 2. Install the tools used by the scripts
+
+The Azure deployment scripts rely on a small local toolchain.
+
+* Azure CLI for resource creation and lifecycle operations.
+* Docker with Buildx for image builds and registry pushes.
+* `kubectl` for cluster access during deployment.
+* Helm for the Traefik installation performed during provisioning.
+
+On macOS, a typical setup looks like this:
+
+[source,bash]
+----
+brew install azure-cli kubectl helm
+----
+
+Docker Buildx is typically available through Docker Desktop or OrbStack.
+
+=== 3. Prepare `.env.deploy`
+
+The scripts do not ask interactive questions. Instead, they read their configuration from `.env.deploy`. Start by copying the example file and filling in the Azure-specific values.
+
+[source,bash]
+----
+cp .env.deploy.example .env.deploy
+----
+
+[source,bash]
+----
+AZ_RESOURCE_GROUP="erp-rg"
+AZ_LOCATION="westeurope"
+AZ_ACR_NAME="erpacr"
+AZ_AKS_NAME="erp-aks"
+AZ_KEYVAULT_NAME="erp-keyvault"
+AZ_VNET_NAME="erp-vnet"
+AZ_PG_SERVER_NAME="erp-pg"
+AZ_PG_LOCATION="northeurope"
+AZ_PG_ADMIN_USER="erpdbadmin"
+AZ_PG_ADMIN_PASSWORD="CHANGE_ME_STRONG_PASSWORD"
+AZURE_DOMAIN="yourdomain.com"
+----
+
+Several of these names must be globally unique in Azure, especially the registry, Key Vault, and PostgreSQL server names. If Azure rejects a name as already taken, choose a more specific variant such as one that includes your initials, team name, or environment.
+
+IMPORTANT: The first provisioning run prints three values that must be copied back into `.env.deploy` before deployment: `AZURE_TENANT_ID`, `AZURE_KV_IDENTITY_CLIENT_ID`, and `AZ_PG_HOST`.
+
+=== 4. Understand the major decisions before you provision
+
+[cols="1,2,2",options="header"]
+|===
+| Decision | What the default setup optimizes for | When to choose differently
+
+| Azure region
+| Simplicity and availability in a common region such as `westeurope`
+| Move if your users, quotas, or compliance requirements point to another region.
+
+| AKS node size
+| Lowest practical cost for a demo
+| Increase it if several services must run comfortably at once or if you expect sustained load.
+
+| Database region
+| A nearby managed PostgreSQL server with a simple public-access configuration
+| Keep it in the same region as AKS for lower latency unless you have a reason to separate them.
+
+| Domain name
+| A single public domain routed through Traefik
+| Pick a real DNS name you control, because TLS and public access depend on it later.
+|===
+
+=== 5. Know what each stage is responsible for
+
+The scripts are enough to deploy ERPDemo to Azure. The Azure UI is not required for the deployment path itself.
+
+[cols="1,1,2,1",options="header"]
+|===
+| Stage | Command | Responsibility | Azure Portal required?
+
+| Authentication
+| `az login`
+| Grants the Azure CLI access to your subscription for the current work session.
+| No
+
+| Provisioning
+| `bash scripts/aks-provision.sh`
+| Creates the Azure resources and installs the shared ingress components.
+| No
+
+| Build and push
+| `bash scripts/aks-build-push.sh`
+| Builds the Docker images and uploads them to ACR.
+| No
+
+| Deployment
+| `bash scripts/aks-deploy.sh`
+| Injects runtime values into the Kubernetes overlay and rolls the workloads into AKS.
+| No
+
+| Cost control
+| `bash scripts/aks-stop.sh` and `bash scripts/aks-start.sh`
+| Stops and resumes the environment without recreating it.
+| No
+|===
+
+=== 6. Use Azure Portal only when it adds value
+
+The Portal becomes useful after the deployment exists.
+
+* Inspect resource health when something is failing.
+* Review costs, quotas, and metrics.
+* Explore logs and monitoring data.
+* Confirm network objects and public IP assignments visually.
+
+For the deployment workflow itself, the Portal is optional. The scripts remain the source of truth.

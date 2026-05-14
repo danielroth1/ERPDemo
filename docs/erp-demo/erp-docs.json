@@ -18,6 +18,11 @@
   { "slug": "kubernetes", "title": "Kubernetes", "level": 1 },
   { "slug": "k3s-private-server", "title": "k3s Private Server", "level": 2 },
   { "slug": "azure", "title": "Azure AKS", "level": 2 },
+  { "slug": "azure-getting-started", "title": "Getting Started with Azure", "level": 3 },
+  { "slug": "azure-provisioning", "title": "Provision Azure Resources", "level": 3 },
+  { "slug": "azure-build-and-push", "title": "Build and Push Images", "level": 3 },
+  { "slug": "azure-deployment", "title": "Deploy to AKS", "level": 3 },
+  { "slug": "azure-management", "title": "Start and Stop the Cluster", "level": 3 },
   { "slug": "telepresence", "title": "Telepresence", "level": 2 },
   { "slug": "mirrord", "title": "mirrord", "level": 2 },
   { "slug": "testing", "title": "Testing", "level": 1 }

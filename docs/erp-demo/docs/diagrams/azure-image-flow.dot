@@ -1,0 +1,20 @@
+digraph azure_image_flow {
+  rankdir=LR;
+  graph [pad="0.2", nodesep="0.6", ranksep="0.8"];
+  node [shape=box, style="rounded,filled", fillcolor="#eef3f7", color="#51606f", fontname="Helvetica"];
+  edge [color="#51606f", fontname="Helvetica"];
+
+  Local [label="Developer laptop\nor CI/CD machine"];
+  Build [label="docker buildx build\n--push"];
+  ACR [label="Azure Container Registry\nstores tagged images"];
+  Deploy [label="kubectl apply -k\nrollout commands"];
+  AKS [label="AKS control plane"];
+  Pods [label="ERP pods in the\nerp-azure namespace"];
+
+  Local -> Build [label="build"];
+  Build -> ACR [label="push images"];
+  Local -> Deploy [label="deploy stage"];
+  Deploy -> AKS [label="apply manifests"];
+  ACR -> Pods [label="AKS pulls images\nvia AcrPull identity"];
+  AKS -> Pods [label="schedule and roll out"];
+}

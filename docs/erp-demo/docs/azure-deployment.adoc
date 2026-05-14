@@ -1,0 +1,142 @@
+== Deploy the images from ACR into AKS
+
+This stage takes the images that already exist in ACR and turns them into running workloads inside AKS. It does not build anything. Instead, it injects the environment-specific values that Kubernetes needs and applies the manifests.
+
+IMPORTANT: The two most common deployment mistakes are using the wrong image tag and forgetting to copy `AZURE_TENANT_ID`, `AZURE_KV_IDENTITY_CLIENT_ID`, and `AZ_PG_HOST` from the provisioning output into `.env.deploy`.
+
+=== Image push and deploy flow
+
+The deployment path is the same whether you run it from your local machine or from a CI/CD worker such as Azure DevOps.
+
+dotgraph::./diagrams/azure-image-flow.dot[caption="Image push and deploy flow",max-width=760]
+
+=== The script validates the required inputs first
+
+[source,bash]
+----
+: "${AZ_ACR_NAME:?AZ_ACR_NAME not set in .env.deploy}"
+: "${AZ_RESOURCE_GROUP:?AZ_RESOURCE_GROUP not set in .env.deploy}"
+: "${AZ_KEYVAULT_NAME:?AZ_KEYVAULT_NAME not set in .env.deploy}"
+: "${AZURE_KV_IDENTITY_CLIENT_ID:?Run aks-provision.sh and set AZURE_KV_IDENTITY_CLIENT_ID in .env.deploy}"
+: "${AZURE_TENANT_ID:?Run aks-provision.sh and set AZURE_TENANT_ID in .env.deploy}"
+: "${AZ_PG_HOST:?Run aks-provision.sh and set AZ_PG_HOST in .env.deploy}"
+: "${AZURE_DOMAIN:?AZURE_DOMAIN not set in .env.deploy}"
+----
+
+This is important because deployment depends on values discovered during provisioning. If they are missing, the script fails early instead of producing a half-configured cluster.
+
+=== Verify cluster connectivity and create the namespace
+
+[source,bash]
+----
+kubectl cluster-info --context "$(kubectl config current-context)"
+
+kubectl create namespace "$NAMESPACE" --dry-run=client -o yaml | kubectl apply -f -
+----
+
+The first command proves that `kubectl` can talk to AKS. The second ensures that the target namespace exists without failing if it is already there.
+
+=== Build a temporary deployment overlay with the real runtime values
+
+The base Kubernetes manifests in source control contain placeholders. The deployment script replaces them at runtime by generating a temporary `kustomization.yaml`.
+
+[source,yaml]
+----
+resources:
+  - ../azure
+images:
+  - name: erp/gateway
+    newName: ${REGISTRY}/erp-gateway
+    newTag: "${TAG}"
+patches:
+  - target:
+      kind: SecretProviderClass
+      name: azure-keyvault-erp
+    patch: |-
+      - op: replace
+        path: /spec/parameters/clientID
+        value: "${KV_IDENTITY}"
+      - op: replace
+        path: /spec/parameters/keyvaultName
+        value: "${KV_NAME}"
+      - op: replace
+        path: /spec/parameters/tenantId
+        value: "${TENANT_ID}"
+----
+
+The real script includes all backend services, the frontend image, the Gateway hostnames, and the Grafana domain. The important idea is that deployment-specific values are generated at deploy time instead of being committed into the repository.
+
+=== Apply the manifests
+
+[source,bash]
+----
+kubectl apply -k "$TMP_OVERLAY"
+----
+
+At this point, Kubernetes knows which images to pull from ACR and which Azure-specific values to inject.
+
+=== Wait for Key Vault secret synchronization
+
+The deployment script explicitly waits for the secret synchronization component, because some workloads depend on secrets that originate in Key Vault.
+
+[source,bash]
+----
+kubectl rollout restart deployment/secret-sync -n "$NAMESPACE"
+kubectl rollout status deployment/secret-sync -n "$NAMESPACE" --timeout=120s
+----
+
+This makes sure the Grafana admin secret has been synchronized into Kubernetes before the rest of the environment is considered healthy.
+
+=== Replace the local PostgreSQL secret with Azure database connection strings
+
+The base manifests still contain local-development-style database wiring, so the deployment stage replaces it with Azure PostgreSQL connection strings.
+
+[source,bash]
+----
+kubectl create secret generic postgres-secret \
+  --namespace "$NAMESPACE" \
+  --from-literal=connection-string-users="${PG_BASE};Database=erp_users" \
+  --from-literal=connection-string-inventory="${PG_BASE};Database=erp_inventory" \
+  --from-literal=connection-string-sales="${PG_BASE};Database=erp_sales" \
+  --from-literal=connection-string-financial="${PG_BASE};Database=erp_financial" \
+  --from-literal=connection-string-dashboard="${PG_BASE};Database=erp_dashboard" \
+  --from-literal=connection-string-orchestration="${PG_BASE};Database=erp_orchestration" \
+  --dry-run=client -o yaml | kubectl apply -f -
+----
+
+This is a good example of why the deployment stage exists even after provisioning. Provisioning created the Azure database. Deployment tells the workloads how to use it.
+
+=== Restart workloads so they pick up the updated secrets
+
+[source,bash]
+----
+ERP_DEPLOYMENTS=(gateway user-management inventory sales financial dashboard orchestration frontend)
+for dep in "${ERP_DEPLOYMENTS[@]}"; do
+  kubectl rollout restart deployment/"$dep" -n "$NAMESPACE" 2>/dev/null || true
+done
+
+for dep in "${ERP_DEPLOYMENTS[@]}"; do
+  kubectl rollout status deployment/"$dep" -n "$NAMESPACE" --timeout=300s
+done
+----
+
+The restarts are necessary because some pods may have started before the final Azure database secret was in place. The rollout wait then confirms that each deployment becomes ready again.
+
+=== Check the resulting routing objects and service status
+
+[source,bash]
+----
+kubectl get gateway -n "$NAMESPACE"
+kubectl get httproute -n "$NAMESPACE"
+kubectl get services -n "$NAMESPACE"
+----
+
+When the stage succeeds, AKS is serving the ERP workloads, pulling images from ACR through the managed identity relationship that was created during provisioning.
+
+The same deployment flow works from a developer laptop or from a CI/CD runner.
+
+1. Push a specific image tag to ACR.
+2. Generate an overlay that points Kubernetes at that tag.
+3. Apply the manifests.
+4. Synchronize the secrets.
+5. Restart and verify the workloads.

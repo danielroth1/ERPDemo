@@ -1,0 +1,17 @@
+ServiceName,ServiceFamily,Provider,PublisherType,ServiceTier,Product,Meter,ChargeType,Cost,CostUSD,Currency
+Virtual Machines,Compute,Azure,Microsoft,Virtual Machines Bsv2 Series,Virtual Machines Bsv2 Series - B2s v2 - EU West,B2s v2,Usage,14.00786478,16.39200336,EUR
+Storage,Storage,Azure,Microsoft,Premium SSD Managed Disks,Premium SSD Managed Disks - P10 - EU West,P10 LRS Disk,Usage,4.251721825,4.97536488,EUR
+Storage,Storage,Azure,Microsoft,Standard SSD Managed Disks,Standard SSD Managed Disks - E2 LRS - EU West,E2 LRS Disk,Usage,0.217759699,0.2548224,EUR
+Storage,Storage,Azure,Microsoft,Standard SSD Managed Disks,Standard SSD Managed Disks - E4 LRS,E4 LRS Disk Operations,Usage,0.208983251,0.2445522,EUR
+Storage,Storage,Azure,Microsoft,Standard SSD Managed Disks,Standard SSD Managed Disks - E1 LRS - EU West,E1 LRS Disk,Usage,0.109224406,0.1278144,EUR
+Virtual Network,Networking,Azure,Microsoft,IP Addresses,IP Addresses - Standard IPv4,Standard IPv4 Static Public IP,Usage,4.059135191,4.75,EUR
+Container Registry,Containers,Azure,Microsoft,Container Registry,Container Registry - Basic,Basic Registry Unit,Usage,1.868605788,2.186642493,EUR
+Bandwidth,Networking,Azure,Microsoft,Bandwidth Inter-Region,Bandwidth Inter-Region - Intra Continent - Europe,Intra Continent Data Transfer Out,Usage,0.192275718,0.225001045,EUR
+Bandwidth,Networking,Azure,Microsoft,Bandwidth Inter-Region,Bandwidth Inter-Region - Inter Continent - Intercontinental,Inter Continent Data Transfer Out - NAM or EU To Any,Usage,0,0,EUR
+Bandwidth,Networking,Azure,Microsoft,Rtn Preference: MGN,Rtn Preference: MGN,Standard Data Transfer Out - Free,Usage,0,0,EUR
+Load Balancer,Networking,Azure,Microsoft,Load Balancer,Load Balancer,Standard Data Processed,Usage,0.088456659,0.103511982,EUR
+Load Balancer,Networking,Azure,Microsoft,Load Balancer,Load Balancer,Standard Data Processed - Free,Usage,0,0,EUR
+Load Balancer,Networking,Azure,Microsoft,Load Balancer,Load Balancer,Standard Included LB Rules and Outbound Rules - Free,Usage,0,0,EUR
+Key Vault,Security,Azure,Microsoft,Key Vault,Key Vault - Premium,Operations,Usage,0.013177235,0.01542,EUR
+Azure Database for PostgreSQL,Databases,Azure,Microsoft,Az DB for PostgreSQL Flexible Server Storage,Az DB for PostgreSQL Flexible Server Storage - Storage,Storage Data Stored - Free,Usage,0,0,EUR
+Azure Database for PostgreSQL,Databases,Azure,Microsoft,Azure Database for PostgreSQL Flexible Server Burstable BS Series Compute,Azure Database for PostgreSQL Flexible Server Burstable BS Series Compute - B1MS,B1MS Compute - Free,Usage,0,0,EUR

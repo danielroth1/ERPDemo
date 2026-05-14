@@ -1,0 +1,301 @@
+== Provision Azure resources step by step
+
+This page explains the infrastructure stage implemented by `scripts/aks-provision.sh`. It is a one-time environment bootstrap: after it succeeds, Azure contains the cluster, registry, database, secret store, ingress components, and the values you need for later deployment.
+
+IMPORTANT: This entire stage is Azure CLI driven. No Azure Portal clicks are required to provision the ERP environment.
+
+IMPORTANT: Run `az login` before starting the provisioning stage, especially after restarting your machine or returning to the project later.
+
+=== The script begins by loading names and regions from `.env.deploy`
+
+[source,bash]
+----
+source "$ENV_FILE"
+
+RG="${AZ_RESOURCE_GROUP}"
+LOCATION="${AZ_LOCATION}"
+ACR="${AZ_ACR_NAME}"
+AKS="${AZ_AKS_NAME}"
+KV="${AZ_KEYVAULT_NAME}"
+VNET="${AZ_VNET_NAME}"
+PG_SERVER="${AZ_PG_SERVER_NAME}"
+PG_LOCATION="${AZ_PG_LOCATION:-${LOCATION}}"
+----
+
+These variables decide the names and locations of the Azure resources. That means the provisioning step is only as good as the configuration you supply. If you want to separate environments such as `dev`, `test`, and `prod`, the easiest way is to give each environment its own resource names.
+
+=== 0. Register the Azure resource providers
+
+Before Azure can create certain resource types in a subscription, the relevant providers must be registered.
+
+[source,bash]
+----
+for PROVIDER in \
+  Microsoft.ContainerRegistry \
+  Microsoft.ContainerService \
+  Microsoft.KeyVault \
+  Microsoft.DBforPostgreSQL \
+  Microsoft.Network \
+  Microsoft.Compute \
+  Microsoft.Storage; do
+  az provider register --namespace "$PROVIDER" --wait --output none
+done
+----
+
+This step is idempotent. It is particularly useful in a fresh Azure subscription, where a first deployment might otherwise fail simply because a provider has never been enabled.
+
+=== 1. Create the resource group
+
+The resource group is the logical container for the environment.
+
+[source,bash]
+----
+az group create --name "$RG" --location "$LOCATION" --output none
+----
+
+Every major Azure resource created by the script is attached to this group. If you ever need to review or delete the environment cleanly, the resource group gives you one place to start.
+
+=== 2. Create the Virtual Network and AKS subnet
+
+[source,bash]
+----
+az network vnet create \
+  --resource-group "$RG" --name "$VNET" \
+  --address-prefix 10.0.0.0/8 --output none
+
+az network vnet subnet create \
+  --resource-group "$RG" --vnet-name "$VNET" \
+  --name aks-subnet --address-prefixes 10.240.0.0/16 --output none
+
+AKS_SUBNET_ID=$(az network vnet subnet show \
+  --resource-group "$RG" --vnet-name "$VNET" --name aks-subnet \
+  --query id -o tsv)
+----
+
+The VNet isolates the cluster network from Azure defaults, and the subnet gives AKS a defined place to allocate addresses.
+
+IMPORTANT: Choose address ranges carefully if this environment may later connect to another VNet, a VPN, or an on-premises network. Overlapping CIDR ranges are a common source of networking pain.
+
+=== 3. Create Azure Container Registry
+
+[source,bash]
+----
+az acr create --resource-group "$RG" --name "$ACR" --sku Basic --output none
+----
+
+ACR stores the container images that AKS will pull later. The script chooses the `Basic` SKU because it is the cheapest useful option for a demo environment.
+
+[cols="1,2,2",options="header"]
+|===
+| Choice | Why the script uses it | When to choose differently
+
+| `Basic`
+| Lowest cost and enough for a demo or small team
+| Move up if image throughput or registry features become limiting.
+
+| `Standard` or `Premium`
+| Not used by default
+| Consider for larger teams, stricter enterprise requirements, or higher pull and push rates.
+|===
+
+=== 4. Create the AKS cluster
+
+The AKS section is where the most important cost and capacity decisions appear.
+
+[source,bash]
+----
+az aks create \
+  --resource-group "$RG" --name "$AKS" \
+  --node-count 1 --node-vm-size Standard_B2s_v2 \
+  --network-plugin azure --vnet-subnet-id "$AKS_SUBNET_ID" \
+  --enable-managed-identity \
+  --enable-oidc-issuer \
+  --enable-workload-identity \
+  --enable-addons azure-keyvault-secrets-provider \
+  --enable-secret-rotation \
+  --rotation-poll-interval 2m \
+  --generate-ssh-keys \
+  --output none
+----
+
+Each flag has a concrete purpose.
+
+* `--node-count 1` keeps the demo cheap.
+* `--node-vm-size Standard_B2s_v2` keeps the demo small enough for low-cost subscriptions.
+* `--network-plugin azure` attaches pod networking to Azure networking semantics.
+* `--vnet-subnet-id` keeps the cluster in the subnet created earlier.
+* `--enable-managed-identity` lets Azure manage identities for the cluster.
+* `--enable-oidc-issuer` and `--enable-workload-identity` prepare modern identity-based access for workloads.
+* `--enable-addons azure-keyvault-secrets-provider` installs the Key Vault secrets integration.
+* `--enable-secret-rotation` keeps synced secrets refreshed.
+
+IMPORTANT: Node size is the most important early AKS decision.
+
+[cols="1,2,2",options="header"]
+|===
+| Node choice | Good fit | Trade-off
+
+| `Standard_B2s_v2`
+| Low-cost demos, experiments, and light shared environments
+| Cheap, but limited CPU and memory headroom for many services running together.
+
+| `Standard_D4s_v3`
+| A stronger baseline for more realistic production-style testing
+| Higher monthly cost, but much more breathing room for the ERP services and observability stack.
+|===
+
+IMPORTANT: Node count is the second major AKS decision. One node is fine for a demo. Multiple nodes are better for resilience, rolling upgrades, and avoiding a single-point resource bottleneck.
+
+=== 5. Attach ACR to AKS and fetch kubeconfig
+
+After the cluster exists, the script wires it to the registry so it can pull images without hand-managed pull secrets.
+
+[source,bash]
+----
+az aks update --resource-group "$RG" --name "$AKS" --attach-acr "$ACR" --output none
+
+az aks get-credentials --resource-group "$RG" --name "$AKS" \
+  --file "$KUBECONFIG_LOCAL" --overwrite-existing
+----
+
+`--attach-acr` creates the `AcrPull` relationship for the cluster identity. `az aks get-credentials` writes a dedicated kubeconfig file so later deployment commands know how to reach the cluster.
+
+=== 6. Install Gateway API CRDs and Traefik
+
+Provisioning does not stop at raw Azure resources. It also installs the ingress layer the ERP deployment expects.
+
+[source,bash]
+----
+kubectl apply -f "https://github.com/kubernetes-sigs/gateway-api/releases/download/${GATEWAY_API_VERSION}/standard-install.yaml"
+
+helm upgrade --install traefik traefik/traefik \
+  --namespace traefik --create-namespace \
+  --skip-crds \
+  --set providers.kubernetesGateway.enabled=true \
+  --set providers.kubernetesIngress.enabled=false \
+  --set gateway.enabled=false \
+  --set service.type=LoadBalancer \
+  --wait --timeout 5m
+----
+
+This creates a public Azure LoadBalancer and installs Traefik configured for the Kubernetes Gateway API rather than the older Ingress pattern.
+
+IMPORTANT: The public load balancer is convenient and necessary for a public demo, but it is also part of the ongoing Azure cost profile.
+
+=== 7. Create Azure Key Vault and identity wiring
+
+Key Vault is where the environment stores sensitive runtime values.
+
+[source,bash]
+----
+az keyvault create \
+  --resource-group "$RG" --name "$KV" \
+  --location "$LOCATION" --sku standard \
+  --enable-rbac-authorization false \
+  --output none
+----
+
+The script then grants the AKS Key Vault provider identity permission to read secrets and creates a federated identity credential for workload identity.
+
+[source,bash]
+----
+az keyvault set-policy --name "$KV" \
+  --object-id "$KV_IDENTITY_OBJECT_ID" \
+  --secret-permissions get list \
+  --output none
+
+az identity federated-credential create \
+  --name "keyvault-federated-credential-${NAMESPACE}" \
+  --identity-name "$KV_IDENTITY_NAME" \
+  --resource-group "$NODE_RG" \
+  --issuer "$OIDC_ISSUER" \
+  --subject "system:serviceaccount:${NAMESPACE}:default" \
+  --audiences "api://AzureADTokenExchange" \
+  --output none
+----
+
+Without this identity wiring, the cluster would exist but would not be able to read the secrets required by the ERP workloads.
+
+=== 8. Create PostgreSQL Flexible Server and the ERP databases
+
+The script provisions a managed PostgreSQL server instead of running PostgreSQL inside the cluster.
+
+[source,bash]
+----
+az postgres flexible-server create \
+  --resource-group "$RG" --name "$PG_SERVER" \
+  --location "$PG_LOCATION" \
+  --admin-user "$PG_ADMIN" --admin-password "$PG_PASS" \
+  --sku-name Standard_B1ms --tier Burstable \
+  --storage-size 32 --version 16 \
+  --public-access 0.0.0.0 \
+  --output none
+----
+
+After the server exists, the script creates one database per ERP bounded context.
+
+[source,bash]
+----
+for DB in erp_users erp_inventory erp_sales erp_financial erp_dashboard erp_orchestration; do
+  az postgres flexible-server db create \
+    --resource-group "$RG" --server-name "$PG_SERVER" \
+    --database-name "$DB" --output none
+done
+----
+
+IMPORTANT: The default database choice is optimized for low cost, not heavy load.
+
+[cols="1,2,2",options="header"]
+|===
+| Database choice | Why the script uses it | When to choose differently
+
+| `Standard_B1ms`, Burstable, 32 GB storage
+| Cheap managed PostgreSQL suitable for a demo environment
+| Increase the size or tier when database throughput or concurrency becomes a bottleneck.
+
+| `--public-access 0.0.0.0`
+| Simpler connectivity for a demo setup
+| Tighten this later with stricter firewall rules or private networking for a harder production posture.
+
+| `AZ_PG_LOCATION` separate from `AZ_LOCATION`
+| Flexible if a specific database region is preferred or required
+| Keep both in the same region in most cases to reduce latency and cross-region complexity.
+|===
+
+=== 9. Store runtime secrets in Key Vault
+
+Once PostgreSQL exists, the script writes the runtime values the cluster will later consume.
+
+[source,bash]
+----
+az keyvault secret set --vault-name "$KV" --name "pg-connection-string-users" \
+  --value "${PG_BASE};Database=erp_users" --output none
+
+az keyvault secret set --vault-name "$KV" --name "pg-connection-string-inventory" \
+  --value "${PG_BASE};Database=erp_inventory" --output none
+
+az keyvault secret set --vault-name "$KV" --name "grafana-admin-password" \
+  --value "${GRAFANA_ADMIN_PASSWORD}" --output none
+----
+
+The actual script sets all six PostgreSQL connection strings and the Grafana admin credentials. This is why deployment can stay free of hard-coded secrets.
+
+=== 10. Copy the printed values back into `.env.deploy`
+
+At the end of provisioning, the script prints three values you need for later stages.
+
+[source,bash]
+----
+AZURE_TENANT_ID=<printed-by-script>
+AZURE_KV_IDENTITY_CLIENT_ID=<printed-by-script>
+AZ_PG_HOST=<printed-by-script>
+----
+
+It also tells you what comes next.
+
+1. Point your DNS A record to the Traefik load balancer IP.
+2. Install the Azure TLS support via `infrastructure/cert-manager/install-azure.sh`.
+3. Build and push images.
+4. Deploy the images into AKS.
+
+Provisioning is therefore not just about resource creation. It is the stage that prepares the environment contract for everything that follows.

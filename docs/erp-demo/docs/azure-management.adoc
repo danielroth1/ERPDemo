@@ -1,0 +1,81 @@
+== Start and stop the cluster without redeploying
+
+The environment can be paused when it is idle and resumed later without rebuilding images or redeploying manifests. That makes Azure more affordable for a demo environment that is not needed 24 hours a day.
+
+IMPORTANT: Run `az login` before using the start or stop scripts. They call Azure CLI directly, so a reboot or expired session requires another login.
+
+IMPORTANT: Stopping the environment removes compute cost, but not all cost. Storage, the public IP and load balancer, ACR, and other persistent resources can still incur charges.
+
+=== What the stop stage does
+
+The stop script shuts down AKS and PostgreSQL in that order.
+
+[source,bash]
+----
+az aks stop --resource-group "$AZ_RESOURCE_GROUP" --name "$AZ_AKS_NAME"
+
+az postgres flexible-server stop \
+	--resource-group "$AZ_RESOURCE_GROUP" \
+	--name "$AZ_PG_SERVER_NAME"
+----
+
+This is the aggressive cost-saving step. The cluster state is preserved, but the compute backing it is suspended. The script also documents the expected residual cost while stopped.
+
+=== What the start stage does
+
+The start script resumes PostgreSQL first, then starts AKS.
+
+[source,bash]
+----
+PG_STATE=$(az postgres flexible-server show \
+	--resource-group "$AZ_RESOURCE_GROUP" \
+	--name "$AZ_PG_SERVER_NAME" \
+	--query "state" -o tsv 2>/dev/null || echo "Unknown")
+
+if [ "$PG_STATE" = "Stopped" ]; then
+	az postgres flexible-server start \
+		--resource-group "$AZ_RESOURCE_GROUP" \
+		--name "$AZ_PG_SERVER_NAME"
+fi
+
+az aks start --resource-group "$AZ_RESOURCE_GROUP" --name "$AZ_AKS_NAME"
+----
+
+Two useful details are built into this flow.
+
+* PostgreSQL is checked first so the script does not try to start it unnecessarily.
+* The cluster comes back with its prior Kubernetes state intact, so no redeploy is needed just because you restarted it.
+
+=== Check the environment after a start
+
+Once the cluster has been resumed, pods need a few minutes to reschedule.
+
+[source,bash]
+----
+KUBECONFIG=~/.kube/aks-erp.yaml kubectl get pods -n erp-azure
+----
+
+That command is the quickest post-start validation. You are looking for the ERP pods to return to a healthy `Running` state. The script itself also reminds you that the recovery time is typically around three to five minutes.
+
+=== When a redeploy is actually necessary
+
+Starting a previously stopped environment is not the same as deploying a new version.
+
+You need a new deployment only when one of these changed:
+
+* the image tag you want AKS to use,
+* the manifests or runtime configuration,
+* the Azure resources or secrets that the workloads depend on.
+
+If none of those changed, `aks-start.sh` is enough.
+
+=== Where Azure Portal becomes useful
+
+The Portal is optional for the start and stop flow, but it becomes useful for management and analysis afterward.
+
+* Review costs after leaving the environment running.
+* Inspect metrics when pods take longer than expected to recover.
+* Check resource health and load balancer assignments.
+* Explore logs and monitoring dashboards.
+
+The core operational principle still stays the same: deploy and control the environment with scripts, then use Azure Portal as a management and analysis surface when it helps.

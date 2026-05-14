@@ -1,0 +1,116 @@
+== Build and push the ERP images into ACR
+
+This stage takes the source code on your machine or CI runner, builds container images for the Azure target platform, and pushes those images into Azure Container Registry.
+
+IMPORTANT: Run `az login` before this stage. `az acr login` depends on an active Azure CLI session, so a reboot or expired session must be followed by another `az login`.
+
+=== Read the target registry and image tag
+
+The script starts by loading `.env.deploy`, allowing a tag override, and constructing the registry URL.
+
+[source,bash]
+----
+_TAG_OVERRIDE="${TAG:-}"
+source "$ENV_FILE"
+[ -n "$_TAG_OVERRIDE" ] && TAG="$_TAG_OVERRIDE"
+
+ACR="${AZ_ACR_NAME}"
+REGISTRY="${ACR}.azurecr.io"
+TAG="${TAG:-latest}"
+PLATFORM="linux/amd64"
+----
+
+Two details matter here.
+
+* The registry is always derived from `AZ_ACR_NAME`.
+* The default tag is `latest`, but you can override it for a release or CI deployment.
+
+IMPORTANT: Choosing the image tag is an important deployment decision. `latest` is convenient for local iteration, but immutable tags such as `v2026.05.10` or a commit SHA make rollbacks and debugging much easier.
+
+=== Authenticate Docker against Azure Container Registry
+
+[source,bash]
+----
+az acr login --name "$ACR"
+----
+
+This command bridges Azure authentication into Docker so pushes can go to your private registry. You do not need to create a separate Docker registry password manually.
+
+=== Ensure a Buildx builder exists
+
+[source,bash]
+----
+if ! docker buildx inspect erp-builder &>/dev/null; then
+  docker buildx create --name erp-builder --driver docker-container --bootstrap
+fi
+docker buildx use erp-builder
+----
+
+Buildx is used because the target platform is explicitly `linux/amd64`, which matches the AKS nodes used by the deployment. This avoids subtle platform mismatches when building from Apple Silicon or other non-AMD64 hosts.
+
+=== The script defines the backend images explicitly
+
+[source,bash]
+----
+declare -a SERVICES=(
+  "erp-gateway:services:services/gateway/Dockerfile"
+  "erp-user-management:services:services/user-management/Dockerfile"
+  "erp-inventory:services:services/inventory/Dockerfile"
+  "erp-sales:services:services/sales/Dockerfile"
+  "erp-financial:services:services/financial/Dockerfile"
+  "erp-dashboard:services:services/dashboard/Dockerfile"
+  "erp-orchestration:services:services/orchestration/Dockerfile"
+)
+----
+
+Each entry is structured as `image-name:build-context:dockerfile`. This is useful because the ERP services share one top-level `services/` build context while still using different Dockerfiles.
+
+=== Each backend image is built and pushed in a loop
+
+[source,bash]
+----
+for entry in "${SERVICES[@]}"; do
+  IFS=':' read -r name context dockerfile <<< "$entry"
+  FULL_IMAGE="$REGISTRY/$name:$TAG"
+  docker buildx build \
+    --platform "$PLATFORM" \
+    --file "$dockerfile" \
+    --tag "$FULL_IMAGE" \
+    --push \
+    "$context"
+done
+----
+
+This loop is the core of the stage.
+
+* It calculates the final image name inside ACR.
+* It uses the right Dockerfile for each service.
+* It pushes the image immediately with `--push`, so the registry becomes the source of truth for deployment.
+
+=== The frontend is built separately
+
+The frontend uses a different build context, so it is handled after the backend loop.
+
+[source,bash]
+----
+FRONTEND_IMAGE="$REGISTRY/erp-frontend:$TAG"
+docker buildx build \
+  --platform "$PLATFORM" \
+  --file "frontend/Dockerfile" \
+  --tag "$FRONTEND_IMAGE" \
+  --push \
+  frontend/
+----
+
+This separation keeps the frontend independent from the backend service build context.
+
+=== What is important to verify after the push
+
+At the end of this stage, ACR should contain one image per ERP service plus the frontend. The next stage does not rebuild anything. It only points Kubernetes at the tags you just pushed.
+
+If you are deploying from CI/CD instead of a developer machine, the flow is the same.
+
+1. Authenticate with Azure.
+2. Build the images for `linux/amd64`.
+3. Push them into ACR.
+4. Deploy those exact tags into AKS.

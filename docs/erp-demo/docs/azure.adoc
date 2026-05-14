@@ -3,13 +3,94 @@
 :sectnums:
 :icons: font
 
-== Azure as the managed deployment path
+== Azure AKS as the managed deployment path
 
-Azure shows how the same architecture evolves when the team moves from self-hosted infrastructure to managed cloud services. That shift matters because the application itself does not fundamentally change: the gateway still fronts the system, services still run as containers, PostgreSQL still stores business data, and message brokers still coordinate asynchronous work. What changes is who operates the underlying platform. In Azure, responsibility for cluster control plane management, managed database operations, image storage, secret delivery, and public ingress moves partly to the cloud provider.
+Azure is the managed-cloud deployment path for ERPDemo. The application architecture stays recognizable: the frontend still talks to one public entry point, the gateway still fronts the backend, the services still run as containers, PostgreSQL still stores business data, and the monitoring stack still observes the platform. What changes is the infrastructure layer. Azure takes over cluster control plane management, container registry hosting, managed PostgreSQL operations, secret storage, and public load balancer integration.
 
-For a project like this ERP demo, Azure is a useful teaching environment because it illustrates a common production migration path. A local stack might start with Docker Compose and a self-hosted Kubernetes cluster, but a production-grade system usually benefits from managed building blocks such as AKS, Azure Container Registry, Azure Database for PostgreSQL, and Azure Key Vault. Understanding that mapping helps teams design applications that are portable without pretending all environments are identical.
+This chapter is intentionally written for readers who do not already know Azure. The goal is not only to list Azure services, but to explain how they map to the ERP system and which decisions matter while setting them up.
 
-== Applying the pattern
+IMPORTANT: Start every Azure work session with `az login`. After a machine restart, a fresh shell session, or an expired Azure CLI token, the Azure scripts will fail until you authenticate again.
+
+[source,bash]
+----
+az login
+----
+
+The Azure Portal is optional for this deployment path. The scripts in this chapter are sufficient to provision the infrastructure, build and push images, deploy the workloads, and start or stop the environment. The Portal becomes useful later for cost analysis, metrics, logs, and manual inspection, but it is not technically required to deploy ERPDemo.
+
+== What ERPDemo maps to in Azure
+
+[cols="1,1,2",options="header"]
+|===
+| ERP concern | Azure resource | Why it exists
+
+| Running containers
+| Azure Kubernetes Service (AKS)
+| AKS runs the gateway, backend services, frontend, monitoring components, and supporting workloads as Kubernetes deployments.
+
+| Container image storage
+| Azure Container Registry (ACR)
+| ACR stores the versioned Docker images that AKS pulls during deployment.
+
+| Secrets and credentials
+| Azure Key Vault
+| Key Vault stores the database connection strings and Grafana credentials, which are synchronized into Kubernetes through the Secrets Store CSI integration.
+
+| Database engine
+| Azure Database for PostgreSQL Flexible Server
+| PostgreSQL is moved from a self-hosted container to a managed database service with Azure-operated backups and lifecycle management.
+
+| Public traffic entry point
+| Azure LoadBalancer plus Traefik on AKS
+| Azure exposes the cluster publicly, while Traefik and the Gateway API route traffic to the correct ERP workloads.
+
+| Network isolation
+| Azure Virtual Network and subnet
+| The AKS cluster is attached to a dedicated subnet rather than using only Azure defaults.
+|===
+
+== The working order
+
+For a new environment, the Azure path is best understood as five stages.
+
+1. Create or sign in to an Azure account, then run `az login`.
+2. Fill `.env.deploy` with the Azure resource names, regions, and passwords.
+3. Provision the Azure resources.
+4. Build and push the application images into ACR.
+5. Deploy those images into AKS and later start or stop the environment as needed.
+
+The following sub-pages walk through each stage in that order and show the relevant script excerpts inline, so the documentation explains what the automation is actually doing.
+
+== Decisions to make early
+
+IMPORTANT: The two most visible cost and capacity levers are the AKS node size and whether the cluster is currently running. For a demo, a small cluster can be enough. For real traffic, undersizing the nodes will show up quickly as pod scheduling and memory pressure problems.
+
+[cols="1,2,2",options="header"]
+|===
+| Decision | Demo-friendly choice | When to choose differently
+
+| AKS node VM size
+| `Standard_B2s_v2`
+| Move to a larger SKU such as `Standard_D4s_v3` when several services need to stay resident, traffic is non-trivial, or monitoring and background jobs compete for memory.
+
+| Node count
+| `1`
+| Increase to multiple nodes for better resilience, larger aggregate capacity, or rolling upgrades with more headroom.
+
+| ACR SKU
+| `Basic`
+| Choose a higher SKU when image throughput, geo-replication, or enterprise registry features matter.
+
+| PostgreSQL tier
+| Burstable
+| Use a stronger tier if the database becomes a sustained production workload instead of a small demonstration environment.
+
+| Networking strictness
+| Publicly reachable managed services with Azure-side controls
+| Prefer private networking and tighter firewall rules when moving from demo simplicity toward stricter production isolation.
+|===
+
+== Configuration-driven workloads
 
 The most important design rule is to keep applications configuration-driven. If services read connection strings, secret values, and broker settings from configuration, the same service image can run locally, on a private cluster, or on AKS without code changes. A representative cloud wiring pattern looks like this:
 
