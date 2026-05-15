@@ -23,6 +23,7 @@
   { "slug": "azure-build-and-push", "title": "Build and Push Images", "level": 3 },
   { "slug": "azure-deployment", "title": "Deploy to AKS", "level": 3 },
   { "slug": "azure-management", "title": "Start and Stop the Cluster", "level": 3 },
+  { "slug": "azure-cost-analysis", "title": "Azure Cost Analysis", "level": 3 },
   { "slug": "telepresence", "title": "Telepresence", "level": 2 },
   { "slug": "mirrord", "title": "mirrord", "level": 2 },
   { "slug": "testing", "title": "Testing", "level": 1 }

@@ -129,4 +129,9 @@ The Portal becomes useful after the deployment exists.
 * Explore logs and monitoring data.
 * Confirm network objects and public IP assignments visually.
 
+A useful starting point is to pin only the Azure services that matter for this project. That keeps AKS, PostgreSQL, Key Vault, networking, container registry, and cost management within one click, while most other Azure services can be ignored for this deployment path.
+
+.Azure Portal favorites focused on the ERP deployment
+image::./images/favorites.jpg[alt="Azure Portal favorites view with the services most relevant to the ERP deployment pinned for quick navigation",width=200]
+
 For the deployment workflow itself, the Portal is optional. The scripts remain the source of truth.

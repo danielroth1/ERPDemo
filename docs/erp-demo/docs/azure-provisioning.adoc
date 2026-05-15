@@ -6,6 +6,11 @@ IMPORTANT: This entire stage is Azure CLI driven. No Azure Portal clicks are req
 
 IMPORTANT: Run `az login` before starting the provisioning stage, especially after restarting your machine or returning to the project later.
 
+Before looking at the individual commands, it helps to see the finished target. When the provisioning script succeeds, the resource group contains the AKS cluster, container registry, database server, network objects, load balancer, and supporting identities shown below.
+
+.Azure resource overview after the provisioning script has finished
+image::./images/resources.jpg[alt="Azure Portal resources view showing the collection of resources created for the ERP environment",width=1100]
+
 === The script begins by loading names and regions from `.env.deploy`
 
 [source,bash]
@@ -76,6 +81,9 @@ The VNet isolates the cluster network from Azure defaults, and the subnet gives 
 
 IMPORTANT: Choose address ranges carefully if this environment may later connect to another VNet, a VPN, or an on-premises network. Overlapping CIDR ranges are a common source of networking pain.
 
+.Virtual network created for the ERP environment
+image::./images/virtual-networks-erp-vnet.jpg[alt="Azure Portal virtual network detail page for the ERP virtual network created during provisioning",width=1100]
+
 === 3. Create Azure Container Registry
 
 [source,bash]
@@ -97,6 +105,14 @@ ACR stores the container images that AKS will pull later. The script chooses the
 | Not used by default
 | Consider for larger teams, stricter enterprise requirements, or higher pull and push rates.
 |===
+
+The Portal views below show both the Container Registry service area and the concrete registry instance used by this environment. The exact registry name differs by subscription and environment, but the validation goal is the same: the expected registry exists in the correct resource group and is ready to receive images.
+
+.Container Registries service area in Azure Portal
+image::./images/container-registries.jpg[alt="Azure Portal Container Registries landing page",width=1100]
+
+.Container registry created for the ERP deployment
+image::./images/container-registries-danielerpacr.jpg[alt="Azure Portal detail page for the container registry used by the ERP deployment",width=1100]
 
 === 4. Create the AKS cluster
 
@@ -160,6 +176,10 @@ az aks get-credentials --resource-group "$RG" --name "$AKS" \
 
 `--attach-acr` creates the `AcrPull` relationship for the cluster identity. `az aks get-credentials` writes a dedicated kubeconfig file so later deployment commands know how to reach the cluster.
 
+.ACR attached to AKS
+image::./images/kubernetes-attach-acr.jpg[alt="Attach ACR to AKS",width=1100]
+kubernetes-attach-acr
+
 === 6. Install Gateway API CRDs and Traefik
 
 Provisioning does not stop at raw Azure resources. It also installs the ingress layer the ERP deployment expects.
@@ -216,6 +236,9 @@ az identity federated-credential create \
 
 Without this identity wiring, the cluster would exist but would not be able to read the secrets required by the ERP workloads.
 
+.Key Vault service area showing the vault created for this project
+image::./images/key-vaults.jpg[alt="Azure Portal Key Vaults page showing the key vault created for the ERP deployment",width=1100]
+
 === 8. Create PostgreSQL Flexible Server and the ERP databases
 
 The script provisions a managed PostgreSQL server instead of running PostgreSQL inside the cluster.
@@ -261,6 +284,14 @@ IMPORTANT: The default database choice is optimized for low cost, not heavy load
 | Flexible if a specific database region is preferred or required
 | Keep both in the same region in most cases to reduce latency and cross-region complexity.
 |===
+
+The PostgreSQL screenshots below show both the general service landing page and the concrete Flexible Server instance created for this demo. This is where you can verify the server name, region, tier, and the fact that the database is managed outside the cluster.
+
+.Azure Database for PostgreSQL service area
+image::./images/azure-db-postgresql.jpg[alt="Azure Portal Azure Database for PostgreSQL landing page",width=1100]
+
+.PostgreSQL Flexible Server created for the ERP deployment
+image::./images/azure-db-postgresql-daniel-erp-pg.jpg[alt="Azure Portal detail page for the PostgreSQL Flexible Server used by the ERP deployment",width=1100]
 
 === 9. Store runtime secrets in Key Vault
 

@@ -7,7 +7,7 @@
 
 Azure is the managed-cloud deployment path for ERPDemo. The application architecture stays recognizable: the frontend still talks to one public entry point, the gateway still fronts the backend, the services still run as containers, PostgreSQL still stores business data, and the monitoring stack still observes the platform. What changes is the infrastructure layer. Azure takes over cluster control plane management, container registry hosting, managed PostgreSQL operations, secret storage, and public load balancer integration.
 
-This chapter is intentionally written for readers who do not already know Azure. The goal is not only to list Azure services, but to explain how they map to the ERP system and which decisions matter while setting them up.
+This chapter is intentionally written for readers who do not already know Azure. The goal is not only to list Azure services, but to explain how they map to the ERP system and which decisions matter while setting them up. It also closes with a dedicated cost-analysis page, because a managed cloud deployment is not complete until you understand which resources keep charging while the environment is idle.
 
 IMPORTANT: Start every Azure work session with `az login`. After a machine restart, a fresh shell session, or an expired Azure CLI token, the Azure scripts will fail until you authenticate again.
 
@@ -59,7 +59,7 @@ For a new environment, the Azure path is best understood as five stages.
 4. Build and push the application images into ACR.
 5. Deploy those images into AKS and later start or stop the environment as needed.
 
-The following sub-pages walk through each stage in that order and show the relevant script excerpts inline, so the documentation explains what the automation is actually doing.
+The following sub-pages walk through each stage in that order and show the relevant script excerpts inline, so the documentation explains what the automation is actually doing. After those five stages, the chapter ends with a separate Azure cost-analysis page that explains what the deployed resources cost when the cluster is running versus stopped.
 
 == Decisions to make early
 

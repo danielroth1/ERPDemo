@@ -73,9 +73,35 @@ If none of those changed, `aks-start.sh` is enough.
 
 The Portal is optional for the start and stop flow, but it becomes useful for management and analysis afterward.
 
-* Review costs after leaving the environment running.
-* Inspect metrics when pods take longer than expected to recover.
-* Check resource health and load balancer assignments.
-* Explore logs and monitoring dashboards.
+==== Start from the AKS overview
+
+The AKS overview is the fastest visual confirmation that you are looking at the correct cluster, region, node count, and resource group after a restart.
+
+.AKS overview page for the ERP cluster
+image::./images/kubernetes.jpg[alt="Azure Portal overview page for the AKS cluster used by the ERP deployment",width=1100]
+
+==== Inspect node pools and the underlying nodes
+
+Once the cluster is running again, the node-pool views are the clearest way to confirm how much compute is available and which nodes Azure has brought back online. In a small demo cluster this matters because even a single missing node or an undersized node pool shows up immediately as scheduling pressure.
+
+.Node pools configured for the ERP AKS cluster
+image::./images/kubernetes-nodepools.jpg[alt="Azure Portal node pools view for the AKS cluster",width=1100]
+
+.Selected node pool for the ERP AKS cluster
+image::./images/kubernetes-nodepools-nodepool1.jpg[alt="Azure Portal detail view of the selected AKS node pool",width=1100]
+
+.Nodes running inside the selected node pool
+image::./images/kubernetes-nodepools-nodepool1-nodes.jpg[alt="Azure Portal node list for the selected AKS node pool, showing the nodes that host the deployed workloads",width=1100]
+
+The node view is especially useful in this project because it gives a concrete overview of what is actually deployed in the cluster after a restart. It turns the abstract idea of "the ERP services are running again" into a visible list of cluster nodes and workloads.
+
+==== Check public exposure and load balancer assignments
+
+Azure Portal is also useful when you need to confirm how the public entry point is wired. The load balancer view helps you verify that the Traefik service still owns the expected frontend IP and that the network objects created during provisioning are still present.
+
+.Azure load balancers associated with the ERP deployment
+image::./images/load-balancers.jpg[alt="Azure Portal load balancers page showing the load balancers associated with the ERP deployment",width=1100]
+
+The detailed cost discussion is separated onto the next page. That keeps this management page focused on operational inspection after a start or stop action, while the cost page analyzes which Azure resources continue charging when the cluster is idle.
 
 The core operational principle still stays the same: deploy and control the environment with scripts, then use Azure Portal as a management and analysis surface when it helps.
