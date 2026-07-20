@@ -2,16 +2,28 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Kafka as the event-streaming backbone
 
 Kafka is used in this architecture for domain events: messages that describe something that *already happened*. That distinction is essential. An event such as `StockReserved`, `ProductUpdated`, or `TransactionCreated` is not telling another service what to do next. It is publishing a fact so that interested services can react independently. That makes Kafka a good fit for analytics, integration, notifications, and any workflow where several consumers may care about the same business occurrence.
+
+website::[href="https://kafka.apache.org/",text="Kafka Documentation"]
+github::[href="https://github.com/apache/kafka",text="Kafka on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Kafka[]
+skill::MassTransit[]
+====
 
 In this ERP demo, Kafka supports loose coupling between services. Inventory can publish stock-related events, financial can publish accounting events, and dashboard can consume multiple streams to build read models and alerts. The value is not just scale. The larger benefit is that producers do not need to know who is listening. That keeps the system extensible as new consumers appear over time.
 
 == Applying the pattern
 
 The services use the MassTransit Kafka Rider so producers and consumers can be configured through the same messaging abstraction used elsewhere in the system. A typical setup registers producers for outbound events and topic endpoints for inbound streams.
+
+Representative sources: {repo-base}/services/inventory/InventoryManagement/Program.cs#L145[services/inventory/InventoryManagement/Program.cs#L145] and {repo-base}/services/dashboard/DashboardAnalytics/Program.cs#L115[services/dashboard/DashboardAnalytics/Program.cs#L115]
 
 [source,csharp]
 ----
@@ -38,6 +50,8 @@ builder.Services.AddMassTransit(x =>
 ----
 
 Publishing an event should happen after the local business action succeeds. That keeps the event meaningful: it tells the rest of the system about a committed change, not about an intention that might still fail.
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Services/ProductService.cs#L187[services/inventory/InventoryManagement/Services/ProductService.cs#L187]
 
 [source,csharp]
 ----

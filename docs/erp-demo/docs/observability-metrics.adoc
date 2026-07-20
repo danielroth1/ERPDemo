@@ -1,0 +1,160 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
+
+== What metrics capture
+
+Metrics are numerical measurements collected at regular intervals. In this project they answer questions like: how many requests per second is the inventory service handling, what is the 99th-percentile response time for the sales endpoint, how full is the Kafka consumer lag, and is any service currently down? They are the fastest signal to react to because Prometheus collects them on a pull model every 15 seconds and stores them as time-series data that Grafana can query over any time window.
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Prometheus[]
+skill::Grafana[]
+skill::OpenTelemetry[]
+====
+
+== Exposing the /metrics endpoint
+
+All seven ASP.NET Core services register a Prometheus-compatible `/metrics` endpoint using the `prometheus-net.AspNetCore` library. The endpoint is mounted during startup alongside the standard health check routes.
+
+Source: {repo-base}/services/shared/ServiceDefaults/Extensions.cs[services/shared/ServiceDefaults/Extensions.cs]
+
+[source,csharp]
+----
+// In Program.cs of each service:
+var app = builder.Build();
+app.MapPrometheusScrapingEndpoint();   // registers GET /metrics
+app.MapDefaultEndpoints();             // registers /health and /alive
+app.Run();
+----
+
+The endpoint exposes built-in ASP.NET Core process metrics (request count, request duration histograms, active connections), CLR metrics (GC heap, thread pool), and any custom meters registered via OpenTelemetry.
+
+== OpenTelemetry metrics in ServiceDefaults
+
+Every service calls `builder.AddServiceDefaults()` from the shared `ServiceDefaults` library. This centrally registers OpenTelemetry instrumentation for metrics so there is no duplication across services.
+
+Source: {repo-base}/services/shared/ServiceDefaults/Extensions.cs[services/shared/ServiceDefaults/Extensions.cs]
+
+[source,csharp]
+----
+builder.Services.AddOpenTelemetry()
+    .WithMetrics(metrics =>
+    {
+        metrics
+            .AddAspNetCoreInstrumentation()   // http.server.request.duration, etc.
+            .AddHttpClientInstrumentation();  // http.client.request.duration, etc.
+    });
+----
+
+`AddAspNetCoreInstrumentation` produces standard OTEL semantic-convention metrics for all inbound HTTP requests: `http.server.request.duration`, `http.server.active_requests`, and `http.server.response.size`. `AddHttpClientInstrumentation` does the same for outbound calls such as the gateway routing to upstream services.
+
+NOTE: The `AddMeter("MassTransit")` call visible in the existing observability page is the pattern for adding MassTransit's own metrics (message rate, consumer duration). It can be added in the same `.WithMetrics` block.
+
+== Prometheus scrape configuration
+
+Prometheus is configured to scrape all seven services. In the dev infra compose (`infrastructure/docker-compose.dev.yml`) services run on the host machine, so Prometheus uses `host.docker.internal` to reach them. The container is started with `--web.enable-remote-write-receiver` so that Tempo can push derived metrics back.
+
+Source: {repo-base}/infrastructure/monitoring/prometheus/prometheus.yml[infrastructure/monitoring/prometheus/prometheus.yml]
+
+[source,yaml]
+----
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'erp-local'
+    environment: 'development'
+
+scrape_configs:
+  - job_name: 'gateway'
+    static_configs:
+      - targets: ['host.docker.internal:8080']
+        labels:
+          service: 'gateway'
+    metrics_path: '/metrics'
+
+  - job_name: 'user-management'
+    static_configs:
+      - targets: ['host.docker.internal:5001']
+        labels:
+          service: 'user-management'
+    metrics_path: '/metrics'
+
+  - job_name: 'inventory'
+    static_configs:
+      - targets: ['host.docker.internal:5002']
+        labels:
+          service: 'inventory'
+    metrics_path: '/metrics'
+
+  - job_name: 'sales'
+    static_configs:
+      - targets: ['host.docker.internal:5003']
+        labels:
+          service: 'sales'
+    metrics_path: '/metrics'
+
+  - job_name: 'financial'
+    static_configs:
+      - targets: ['host.docker.internal:5004']
+        labels:
+          service: 'financial'
+    metrics_path: '/metrics'
+
+  - job_name: 'dashboard'
+    static_configs:
+      - targets: ['host.docker.internal:5005']
+        labels:
+          service: 'dashboard'
+    metrics_path: '/metrics'
+
+  # Kafka JMX exporter runs as a sidecar container exposing broker metrics
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka-jmx-exporter:7071']
+----
+
+In a full Docker Compose deployment (`docker-compose.yml`) the targets are the container service names on the internal network (e.g., `user-management:8080`) rather than `host.docker.internal`. In Kubernetes the targets are the K8s `Service` DNS names.
+
+== Kafka JMX exporter
+
+Kafka does not natively expose Prometheus metrics. A JMX-to-Prometheus bridge container (`kafka-jmx-exporter`) reads Kafka broker JMX metrics and exposes them on port 7071. Prometheus scrapes this container using the `kafka` job. The resulting metrics include consumer group lag, partition leader elections, broker network throughput, and replica in-sync counts.
+
+== Derived metrics from Tempo
+
+Tempo's `metrics_generator` component processes ingested traces and derives two additional sets of metrics that are written back to Prometheus via remote-write:
+
+* **span-metrics** — request rate, error rate, and duration histograms for every `(service, span_name)` pair.
+* **service-graphs** — inter-service request rate and error rate as a directed graph, which powers Grafana's node-graph panel.
+
+Source: {repo-base}/infrastructure/monitoring/tempo/tempo.yaml[infrastructure/monitoring/tempo/tempo.yaml]
+
+[source,yaml]
+----
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: docker-compose
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true   # attaches TraceID to Prometheus data points
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+----
+
+`send_exemplars: true` attaches the TraceID of the originating span to the Prometheus data point. This enables Grafana's exemplar overlay on metric panels: clicking a spike in the p99 histogram jumps directly to the trace that caused it.
+
+== Docker topology
+
+The diagram below shows the monitoring containers defined in `infrastructure/docker-compose.dev.yml`, their ports, and how they connect to each other and to the host-running .NET services.
+
+dotgraph::./diagrams/observability-docker-topology.dot[caption="Docker Compose monitoring topology",max-width=900]

@@ -1,6 +1,10 @@
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
+
 == Build and push the ERP images into ACR
 
 This stage takes the source code on your machine or CI runner, builds container images for the Azure target platform, and pushes those images into Azure Container Registry.
+
+Script source for the bash examples on this page: {repo-base}/scripts/aks-build-push.sh#L1[scripts/aks-build-push.sh#L1]
 
 IMPORTANT: Run `az login` before this stage. `az acr login` depends on an active Azure CLI session, so a reboot or expired session must be followed by another `az login`.
 

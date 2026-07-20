@@ -2,16 +2,26 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Why REST remains the default tool
 
 REST is still the simplest and most widely useful communication style in this repository. A client sends an HTTP request to a resource-oriented endpoint and receives a structured response. That model remains valuable even in a system that also uses GraphQL and messaging because many business actions are naturally request-response operations: create a product, update a budget, retrieve the current user, or start a workflow. Those tasks benefit from explicit routes, familiar HTTP semantics, middleware support, and strong client-generation tooling.
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Restful API[]
+skill::ASP.NET Core[]
+skill::TypeScript[]
+====
 
 In this ERP demo, REST is especially important on write paths and straightforward CRUD paths. The gateway routes incoming requests to the correct service, ASP.NET Core controllers implement the API surface, and the frontend often uses generated clients so it can call those endpoints with a typed developer experience. REST is not the answer to every read-model problem, but it is still the most direct way to represent transactional commands and simple resources.
 
 == Applying REST in code
 
 At the edge, the gateway matches public routes and forwards them to the right backend service. That keeps the browser focused on one entry point instead of many service URLs.
+
+Representative source: {repo-base}/services/gateway/ApiGateway/appsettings.json#L38[services/gateway/ApiGateway/appsettings.json#L38]
 
 [source,json]
 ----
@@ -29,6 +39,8 @@ At the edge, the gateway matches public routes and forwards them to the right ba
 ----
 
 Inside the service, a controller expresses the business action in the usual ASP.NET Core way.
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Controllers/ProductsController.cs#L142[services/inventory/InventoryManagement/Controllers/ProductsController.cs#L142]
 
 [source,csharp]
 ----
@@ -58,6 +70,8 @@ public sealed class ProductsController : ControllerBase
 ----
 
 On the frontend, generated REST clients make usage concise while preserving typing and shared authentication behavior.
+
+Representative source: {repo-base}/frontend/src/services/inventory-api.client.ts#L18[frontend/src/services/inventory-api.client.ts#L18]
 
 [source,typescript]
 ----

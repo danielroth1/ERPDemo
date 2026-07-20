@@ -1,7 +1,8 @@
 digraph k8s_topology {
   rankdir=TB;
-  graph [nodesep=0.5, ranksep=0.8, splines=ortho];
+  graph [nodesep=0.7, ranksep=0.95, pad=0.2, splines=polyline, concentrate=true];
   node [shape=box, style="rounded", fontsize=11];
+  edge [penwidth=1];
 
   user [label="Developer / Browser"];
   ingress [label="Traefik / Gateway API"];
@@ -21,35 +22,35 @@ digraph k8s_topology {
   grafana [label="Grafana / Loki / Tempo / Prometheus", shape=folder];
 
   user -> ingress -> gateway;
-  gateway -> inventory;
-  gateway -> sales;
-  gateway -> financial;
-  gateway -> dashboard;
-  gateway -> orchestration;
-  gateway -> users;
+  gateway -> inventory [sametail=gw];
+  gateway -> sales [sametail=gw];
+  gateway -> financial [sametail=gw];
+  gateway -> dashboard [sametail=gw];
+  gateway -> orchestration [sametail=gw];
+  gateway -> users [sametail=gw];
 
-  inventory -> postgres;
-  sales -> postgres;
-  financial -> postgres;
-  dashboard -> postgres;
-  orchestration -> postgres;
-  users -> postgres;
+  inventory -> postgres [samehead=pg];
+  sales -> postgres [samehead=pg];
+  financial -> postgres [samehead=pg];
+  dashboard -> postgres [samehead=pg];
+  orchestration -> postgres [samehead=pg];
+  users -> postgres [samehead=pg];
 
   inventory -> minio;
-  inventory -> kafka;
-  sales -> kafka;
-  financial -> kafka;
-  dashboard -> kafka;
-  orchestration -> kafka;
-  orchestration -> rabbit;
-  inventory -> rabbit;
-  financial -> rabbit;
+  inventory -> kafka [samehead=events];
+  sales -> kafka [samehead=events];
+  financial -> kafka [samehead=events];
+  dashboard -> kafka [samehead=events];
+  orchestration -> kafka [samehead=events];
+  orchestration -> rabbit [samehead=commands];
+  inventory -> rabbit [samehead=commands];
+  financial -> rabbit [samehead=commands];
 
-  gateway -> grafana [style=dashed];
-  inventory -> grafana [style=dashed];
-  sales -> grafana [style=dashed];
-  financial -> grafana [style=dashed];
-  dashboard -> grafana [style=dashed];
-  orchestration -> grafana [style=dashed];
-  users -> grafana [style=dashed];
+  gateway -> grafana [style=dashed, samehead=telemetry];
+  inventory -> grafana [style=dashed, samehead=telemetry];
+  sales -> grafana [style=dashed, samehead=telemetry];
+  financial -> grafana [style=dashed, samehead=telemetry];
+  dashboard -> grafana [style=dashed, samehead=telemetry];
+  orchestration -> grafana [style=dashed, samehead=telemetry];
+  users -> grafana [style=dashed, samehead=telemetry];
 }

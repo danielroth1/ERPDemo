@@ -2,10 +2,19 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Telepresence overview and concepts
 
 Telepresence is a powerful open-source tool built for Kubernetes that allows developers to run a single service locally while redirecting matching traffic from a remote Kubernetes cluster to their local machine. This provides a "local-to-cloud" debugging experience. By acting as a transparent network bridge, Telepresence allows the locally running service to seamlessly interact with remote dependencies—such as databases, internal APIs, and external integrations—without requiring you to run the entire backend infrastructure on your laptop. 
+
+website::[href="https://telepresence.io/",text="Telepresence Documentation"]
+github::[href="https://github.com/telepresenceio/telepresence",text="Telepresence on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Kubernetes[]
+====
 
 This approach minimizes resource consumption on local development machines, avoids the "works on my machine" problem by running against real infrastructure, and drastically speeds up the feedback loop compared to building and pushing container images continuously. By specifying session headers, a developer can ensure that only their own traffic is routed to their local machine, ensuring they don't break the environment for other teammates sharing the same development cluster.
 
@@ -23,6 +32,8 @@ To use Telepresence effectively, it requires an installed CLI on the developer m
 
 Below is a generic example of how to connect and intercept a service. Ensure you define a unique HTTP header (e.g., `x-telepresence-session=your-name`) so you only capture your own debugging traffic.
 
+Representative source: {repo-base}/.vscode/tasks.json#L1343[.vscode/tasks.json#L1343]
+
 [source,bash]
 ----
 # 1. Connect your local machine to the remote Kubernetes cluster
@@ -37,6 +48,8 @@ telepresence intercept your-service-deployment \
 ----
 
 On the client side (e.g., a React Frontend or API consumer), you simply attach the matching session header to your outgoing requests.
+
+Related project configuration: {repo-base}/.vscode/tasks.json#L83[.vscode/tasks.json#L83]
 
 [source,typescript]
 ----

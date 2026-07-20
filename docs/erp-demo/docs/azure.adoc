@@ -2,10 +2,22 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Azure AKS as the managed deployment path
 
 Azure is the managed-cloud deployment path for ERPDemo. The application architecture stays recognizable: the frontend still talks to one public entry point, the gateway still fronts the backend, the services still run as containers, PostgreSQL still stores business data, and the monitoring stack still observes the platform. What changes is the infrastructure layer. Azure takes over cluster control plane management, container registry hosting, managed PostgreSQL operations, secret storage, and public load balancer integration.
+
+website::[href="https://learn.microsoft.com/azure/aks/",text="Azure AKS Documentation"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Azure AKS[]
+skill::Kubernetes[]
+skill::Docker[]
+skill::PostgreSQL[]
+skill::Grafana[]
+====
 
 This chapter is intentionally written for readers who do not already know Azure. The goal is not only to list Azure services, but to explain how they map to the ERP system and which decisions matter while setting them up. It also closes with a dedicated cost-analysis page, because a managed cloud deployment is not complete until you understand which resources keep charging while the environment is idle.
 
@@ -16,7 +28,7 @@ IMPORTANT: Start every Azure work session with `az login`. After a machine resta
 az login
 ----
 
-The Azure Portal is optional for this deployment path. The scripts in this chapter are sufficient to provision the infrastructure, build and push images, deploy the workloads, and start or stop the environment. The Portal becomes useful later for cost analysis, metrics, logs, and manual inspection, but it is not technically required to deploy ERPDemo.
+The Azure Portal is optional for this deployment path. The scripts in this chapter are sufficient to provision the infrastructure, build and push images, deploy the workloads, and start or stop the environment. The detailed Azure pages link each excerpt back to the matching repository lines, so you can inspect the live automation beside the explanation. The Portal becomes useful later for cost analysis, metrics, logs, and manual inspection, but it is not technically required to deploy ERPDemo.
 
 == What ERPDemo maps to in Azure
 
@@ -94,6 +106,8 @@ IMPORTANT: The two most visible cost and capacity levers are the AKS node size a
 
 The most important design rule is to keep applications configuration-driven. If services read connection strings, secret values, and broker settings from configuration, the same service image can run locally, on a private cluster, or on AKS without code changes. A representative cloud wiring pattern looks like this:
 
+Representative source: {repo-base}/infrastructure/k8s/azure/secret-provider.yaml#L1[infrastructure/k8s/azure/secret-provider.yaml#L1]
+
 [source,yaml]
 ----
 apiVersion: secrets-store.csi.x-k8s.io/v1
@@ -125,6 +139,8 @@ spec:
 ----
 
 Once the secret is synchronized into the cluster, a service can consume it exactly like any other Kubernetes secret. That keeps application startup code clean and environment-agnostic.
+
+Representative source: {repo-base}/infrastructure/k8s/base/inventory.yaml#L1[infrastructure/k8s/base/inventory.yaml#L1]
 
 [source,yaml]
 ----

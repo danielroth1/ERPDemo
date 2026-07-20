@@ -2,12 +2,22 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Distributed Workflows with Sagas
 
 A saga is a sophisticated pattern for managing complex business workflows that span multiple independent microservices. In traditional monolithic architectures, these workflows are often handled using large, single-database transactions that guarantee ACID (Atomicity, Consistency, Isolation, Durability) properties. However, when transitioning to decentralized microservices, relying on remote distributed transactions using concepts like two-phase commit (2PC) introduces severe latency, performance bottlenecks, and single points of failure.
 
 Sagas solve this by explicitly breaking the workflow down into a sequential series of local database transactions or steps. If one step in the sequence fails—such as a failure to charge a credit card after reserving an item—the saga executes "compensating actions" to gracefully undo or reverse the preceding successful steps (like releasing the inventory reservation). This orchestration creates robust, predictable models for handling eventual consistency across bounded contexts.
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::MassTransit[]
+skill::RabbitMQ[]
+skill::Kafka[]
+skill::PostgreSQL[]
+skill::EF Core[]
+====
 
 == Orchestrating the Purchase Flow
 
@@ -16,6 +26,8 @@ The orchestration service maintains standard saga state machines. The purchase f
 dotgraph::./diagrams/purchase-saga.dot[caption="Purchase saga overview",max-width=980,engine=dot]
 
 State machines govern these flows and ensure states are saved asynchronously (typically to PostgreSQL with persistence tools like Entity Framework Core), guaranteeing that workflows survive process restarts.
+
+Representative source: {repo-base}/services/orchestration/Orchestration/Program.cs#L105[services/orchestration/Orchestration/Program.cs#L105]
 
 [source,csharp]
 ----
@@ -31,6 +43,8 @@ x.AddSagaStateMachine<OrderStateMachine, OrderState>()
 ----
 
 Client initialization acts as the launch point for a saga. By emitting an event or calling the orchestration orchestrator API point, a frontend client effectively instantiates a new saga instance.
+
+Representative sources: {repo-base}/frontend/src/services/shop.service.ts#L66[frontend/src/services/shop.service.ts#L66] and {repo-base}/frontend/src/generated/clients/orchestration/api/v1/shop/purchase/index.ts#L18[frontend/src/generated/clients/orchestration/api/v1/shop/purchase/index.ts#L18]
 
 [source,typescript]
 ----

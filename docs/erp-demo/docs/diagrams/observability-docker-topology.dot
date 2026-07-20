@@ -1,0 +1,84 @@
+// Docker Compose monitoring topology (infrastructure/docker-compose.dev.yml)
+// Shows all monitoring containers, their ports, volumes, and how they interconnect.
+
+digraph observability_docker {
+  rankdir=TB;
+  graph [nodesep=0.7, ranksep=0.85, pad=0.4, splines=polyline, fontname="sans-serif",
+         label="Docker Compose — Monitoring Stack  (infrastructure/docker-compose.dev.yml)",
+         labelloc=t, fontsize=11];
+  node [shape=box, style="rounded,filled", fontsize=9, fontname="sans-serif"];
+  edge [fontsize=8, fontname="sans-serif", penwidth=1.2];
+
+  // ── Host machine: .NET services run with dotnet watch ─────────────────────
+  subgraph cluster_host {
+    label="Host machine  (dotnet watch / dotnet run)";
+    style=dashed; color="#5a7fc7"; bgcolor="#eef3ff"; fontsize=10;
+    node [fillcolor="#c5d8ff"];
+    host_svc [
+      label=".NET Services (7)\nGateway :8080  User Management :5001\nInventory :5002  Sales :5003\nFinancial :5004  Dashboard :5005\nOrchestration :5010\n\nenv: OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4319"
+    ];
+  }
+
+  // ── erp-dev-network (Docker) ──────────────────────────────────────────────
+  subgraph cluster_docker {
+    label="Docker network: erp-dev-network";
+    style=dashed; color="#888888"; bgcolor="#fafafa"; fontsize=10;
+
+    prometheus [
+      label="erp-dev-prometheus\nprom/prometheus:v2.48.0\nport: 9090\n+ extra_hosts → host.docker.internal\n+ --web.enable-remote-write-receiver",
+      fillcolor="#fff9c4"
+    ];
+    grafana [
+      label="erp-dev-grafana\ngrafana/grafana:10.2.0\nport: 3001\ncredentials: admin / admin\ndatasources + dashboards provisioned",
+      fillcolor="#e1bee7"
+    ];
+    loki [
+      label="erp-dev-loki\ngrafana/loki:3.4.1\nport: 3100\nretention: 168 h (7 days)",
+      fillcolor="#c8e6c9"
+    ];
+    tempo [
+      label="erp-dev-tempo\ngrafana/tempo:2.3.1\nport 3200  HTTP API\nport 4317  OTLP gRPC\nport 4318  OTLP HTTP\nmetrics_generator: service-graphs, span-metrics",
+      fillcolor="#ffe0b2"
+    ];
+    alloy [
+      label="erp-dev-alloy\ngrafana/alloy:latest\nport 4319  OTLP gRPC  ← host services\nport 12345  Alloy UI\nvolume: /var/run/docker.sock (read-only)",
+      fillcolor="#fff9c4"
+    ];
+    kafka_jmx [
+      label="kafka-jmx-exporter\nport: 7071",
+      shape=component, fillcolor="#ffcc80"
+    ];
+  }
+
+  docker_sock [
+    label="/var/run/docker.sock",
+    shape=cylinder, style="filled", fillcolor="#e0e0e0"
+  ];
+
+  // ── Host → Prometheus (metrics pull via extra_hosts) ──────────────────────
+  host_svc   -> prometheus [label="scrape /metrics\n(host.docker.internal:{port})",
+                            color="#1565c0", fontcolor="#1565c0", style=dashed];
+  kafka_jmx  -> prometheus [label="scrape :7071",
+                            color="#1565c0", fontcolor="#1565c0", style=dashed];
+
+  // ── Alloy: Docker socket → container logs ─────────────────────────────────
+  docker_sock -> alloy [label="container log discovery\n(mount read-only)",
+                        color="#2e7d32", fontcolor="#2e7d32"];
+
+  // ── Host services → Alloy (OTLP: logs + traces) ───────────────────────────
+  host_svc -> alloy [label="OTLP gRPC :4319\nlogs + traces",
+                     color="#885500", fontcolor="#885500", style=dashed];
+
+  // ── Alloy → Loki + Tempo ──────────────────────────────────────────────────
+  alloy -> loki  [label="logs (Loki API push)", color="#2e7d32", fontcolor="#2e7d32"];
+  alloy -> tempo [label="traces (OTLP relay)", color="#e65100", fontcolor="#e65100"];
+
+  // ── Tempo → Prometheus: derived metrics ───────────────────────────────────
+  tempo -> prometheus [label="remote-write\nspan-metrics\nservice-graphs",
+                       color="#6a1b9a", fontcolor="#6a1b9a", style=dashed];
+
+  // ── Grafana → datasources ─────────────────────────────────────────────────
+  grafana -> prometheus [label="PromQL",   color="#1565c0", fontcolor="#1565c0"];
+  grafana -> loki       [label="LogQL",    color="#2e7d32", fontcolor="#2e7d32"];
+  grafana -> tempo      [label="TraceQL",  color="#e65100", fontcolor="#e65100"];
+}

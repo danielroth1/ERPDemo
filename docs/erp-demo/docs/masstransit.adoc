@@ -2,16 +2,30 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Why MassTransit is central to the architecture
 
 MassTransit is the messaging abstraction that keeps the application's broker code from fragmenting into transport-specific plumbing. That matters in this ERP demo because the system uses both RabbitMQ and Kafka, and it also relies on higher-level messaging patterns such as retries, outbox delivery, test harnesses, and saga state machines. Without a consistent abstraction, every service would need to solve connection management, endpoint naming, retry behavior, and message dispatching in slightly different ways.
+
+website::[href="https://masstransit.io/",text="MassTransit Documentation"]
+github::[href="https://github.com/MassTransit/MassTransit",text="MassTransit on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::MassTransit[]
+skill::RabbitMQ[]
+skill::Kafka[]
+skill::EF Core[]
+====
 
 The real benefit is not simply convenience. MassTransit gives the codebase a common mental model for asynchronous workflows. Whether a service is sending a RabbitMQ command, publishing a Kafka event, or progressing a saga, the surrounding application code stays recognizable. That consistency reduces accidental complexity, especially when the system grows and more teams contribute to the messaging layer.
 
 == Applying the pattern
 
 A useful baseline setup configures endpoint naming, consumers, persistence-backed outbox behavior, and transport-specific details in one place. The example below captures the essential structure:
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Program.cs#L96[services/inventory/InventoryManagement/Program.cs#L96]
 
 [source,csharp]
 ----
@@ -43,6 +57,8 @@ builder.Services.AddMassTransit(x =>
 ----
 
 Once configured, application code should depend on interfaces such as `IPublishEndpoint`, `ISendEndpointProvider`, or typed producers instead of talking directly to the broker SDK. That keeps business logic focused on intent.
+
+Representative source: {repo-base}/services/orchestration/Orchestration/Controllers/ShopController.cs#L51[services/orchestration/Orchestration/Controllers/ShopController.cs#L51]
 
 [source,csharp]
 ----

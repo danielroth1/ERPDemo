@@ -2,10 +2,19 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == mirrord Overview
 
 mirrord is a dynamic local-to-cloud development tool that solves the problem of running code locally while connecting it to a remote Kubernetes cluster. Unlike traditional VPN-based or network-level tunneling tools, mirrord operates at the process level. It hooks into your application process and intercepts system calls, redirecting network traffic, environment variables, and file system reads from the remote cluster pod directly into your local process.
+
+website::[href="https://mirrord.dev/",text="mirrord Documentation"]
+github::[href="https://github.com/metalbear-co/mirrord",text="mirrord on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Kubernetes[]
+====
 
 Because mirrord guarantees process-level isolation, it doesn't pollute your workstation's global network interfaces or DNS resolution. This makes it an excellent choice for developers who want to avoid system-wide routing modifications. You can clone the environment of an existing pod, and by leveraging HTTP header filtering, you can intercept specific traffic flows directed at that pod, ensuring your local code only processes requests intended for your debugging session.
 
@@ -21,6 +30,8 @@ If your microservice consumes topics from Kafka or queues from RabbitMQ, mirrord
 
 mirrord is configured either via a CLI or a direct IDE extension. Below is a generic setup using the CLI. The command wraps your local execution (like starting a Node server, Spring app, or Python script) and points to a configuration file that dictates which pod to impersonate and which HTTP headers to filter by.
 
+Representative source: {repo-base}/.vscode/tasks.json#L1185[.vscode/tasks.json#L1185]
+
 [source,bash]
 ----
 # Run your local application within the mirrord context.
@@ -31,6 +42,8 @@ mirrord exec --key your-dev-name \
 ----
 
 To ensure your local workstation processes the requests, the consumer (which could be a frontend application or another API) must attach the defined session header to all asynchronous requests:
+
+Related project configuration: {repo-base}/.mirrord/azure/gateway.mirrord.json#L23[.mirrord/azure/gateway.mirrord.json#L23]
 
 [source,typescript]
 ----

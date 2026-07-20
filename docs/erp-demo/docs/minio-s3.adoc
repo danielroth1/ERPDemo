@@ -2,16 +2,28 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Why object storage belongs beside the database
 
 Object storage solves a different problem from a relational database. PostgreSQL is excellent for structured business data and transactional updates, but it is not the best place to store large binary files such as product images, PDFs, or other uploaded documents. Those assets are better handled by a blob store that is optimized for large objects, simple retrieval, and HTTP-friendly access patterns. In this ERP demo, MinIO fills that role while keeping the API model compatible with S3-style storage.
+
+website::[href="https://min.io/",text="MinIO Documentation"]
+github::[href="https://github.com/minio/minio",text="MinIO on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::MinIO[]
+skill::PostgreSQL[]
+====
 
 That compatibility is useful beyond the project itself. Teams can learn the object-storage pattern locally with MinIO and later move to AWS S3 or another compatible provider with minimal application changes. The architectural lesson is the important part: store metadata and ownership rules in the business database, but store the binary payload itself in object storage.
 
 == Applying the pattern
 
 Backend setup usually starts by configuring an S3-compatible client and wrapping it in an application-facing storage service. That hides bucket names, naming conventions, and error handling behind a domain-specific interface.
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Program.cs#L51[services/inventory/InventoryManagement/Program.cs#L51]
 
 [source,csharp]
 ----
@@ -28,6 +40,8 @@ builder.Services.AddScoped<IProductFileStorage, MinioProductFileStorage>();
 ----
 
 The storage service is where uploads become useful application behavior rather than raw SDK calls.
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Services/MinioFileStorageService.cs#L54[services/inventory/InventoryManagement/Services/MinioFileStorageService.cs#L54]
 
 [source,csharp]
 ----
@@ -47,6 +61,8 @@ public async Task<string> UploadImageAsync(string productId, Stream content, str
 ----
 
 From the frontend, the safest pattern is usually to upload through the backend so authorization, validation, and metadata updates stay in one place.
+
+Representative source: {repo-base}/frontend/src/services/inventory.service.ts#L245[frontend/src/services/inventory.service.ts#L245]
 
 [source,typescript]
 ----

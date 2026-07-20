@@ -7,6 +7,17 @@
 
 Designing a modern distributed system involves making critical decisions about how decoupled services communicate and share data. This architecture uses a polyglot integration pattern—meaning it embraces several distinct communication styles, utilizing each where it naturally fits the system's technical requirements and the frontend's functional needs. By combining HTTP APIs with asynchronous message-oriented middleware and bi-directional streaming protocols, the architecture optimizes resilience, responsiveness, and horizontal scalability across its subdomains.
 
+[highlight,title="Tech Stack",shadow]
+====
+skill::GraphQL[]
+skill::SignalR[]
+skill::Kafka[]
+skill::RabbitMQ[]
+skill::Redis[]
+skill::MinIO[]
+skill::Kubernetes[]
+====
+
 The runtime topology provides the foundation for the entire software ecosystem:
 
 dotgraph::./diagrams/system-architecture.dot[caption="Runtime architecture overview",max-width=980,engine=dot]

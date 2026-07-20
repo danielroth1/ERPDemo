@@ -2,16 +2,32 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Docker Compose as the local infrastructure baseline
 
 Docker Compose is the most approachable way to bootstrap a distributed system on one machine because it turns a set of infrastructure dependencies into a single declarative file. That is valuable in this ERP demo because local development requires much more than one application process. The system depends on PostgreSQL for persistence, Kafka and RabbitMQ for messaging, MinIO for object storage, and several observability components. Asking every developer to install and configure those tools by hand would make onboarding slow and fragile.
+
+website::[href="https://docs.docker.com/compose/",text="Docker Compose Documentation"]
+github::[href="https://github.com/docker/compose",text="Docker Compose on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Docker Compose[]
+skill::Docker[]
+skill::PostgreSQL[]
+skill::Kafka[]
+skill::RabbitMQ[]
+skill::MinIO[]
+====
 
 Compose solves that problem well for local work because it defines containers, networks, ports, environment variables, and startup relationships in one place. It does not behave exactly like Kubernetes, and it should not be treated as a production orchestration platform, but it is still the fastest way to give a team a shared baseline. In practice, many developers use Compose for infrastructure and then run application services with `dotnet watch`, Vite, or Aspire.
 
 == Applying the pattern
 
 A useful Compose setup usually separates shared infrastructure from application services, then injects hostnames and ports into the services through environment variables. A stripped-down example looks like this:
+
+Representative source: {repo-base}/docker-compose.yml#L1[docker-compose.yml#L1]
 
 [source,yaml]
 ----
@@ -49,12 +65,16 @@ services:
 
 Starting the environment is intentionally simple:
 
+Relevant project file: {repo-base}/docker-compose.yml#L1[docker-compose.yml#L1]
+
 [source,bash]
 ----
 docker compose up -d
 ----
 
 From there, application code consumes those values through normal configuration APIs. The frontend usually remains outside the Compose file during active development so it keeps hot reload and a lightweight inner loop.
+
+Representative source: {repo-base}/frontend/src/services/api-base-url.ts#L1[frontend/src/services/api-base-url.ts#L1]
 
 [source,typescript]
 ----

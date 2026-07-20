@@ -2,12 +2,33 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == What this documentation is trying to teach
 
 ERPDemo is a microservice-based ERP sample that is meant to be read as both a concrete project and a technology case study. The system is split into business-focused services such as inventory, sales, financial processing, dashboard analytics, and orchestration rather than being implemented as one large backend. That architectural split is deliberate: it makes the project a useful example of how modern distributed systems combine HTTP APIs, asynchronous messaging, object storage, observability, and frontend composition in one runtime.
 
+github::[href="https://github.com/danielroth1/ERPDemo",text="View Project on GitHub"]
+website::[href="https://www.shopping-now.net/",text="Visit Live Demo"]
+
+++++
+<highlight title="Tech Stack" shadow>
+	<skill>React</skill>
+	<skill>TypeScript</skill>
+	<skill>ASP.NET Core</skill>
+	<skill>PostgreSQL</skill>
+	<skill>Kafka</skill>
+	<skill>RabbitMQ</skill>
+	<skill>MassTransit</skill>
+	<skill>OpenTelemetry</skill>
+	<skill>Kubernetes</skill>
+	<skill>Azure AKS</skill>
+</highlight>
+++++
+
 For readers who are new to these technologies, the most important mindset is to treat the project as a set of cooperating layers rather than as a single web application. The browser talks to the gateway, the gateway routes to internal services, services own their own data, and long-running workflows continue over message brokers after the original HTTP request has completed. Once that mental model is clear, the individual chapters become much easier to understand.
+
+When a chapter shows a code or script example taken from the repository, it links back to the corresponding GitHub file and starting line so you can inspect the live implementation beside the explanation.
 
 highlight::[title="Reality check",text="The current codebase uses PostgreSQL, EF Core, Kafka, RabbitMQ, MinIO, Redis, OpenTelemetry, and .NET Aspire. Older repository summaries that describe a different stack are historical and should not be treated as the current implementation.",shadow]
 

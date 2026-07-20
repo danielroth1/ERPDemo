@@ -2,16 +2,33 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == The frontend as the user's single entry point
 
-The frontend is a skill:React[] and skill:TypeScript[] single-page application built with Vite. From the user's perspective it behaves like one application, but internally it coordinates several backend capabilities exposed through the gateway and service-specific APIs. That distinction is important because the frontend is where the architectural choices of the entire system become visible: REST is used for straightforward commands, GraphQL powers flexible read models, and real-time channels update the UI when background work completes.
+The frontend is a React and TypeScript single-page application built with Vite. From the user's perspective it behaves like one application, but internally it coordinates several backend capabilities exposed through the gateway and service-specific APIs. That distinction is important because the frontend is where the architectural choices of the entire system become visible: GraphQL powers flexible read models, REST is used for straightforward commands, and SignalR updates the UI when background work completes.
+
+website::[href="https://react.dev/",text="React Documentation"]
+website::[href="https://vite.dev/",text="Vite Documentation"]
+website::[href="https://www.apollographql.com/docs/react/",text="Apollo Client Documentation"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::React[]
+skill::TypeScript[]
+skill::Vite[]
+skill::GraphQL[]
+skill::Apollo Client[]
+skill::SignalR[]
+====
 
 The browser is intentionally kept away from internal infrastructure. It never connects directly to PostgreSQL, Kafka, RabbitMQ, or MinIO. Those systems remain behind backend APIs so the application can enforce authorization, validation, workflow rules, and data ownership in one place. That is the safest and most portable pattern for distributed web applications.
 
 == Applying the frontend pattern
 
 The application usually starts by composing the major client-side providers: routing, GraphQL, authentication, and global state or context. A simplified initialization looks like this:
+
+Representative sources: {repo-base}/frontend/src/main.tsx#L6[frontend/src/main.tsx#L6] and {repo-base}/frontend/src/services/apollo.client.ts#L87[frontend/src/services/apollo.client.ts#L87]
 
 [source,tsx]
 ----
@@ -35,6 +52,8 @@ createRoot(document.getElementById('root')!).render(
 
 Feature code then chooses the right backend integration style for the job. A typical screen might load a read model through GraphQL, execute a mutation or CRUD action through REST, and listen for background updates through SignalR.
 
+Representative sources: {repo-base}/frontend/src/features/inventory/InventoryPage.tsx#L12[frontend/src/features/inventory/InventoryPage.tsx#L12] and {repo-base}/frontend/src/services/inventory-api.client.ts#L33[frontend/src/services/inventory-api.client.ts#L33]
+
 [source,tsx]
 ----
 export function InventoryPage() {
@@ -56,6 +75,8 @@ export function InventoryPage() {
 ----
 
 For real-time experiences such as dashboards, the browser connects to a SignalR hub or GraphQL subscription endpoint after authentication so updates arrive without constant polling.
+
+Representative source: {repo-base}/frontend/src/services/signalr.service.ts#L17[frontend/src/services/signalr.service.ts#L17]
 
 [source,typescript]
 ----

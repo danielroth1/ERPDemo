@@ -2,16 +2,29 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Why GraphQL exists alongside REST
 
 GraphQL is useful when the client needs flexible read models rather than rigid endpoint-specific response shapes. In a system like this ERP demo, some screens are simple enough for REST, but others need nested data, optional fields, filtered collections, paging, and live updates without forcing the backend to create a dedicated endpoint for every UI variation. GraphQL addresses that by letting the client describe the data shape it wants while the server controls how that data is resolved.
+
+website::[href="https://graphql.org/",text="GraphQL Documentation"]
+website::[href="https://www.apollographql.com/docs/react/",text="Apollo Client Documentation"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::GraphQL[]
+skill::Apollo Client[]
+skill::React[]
+====
 
 That does not make GraphQL a universal replacement for REST. In this architecture it is primarily a read-side tool. The most successful GraphQL usage in real projects usually appears where the frontend benefits from flexible composition and where the server team is willing to invest in projection, batching, and query-governance discipline. This repository follows that pattern in inventory, sales, and dashboard scenarios.
 
 == Applying GraphQL in code
 
 On the server, a useful setup combines the GraphQL schema, EF Core projections, filtering, and DataLoader-based batching. That prevents the API from becoming flexible but inefficient.
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Program.cs#L70[services/inventory/InventoryManagement/Program.cs#L70]
 
 [source,csharp]
 ----
@@ -37,6 +50,8 @@ public sealed class ProductQueries
 
 When nested data is involved, a DataLoader batches lookups so the resolver layer does not create one database query per row.
 
+Representative source: {repo-base}/services/inventory/InventoryManagement/GraphQL/DataLoaders/ProductDocumentsByProductIdDataLoader.cs#L12[services/inventory/InventoryManagement/GraphQL/DataLoaders/ProductDocumentsByProductIdDataLoader.cs#L12]
+
 [source,csharp]
 ----
 public sealed class ProductDocumentsByProductIdDataLoader
@@ -60,6 +75,8 @@ public sealed class ProductDocumentsByProductIdDataLoader
 ----
 
 On the client, GraphQL is typically initialized through Apollo Client or another GraphQL client, then used with strongly named operations.
+
+Representative source: {repo-base}/frontend/src/services/apollo.client.ts#L87[frontend/src/services/apollo.client.ts#L87]
 
 [source,typescript]
 ----

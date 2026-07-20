@@ -1,0 +1,53 @@
+// Cross-signal correlation navigation in Grafana.
+// Shows how an operator moves from a metrics alert to correlated logs and then to a trace.
+
+digraph observability_correlation {
+  rankdir=LR;
+  graph [nodesep=0.65, ranksep=1.1, pad=0.4, splines=polyline, fontname="sans-serif",
+         label="Cross-Signal Correlation in Grafana", labelloc=t, fontsize=12];
+  node [shape=box, style="rounded,filled", fontsize=10, fontname="sans-serif"];
+  edge [fontsize=9,  fontname="sans-serif", penwidth=1.3];
+
+  // ── Grafana UI panels / views ─────────────────────────────────────────────
+  overview [
+    label="Overview Dashboard\n(erp-overview.json)\nRequest rate · Error rate · p99 Latency\nService health · RPS per endpoint\n─ datasource: Prometheus ─",
+    fillcolor="#bbdefb"
+  ];
+  logs_view [
+    label="Logs Dashboard\n(erp-logs.json)\nStructured log stream\nError / Warning filter\nService label filter\n─ datasource: Loki ─",
+    fillcolor="#c8e6c9"
+  ];
+  traces_view [
+    label="Traces Dashboard\n(erp-traces.json)\nTrace search by service / duration\nDuration histogram\nRecent traces\n─ datasource: Tempo ─",
+    fillcolor="#ffe0b2"
+  ];
+  trace_detail [
+    label="Trace Detail View\nSpan waterfall\nSpan tags: product.id, stock.quantity …\nParent-child service hierarchy",
+    fillcolor="#fff9c4"
+  ];
+  svc_map [
+    label="Service Map\ninter-service request topology\nEdge: request rate + error rate\n─ Tempo → Prometheus (service-graphs) ─",
+    fillcolor="#e1bee7"
+  ];
+
+  // ── Navigation links ──────────────────────────────────────────────────────
+  overview    -> logs_view    [label="  Explore logs for service\n  (split panel → Loki filter)  ",
+                               color="#2e7d32", fontcolor="#2e7d32"];
+  overview    -> svc_map      [label="  Node graph panel\n  (built-in Grafana widget)  ",
+                               color="#6a1b9a", fontcolor="#6a1b9a"];
+  overview    -> traces_view  [label="  Explore traces\n  (tempo datasource link)  ",
+                               color="#e65100", fontcolor="#e65100", style=dashed];
+
+  logs_view   -> trace_detail [label="  Click TraceID link\n  (derived field: regex match on log line\n   → Tempo datasource)  ",
+                               color="#e65100", fontcolor="#e65100"];
+  traces_view -> trace_detail [label="  Select trace from\n  search results  ",
+                               color="#e65100", fontcolor="#e65100"];
+
+  trace_detail -> logs_view   [label="  tracesToLogs:\n  open correlated logs\n  (filter by TraceID)  ",
+                               color="#2e7d32", fontcolor="#2e7d32", style=dashed];
+  trace_detail -> overview    [label="  tracesToMetrics:\n  open service metrics\n  (Prometheus datasource)  ",
+                               color="#1565c0", fontcolor="#1565c0", style=dashed];
+
+  svc_map     -> traces_view  [label="  Click edge between services\n  → trace search for that pair  ",
+                               color="#e65100", fontcolor="#e65100"];
+}

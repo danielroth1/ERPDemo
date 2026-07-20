@@ -2,10 +2,19 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Why distributed systems need several test layers
 
 A distributed system cannot be tested well with one technique alone. Unit tests are fast and precise, but they do not prove that ASP.NET Core, EF Core, message brokers, and the frontend are wired together correctly. End-to-end tests are realistic, but they are slower and more brittle. The right strategy is therefore layered: use the cheapest test that can answer the question, and only move to a heavier layer when the lower one cannot prove the behavior.
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::React[]
+skill::ASP.NET Core[]
+skill::EF Core[]
+skill::MassTransit[]
+====
 
 That principle matters even more in this ERP demo because the system spans synchronous APIs, asynchronous messaging, databases, and browser behavior. A saga transition, a React loading state, a database migration, and a full purchase journey are not the same testing problem. Treating them as if they were leads either to over-mocked tests that prove too little or to expensive system tests that teams stop running regularly.
 
@@ -14,6 +23,8 @@ That principle matters even more in this ERP demo because the system spans synch
 The repository uses four complementary layers, each answering a different risk.
 
 Unit tests:: Use these for focused business rules, pure services, and saga transitions. They should be fast and narrow.
+
+Representative source: {repo-base}/services/orchestration/Orchestration.Tests/Sagas/PurchaseStateMachineTests.cs#L46[services/orchestration/Orchestration.Tests/Sagas/PurchaseStateMachineTests.cs#L46]
 
 [source,csharp]
 ----
@@ -30,6 +41,8 @@ await _harness.Bus.Publish(new SubmitPurchase
 
 Component tests:: Use these for React screens and UI state transitions with mocked dependencies.
 
+Representative sources: {repo-base}/frontend/src/features/inventory/InventoryPage.test.tsx#L69[frontend/src/features/inventory/InventoryPage.test.tsx#L69] and {repo-base}/frontend/src/test/test-utils.tsx#L68[frontend/src/test/test-utils.tsx#L68]
+
 [source,typescript]
 ----
 vi.mock('../../services/inventory.service', () => ({
@@ -43,6 +56,8 @@ expect(screen.getByText('Keyboard')).toBeInTheDocument();
 ----
 
 Integration tests:: Use these when the real application host, database wiring, or messaging infrastructure integration must be validated.
+
+Representative source: {repo-base}/services/inventory/InventoryManagement.IntegrationTests/Fixtures/InventoryIntegrationFixture.cs#L47[services/inventory/InventoryManagement.IntegrationTests/Fixtures/InventoryIntegrationFixture.cs#L47]
 
 [source,csharp]
 ----
@@ -61,6 +76,8 @@ var factory = new WebApplicationFactory<Program>()
 ----
 
 System tests:: Use these for end-user flows in a real browser with Playwright or a similar tool.
+
+Representative source: {repo-base}/tests/e2e/playwright.config.ts#L3[tests/e2e/playwright.config.ts#L3]
 
 [source,typescript]
 ----

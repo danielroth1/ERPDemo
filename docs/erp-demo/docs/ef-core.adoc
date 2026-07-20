@@ -2,16 +2,29 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Entity Framework Core in a service-oriented system
 
 Entity Framework Core is the main data-access technology used by the backend services. It maps domain classes to relational tables, tracks changes, executes migrations, and translates LINQ expressions into SQL. In a microservice architecture, that is useful because each service can keep its own persistence model close to its domain logic instead of writing hand-crafted data access code for every query and command.
+
+website::[href="https://learn.microsoft.com/ef/core/",text="EF Core Documentation"]
+github::[href="https://github.com/dotnet/efcore",text="EF Core on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::EF Core[]
+skill::C#[]
+skill::PostgreSQL[]
+====
 
 That convenience comes with an important architectural rule: EF Core should reinforce service boundaries, not bypass them. In this project, each service owns its own `DbContext`, migrations, and schema. That keeps data ownership local. The frontend never touches EF Core directly, and other services should not couple themselves to another service's tables. Once that separation is respected, EF Core becomes a productive way to model aggregates, execute transactions, and evolve schemas through code.
 
 == Applying EF Core in code
 
 The usual setup starts by registering a service-specific `DbContext`, choosing the database provider, and applying conventions such as snake_case naming. The example below captures the same pattern used throughout the ERP demo:
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Program.cs#L60[services/inventory/InventoryManagement/Program.cs#L60]
 
 [source,csharp]
 ----
@@ -29,6 +42,8 @@ using (var scope = app.Services.CreateScope())
 ----
 
 Inside the `DbContext`, entity configuration expresses the relational model explicitly so that the database shape stays intentional and readable.
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Infrastructure/AppDbContext.cs#L21[services/inventory/InventoryManagement/Infrastructure/AppDbContext.cs#L21]
 
 [source,csharp]
 ----
@@ -51,6 +66,8 @@ public sealed class InventoryDbContext : DbContext
 ----
 
 Usage then becomes ordinary application code. A domain service can query, mutate, and save changes through the `DbContext` without leaking SQL details into controllers.
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Services/ProductService.cs#L66[services/inventory/InventoryManagement/Services/ProductService.cs#L66]
 
 [source,csharp]
 ----

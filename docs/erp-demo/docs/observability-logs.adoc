@@ -1,0 +1,231 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
+
+== What logs capture
+
+Logs are discrete, timestamped records of things that happened inside a service. In this project they answer questions like: which user triggered a particular action, what was the exception message when a database call failed, and what was the exact sequence of steps the orchestration saga executed. The stack uses skill:Serilog[] to emit structured JSON logs and ships them to skill:Loki[] via Grafana Alloy so they are searchable by service, severity, TraceID, and any structured field.
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Serilog[]
+skill::Loki[]
+skill::Grafana[]
+====
+
+== Serilog configuration
+
+Every service adds Serilog via `builder.Host.UseSerilog()`. The logger is built from configuration (appsettings.json) plus an OTLP sink that activates when the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable is set.
+
+[source,json]
+----
+// appsettings.json — shared across all services
+{
+  "Serilog": {
+    "MinimumLevel": {
+      "Default": "Information",
+      "Override": {
+        "Microsoft": "Warning",
+        "Microsoft.Hosting.Lifetime": "Information",
+        "System": "Warning"
+      }
+    },
+    "WriteTo": [
+      {
+        "Name": "Console",
+        "Args": {
+          "formatter": "Serilog.Formatting.Compact.CompactJsonFormatter, Serilog.Formatting.Compact"
+        }
+      }
+    ],
+    "Enrich": ["FromLogContext", "WithMachineName", "WithThreadId"]
+  }
+}
+----
+
+`CompactJsonFormatter` emits compact single-line JSON. This is important because Alloy and Loki parse the log output as JSON and can index the individual fields (e.g., `RenderedMessage`, `Level`, `TraceId`).
+
+[source,csharp]
+----
+// Program.cs — pattern used in every service
+var loggerConfig = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .WriteTo.Console(new CompactJsonFormatter());
+
+// Conditionally attach OTLP sink for dev-infra / Docker mode
+if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("OTEL_EXPORTER_OTLP_ENDPOINT")))
+{
+    loggerConfig = loggerConfig.WriteTo.OpenTelemetry();
+}
+
+Log.Logger = loggerConfig.CreateLogger();
+builder.Host.UseSerilog();
+----
+
+In addition to the OTLP sink, `ServiceDefaults.ConfigureOpenTelemetry` wires the OpenTelemetry logging bridge so that `ILogger<T>` calls also flow into the OTLP pipeline:
+
+[source,csharp]
+----
+builder.Logging.AddOpenTelemetry(logging =>
+{
+    logging.IncludeFormattedMessage = true;
+    logging.IncludeScopes = true;
+});
+----
+
+== Grafana Alloy — Docker container log discovery
+
+Alloy is the telemetry collector that ships log data to Loki. In Docker Compose mode it mounts the Docker socket read-only and automatically discovers all running containers. No log driver changes are required on any container.
+
+Source: {repo-base}/infrastructure/monitoring/alloy/config.alloy[infrastructure/monitoring/alloy/config.alloy]
+
+[source,hcl]
+----
+// Discover all running Docker containers
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Relabel: extract container name, compose service name, and image
+discovery.relabel "docker_labels" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/?(.*)"
+    target_label  = "container"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_service"]
+    target_label  = "service"
+  }
+
+  rule {
+    source_labels = ["__meta_docker_container_image_name"]
+    target_label  = "image"
+  }
+}
+
+// Tail container stdout/stderr and attach the relabelled labels
+loki.source.docker "docker_logs" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.docker_labels.output
+  forward_to = [loki.write.local.receiver]
+  relabel_rules = discovery.relabel.docker_labels.rules
+}
+
+// Push to Loki
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+----
+
+The resulting Loki stream labels per log line are:
+
+[cols="1,2",options="header"]
+|===
+| Label | Example value
+
+| `container` | `erp-dev-inventory`
+| `service`   | `inventory`
+| `image`     | `erp-demo/inventory:latest`
+|===
+
+These labels can be used directly in Grafana LogQL queries, e.g.: `{service="inventory"} |= "error"`.
+
+== Grafana Alloy — OTLP relay for host-running services
+
+When services run locally with `dotnet watch` (not in Docker), they send OTLP data to Alloy on port `4319`. Alloy splits the payload: logs go to Loki and traces go to Tempo.
+
+[source,hcl]
+----
+// OTLP receiver — host services point OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4319
+otelcol.receiver.otlp "host_services" {
+  grpc {
+    endpoint = "0.0.0.0:4319"
+  }
+
+  output {
+    logs   = [otelcol.exporter.loki.default.input]
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.loki "default" {
+  forward_to = [loki.write.local.receiver]
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}
+----
+
+This means the log pipeline works identically whether services run in Docker or on the host — the storage backend (Loki) and the Grafana dashboards remain unchanged.
+
+== Loki configuration
+
+Loki uses the TSDB storage schema (v13) backed by the local filesystem. Retention is set to 7 days (168 hours) with a compactor running every 10 minutes.
+
+Source: {repo-base}/infrastructure/logging/loki-config.yml[infrastructure/logging/loki-config.yml]
+
+[source,yaml]
+----
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  retention_period: 168h        # 7 days
+  ingestion_rate_mb: 16
+  ingestion_burst_size_mb: 32
+  max_entries_limit_per_query: 50000
+
+compactor:
+  compaction_interval: 10m
+  retention_enabled: true
+  retention_delete_delay: 2h
+----
+
+NOTE: `auth_enabled: false` is appropriate for local development. In production (K8s with Ingress), Loki should sit behind the cluster network and not be exposed externally.
+
+== Querying logs in Grafana
+
+Open http://localhost:3001 and navigate to *Explore* → datasource *Loki*. Example LogQL queries:
+
+[source,logql]
+----
+# All logs from the sales service
+{service="sales"}
+
+# Errors and warnings across all services
+{service=~".+"} |= "error" or `level`="Warning"
+
+# Logs for a specific trace
+{service="inventory"} | json | TraceId = "4bf92f3577b34da6a3ce929d0e0e4736"
+
+# Structured field filter on HTTP status
+{service="gateway"} | json | StatusCode >= 500
+----
+
+The *erp-logs* pre-built dashboard pre-configures these filters as panel variables so operators can select service and log level from dropdowns without writing LogQL manually.

@@ -2,16 +2,28 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Why a private k3s cluster is useful
 
 k3s is a lightweight Kubernetes distribution that keeps the Kubernetes programming model while reducing operational overhead. That makes it a strong option for teams that want a production-like cluster but do not want the cost or platform dependency of a managed cloud offering. In the context of this ERP demo, the private k3s path demonstrates an important architectural lesson: the application should be portable enough to run on both managed and self-hosted clusters without redesigning the services themselves.
+
+website::[href="https://k3s.io/",text="k3s Documentation"]
+github::[href="https://github.com/k3s-io/k3s",text="k3s on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Kubernetes[]
+skill::Docker[]
+====
 
 Running on k3s also makes the operational boundaries clearer. The team gets full control over ingress, storage, image pulling, secret handling, and upgrades. That freedom is useful for learning and for self-hosted environments, but it also means the team becomes responsible for tasks that Azure or another managed provider would otherwise absorb.
 
 == Applying the pattern
 
 The essential setup is the same as any Kubernetes deployment: install the cluster, make images available through a registry, and expose public traffic through an ingress controller such as Traefik. A representative service manifest looks like this:
+
+Representative sources: {repo-base}/infrastructure/k8s/base/api-gateway.yaml#L1[infrastructure/k8s/base/api-gateway.yaml#L1] and {repo-base}/infrastructure/k8s/production/ingress.yaml#L25[infrastructure/k8s/production/ingress.yaml#L25]
 
 [source,yaml]
 ----

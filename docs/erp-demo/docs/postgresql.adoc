@@ -2,16 +2,27 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == PostgreSQL as the durable system of record
 
 PostgreSQL is the primary relational database used across the system. It stores transactional business data, read-model data, and saga state. That choice is significant because the ERP domain is full of entities that benefit from relational guarantees: products, users, budgets, stock movements, financial transactions, and workflow state all require consistency, indexing, and a well-understood query model.
+
+website::[href="https://www.postgresql.org/",text="PostgreSQL Documentation"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::PostgreSQL[]
+skill::EF Core[]
+====
 
 In a microservice architecture, the key principle is not simply "use PostgreSQL". The more important rule is "each service owns its own schema or database". This repository follows that pattern by letting each service manage its own logical database and migrations. That preserves service autonomy and reduces the temptation to solve cross-service needs with direct SQL joins between unrelated domains.
 
 == Applying the pattern
 
 At the infrastructure level, PostgreSQL can host several logical databases while still being one shared server in development. That keeps local setup simple without abandoning data ownership.
+
+Representative source: {repo-base}/docker-compose.yml#L1[docker-compose.yml#L1]
 
 [source,yaml]
 ----
@@ -28,6 +39,8 @@ services:
 
 Application code should then read a service-specific connection string and use migrations to keep the schema in sync.
 
+Representative source: {repo-base}/services/financial/FinancialManagement/Program.cs#L55[services/financial/FinancialManagement/Program.cs#L55]
+
 [source,csharp]
 ----
 var connectionString = builder.Configuration.GetConnectionString("financial-db")
@@ -38,6 +51,8 @@ builder.Services.AddDbContext<FinancialDbContext>(options =>
 ----
 
 When database design becomes explicit, teams can also explain their model clearly. A table definition for a financial transaction might look like this:
+
+Representative source: {repo-base}/services/financial/FinancialManagement/Infrastructure/AppDbContext.cs#L20[services/financial/FinancialManagement/Infrastructure/AppDbContext.cs#L20]
 
 [source,sql]
 ----

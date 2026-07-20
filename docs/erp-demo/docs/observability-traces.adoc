@@ -1,0 +1,273 @@
+:toc: left
+:toclevels: 3
+:sectnums:
+:icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
+
+== What traces capture
+
+A distributed trace is a directed acyclic graph of spans. Each span represents a unit of work — an HTTP request handled by a service, a database query, a message published to Kafka — with a start time, duration, service name, and a set of key-value tags. Together the spans form a timeline that shows exactly how one business action propagated across service boundaries and where time was spent.
+
+Traces answer questions that metrics and logs cannot: why did *this specific request* to the sales service take 800 ms when the median is 40 ms, and which downstream call was responsible?
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::OpenTelemetry[]
+skill::Tempo[]
+skill::Grafana[]
+====
+
+== ServiceDefaults tracing setup
+
+All services call `builder.AddServiceDefaults()` from the shared library. Tracing is configured centrally so each service automatically gets instrumentation for inbound HTTP requests, outbound HTTP calls, and MassTransit message operations.
+
+Source: {repo-base}/services/shared/ServiceDefaults/Extensions.cs[services/shared/ServiceDefaults/Extensions.cs]
+
+[source,csharp]
+----
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracing =>
+    {
+        tracing
+            .AddAspNetCoreInstrumentation()   // every incoming HTTP request becomes a span
+            .AddHttpClientInstrumentation()   // every HttpClient call becomes a child span
+            .AddSource("MassTransit");        // MassTransit publish/consume spans
+    });
+----
+
+The OTLP exporter is activated by the `OTEL_EXPORTER_OTLP_ENDPOINT` environment variable. When the variable is present, `UseOtlpExporter()` is called and all traces, metrics, and logs are shipped to the configured endpoint in a single OTLP connection.
+
+[source,csharp]
+----
+private static IHostApplicationBuilder AddOpenTelemetryExporters(this IHostApplicationBuilder builder)
+{
+    var useOtlpExporter = !string.IsNullOrWhiteSpace(
+        builder.Configuration["OTEL_EXPORTER_OTLP_ENDPOINT"]);
+
+    if (useOtlpExporter)
+    {
+        builder.Services.AddOpenTelemetry().UseOtlpExporter();
+    }
+
+    return builder;
+}
+----
+
+== Custom ActivitySource — business-level spans
+
+Automatic instrumentation covers framework boundaries. For business operations that span a database call and a domain-model state change, a custom `System.Diagnostics.ActivitySource` is used to create spans with domain-specific tags.
+
+The following pattern is taken from the Inventory service stock reservation flow. The source name `"InventoryService"` must be registered in `AddSource(...)` above.
+
+[source,csharp]
+----
+// The ActivitySource is a static field — one instance per service, reused across calls
+private static readonly ActivitySource ActivitySource = new("InventoryService");
+
+public async Task ReserveStockAsync(
+    string productId, int quantity, CancellationToken cancellationToken)
+{
+    // StartActivity creates a child span of whatever is currently active.
+    // The using block ends the span when the operation completes or throws.
+    using var activity = ActivitySource.StartActivity("ReserveStock");
+
+    // Tags become searchable attributes in Tempo / TraceQL
+    activity?.SetTag("product.id", productId);
+    activity?.SetTag("stock.quantity", quantity);
+
+    var product = await _dbContext.Products
+        .SingleAsync(x => x.Id == productId, cancellationToken);
+
+    product.Reserve(quantity);
+    await _dbContext.SaveChangesAsync(cancellationToken);
+}
+----
+
+Tags like `product.id` and `stock.quantity` are indexed in Tempo and can be searched with TraceQL:
+
+[source,traceql]
+----
+# Find all ReserveStock spans for a specific product
+{ name = "ReserveStock" && span.product.id = "PROD-42" }
+
+# Find slow ReserveStock operations
+{ name = "ReserveStock" } | duration > 200ms
+----
+
+== MassTransit spans
+
+MassTransit integrates natively with OpenTelemetry. Adding `.AddSource("MassTransit")` causes every `Publish`, `Send`, `Consume`, and saga state-machine transition to emit a span. The TraceID propagates through the message headers, so a trace that begins with an HTTP request to the gateway continues seamlessly into the Kafka or RabbitMQ consumer that processes the resulting command — forming a single end-to-end trace across the message boundary.
+
+== Tempo configuration
+
+Tempo accepts OTLP traces over gRPC (port 4317) and HTTP (port 4318). Traces are stored locally in a WAL + block format with a 48-hour block retention. The `metrics_generator` derives additional Prometheus metrics from the ingested spans.
+
+Source: {repo-base}/infrastructure/monitoring/tempo/tempo.yaml[infrastructure/monitoring/tempo/tempo.yaml]
+
+[source,yaml]
+----
+stream_over_http_enabled: true
+
+server:
+  http_listen_port: 3200
+  log_level: info
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: "0.0.0.0:4317"
+        http:
+          endpoint: "0.0.0.0:4318"
+
+ingester:
+  max_block_duration: 5m     # flush WAL to block every 5 minutes
+
+compactor:
+  compaction:
+    block_retention: 48h     # keep blocks for 48 hours
+
+storage:
+  trace:
+    backend: local
+    wal:
+      path: /var/tempo/wal
+    local:
+      path: /var/tempo/blocks
+
+metrics_generator:
+  registry:
+    external_labels:
+      source: tempo
+      cluster: docker-compose
+  storage:
+    path: /var/tempo/generator/wal
+    remote_write:
+      - url: http://prometheus:9090/api/v1/write
+        send_exemplars: true   # attach TraceID to Prometheus data points
+
+overrides:
+  defaults:
+    metrics_generator:
+      processors: [service-graphs, span-metrics]
+----
+
+`send_exemplars: true` means Prometheus data points include a reference to the trace that generated them. In Grafana this shows as a diamond marker on metric panels. Clicking the diamond opens the corresponding trace in Tempo.
+
+== Grafana datasource configuration and cross-signal correlation
+
+Grafana is provisioned with three datasources and correlation links so operators can navigate between metrics, logs, and traces without manually copying IDs.
+
+Source: {repo-base}/infrastructure/monitoring/grafana/provisioning/datasources/datasources.yaml[infrastructure/monitoring/grafana/provisioning/datasources/datasources.yaml]
+
+[source,yaml]
+----
+datasources:
+  - name: Prometheus
+    type: prometheus
+    uid: prometheus
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: "15s"
+
+  - name: Loki
+    type: loki
+    uid: loki
+    url: http://loki:3100
+    jsonData:
+      maxLines: 5000
+      derivedFields:
+        # Compact JSON logs: "TraceId":"<32 hex chars>"
+        - datasourceUid: tempo
+          matcherRegex: '"TraceId"\s*:\s*"([0-9a-fA-F]{32})"'
+          name: TraceID
+          url: "$${__value.raw}"
+        # Serilog text logs: traceId=<32 hex chars>
+        - datasourceUid: tempo
+          matcherRegex: "traceId=([0-9a-fA-F]{32})"
+          name: TraceID
+          url: "$${__value.raw}"
+
+  - name: Tempo
+    type: tempo
+    uid: tempo
+    url: http://tempo:3200
+    jsonData:
+      httpMethod: GET
+      tracesToLogs:
+        datasourceUid: loki
+        filterByTraceID: true
+      tracesToMetrics:
+        datasourceUid: prometheus
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+      lokiSearch:
+        datasourceUid: loki
+----
+
+What these settings enable:
+
+[cols="1,2",options="header"]
+|===
+| Setting | Effect in Grafana UI
+
+| `derivedFields` on Loki
+| Every log line containing a `TraceId` field gets a clickable *TraceID* link that opens the trace in Tempo.
+
+| `tracesToLogs` on Tempo
+| The trace detail view shows a *Logs* button that opens a Loki query filtered by TraceID.
+
+| `tracesToMetrics` on Tempo
+| The trace detail view shows a *Metrics* button that opens a Prometheus query for the originating service.
+
+| `serviceMap`
+| Enables the node-graph panel showing inter-service request topology and error rates (powered by Tempo's `service-graphs` processor).
+
+| `nodeGraph`
+| Enables the visual graph view in the Tempo trace panel.
+|===
+
+== Pre-provisioned Grafana dashboards
+
+Three dashboards are automatically available after starting Grafana. They are provisioned from JSON files in `infrastructure/monitoring/grafana/dashboards/` and do not need to be imported manually.
+
+=== erp-overview (Metrics)
+
+Panels: request rate (RPS) per service, HTTP error rate (5xx / total), p99 response-time latency per service, active HTTP connections, service-health summary, and a node-graph panel showing inter-service topology (from Tempo's service-graph metrics). All panels are Prometheus queries.
+
+=== erp-logs (Logs)
+
+Panels: live log stream with selectable service and log-level variables, error-rate trend (count of `level="Error"` log lines over time), and a structured log table with expandable rows. All panels are Loki LogQL queries. TraceID links in log lines point to the *Traces* dashboard.
+
+=== erp-traces (Traces)
+
+Panels: trace search (by service name and minimum duration), duration distribution histogram, and a recent-traces table. Selecting a row opens the full span waterfall in the Tempo trace viewer.
+
+== Cross-signal correlation diagram
+
+The diagram below shows the navigation paths an operator uses to move between the three signal types inside Grafana, from a metric alert all the way to a specific trace span.
+
+dotgraph::./diagrams/observability-correlation.dot[caption="Cross-signal navigation in Grafana",max-width=900]
+
+== Querying traces in Grafana
+
+Open http://localhost:3001 → *Explore* → datasource *Tempo*. Example TraceQL queries:
+
+[source,traceql]
+----
+# All traces from the inventory service
+{ .service.name = "inventory" }
+
+# Slow traces (over 500 ms end-to-end)
+{ .service.name = "sales" } | duration > 500ms
+
+# Traces containing a ReserveStock span with a specific product
+{ name = "ReserveStock" && span.product.id = "PROD-42" }
+
+# Traces that contain an error span
+{ status = error }
+----

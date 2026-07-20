@@ -1,6 +1,10 @@
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
+
 == Start and stop the cluster without redeploying
 
 The environment can be paused when it is idle and resumed later without rebuilding images or redeploying manifests. That makes Azure more affordable for a demo environment that is not needed 24 hours a day.
+
+Relevant scripts for the bash examples on this page: {repo-base}/scripts/aks-stop.sh#L1[scripts/aks-stop.sh#L1] and {repo-base}/scripts/aks-start.sh#L1[scripts/aks-start.sh#L1]
 
 IMPORTANT: Run `az login` before using the start or stop scripts. They call Azure CLI directly, so a reboot or expired session requires another login.
 
@@ -67,7 +71,7 @@ You need a new deployment only when one of these changed:
 * the manifests or runtime configuration,
 * the Azure resources or secrets that the workloads depend on.
 
-If none of those changed, `aks-start.sh` is enough.
+If none of those changed, {repo-base}/scripts/aks-start.sh#L1[scripts/aks-start.sh#L1] is enough.
 
 === Where Azure Portal becomes useful
 

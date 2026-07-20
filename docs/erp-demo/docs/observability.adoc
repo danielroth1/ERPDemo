@@ -2,68 +2,126 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
-== Observability as a runtime design concern
+== Overview
 
 Observability is the ability to understand what the system is doing while it is running, especially when the answer is not obvious from one log line or one failed request. In a distributed architecture like this ERP demo, that matters far more than in a monolith because a single business action can cross the gateway, several backend services, two message brokers, and multiple databases before it completes. Metrics tell you *that* something is wrong, logs help explain *what* happened, and traces reveal *where* time was spent across service boundaries.
 
-The stack used here follows the common three-signal model. OpenTelemetry instrumentation emits telemetry from the services, Prometheus stores metrics, Loki stores logs, Tempo stores traces, and Grafana ties the information together. The important lesson is not the brand names themselves; it is the correlation model. A healthy observability setup lets an operator move from an elevated error rate, to the affected logs, to the trace that shows which downstream dependency actually failed.
+website::[href="https://opentelemetry.io/docs/",text="OpenTelemetry Documentation"]
+website::[href="https://grafana.com/docs/",text="Grafana Stack Documentation"]
 
-== Applying the pattern
+[highlight,title="Tech Stack",shadow]
+====
+skill::OpenTelemetry[]
+skill::Prometheus[]
+skill::Grafana[]
+skill::Loki[]
+skill::Tempo[]
+skill::MassTransit[]
+====
 
-Good observability starts in application code. Services should register standard HTTP instrumentation, client instrumentation, and any custom activity sources that represent business or messaging behavior.
+The stack used here follows the common three-signal model. OpenTelemetry instrumentation emits telemetry from the services, Prometheus stores metrics, Loki stores logs, Tempo stores traces, and Grafana ties all three together. The important lesson is not the brand names themselves; it is the correlation model. A healthy observability setup lets an operator move from an elevated error rate, to the affected logs, to the trace that shows which downstream dependency actually failed.
 
-[source,csharp]
+== Stack Components
+
+[cols="1,1,2,1",options="header"]
+|===
+| Component | Image | Role | Port(s)
+
+| skill:Prometheus[]
+| `prom/prometheus:v2.48.0`
+| Scrapes `/metrics` from all services every 15 s. Also receives remote-write from Tempo's metrics generator.
+| 9090
+
+| skill:Grafana[]
+| `grafana/grafana:10.2.0`
+| Unified dashboards, three pre-provisioned datasources (Prometheus, Loki, Tempo), three pre-built dashboards. Enables cross-signal navigation.
+| 3001 (local)
+
+| skill:Loki[]
+| `grafana/loki:3.4.1`
+| Log aggregation backend. 7-day retention. Receives logs from Grafana Alloy.
+| 3100
+
+| skill:Tempo[]
+| `grafana/tempo:2.3.1`
+| Distributed trace storage. Accepts OTLP over gRPC and HTTP. Generates derived span-metrics and service-graph metrics into Prometheus.
+| 3200 (HTTP) · 4317 (gRPC) · 4318 (HTTP OTLP)
+
+| Grafana Alloy
+| `grafana/alloy:latest`
+| Telemetry collector. Discovers Docker container logs via the socket and ships them to Loki. Receives OTLP from host-running services and relays logs to Loki and traces to Tempo.
+| 4319 (OTLP gRPC) · 12345 (UI)
+|===
+
+== Data Flow
+
+The diagram below shows all three signal paths: metric scraping by Prometheus (blue), log shipping via Alloy (green), and trace collection into Tempo (orange). Tempo derives additional metrics from spans and remote-writes them back to Prometheus. Grafana queries all three backends and exposes cross-datasource navigation links.
+
+dotgraph::./diagrams/observability-data-flow.dot[caption="Observability data-flow",max-width=900]
+
+The detailed sub-pages document each signal path with configuration examples:
+
+* xref:observability-metrics[] — Prometheus scrape config, `/metrics` endpoint, Kafka JMX exporter, span-metrics
+* xref:observability-logs[] — Serilog setup, Alloy Docker discovery, Alloy OTLP relay, Loki config
+* xref:observability-traces[] — OpenTelemetry tracing, custom `ActivitySource`, Tempo config, Grafana correlation
+
+== Development Environments
+
+The project ships two Docker Compose files that represent different local development modes.
+
+[cols="1,2,2",options="header"]
+|===
+| Aspect | `docker-compose.yml` (full Docker) | `infrastructure/docker-compose.dev.yml` (dev infra only)
+
+| Services
+| All .NET services run as Docker containers
+| Infra only in Docker; .NET services run with `dotnet watch` on the host
+
+| Metrics
+| Prometheus scrapes container IPs on the `erp-network`
+| Prometheus uses `extra_hosts: host.docker.internal` to scrape host ports
+
+| Logs
+| Alloy discovers container stdout via Docker socket; ships to Loki
+| Alloy receives OTLP logs from host services on port 4319
+
+| Traces
+| Services send OTLP traces directly to Tempo `:4317` over the Docker network
+| Services send OTLP to Alloy `:4319`; Alloy relays traces to Tempo
+
+| Required env var
+| `OTEL_EXPORTER_OTLP_ENDPOINT` set in container environment
+| `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4319` set in shell / launch profile
+
+| Grafana
+| http://localhost:3001 · admin / admin
+| http://localhost:3001 · admin / admin
+|===
+
+[source,shell]
 ----
-builder.Services.AddOpenTelemetry()
-    .WithMetrics(metrics =>
-    {
-        metrics.AddAspNetCoreInstrumentation()
-               .AddHttpClientInstrumentation()
-               .AddMeter("MassTransit");
-    })
-    .WithTracing(tracing =>
-    {
-        tracing.AddAspNetCoreInstrumentation()
-               .AddHttpClientInstrumentation()
-               .AddSource("InventoryService")
-               .AddSource("MassTransit");
-    });
+# Set this before starting services locally with dotnet watch:
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4319
 ----
 
-Once tracing is enabled, feature code can create spans around important operations so cross-service workflows remain understandable.
+== Kubernetes
 
-[source,csharp]
-----
-private static readonly ActivitySource ActivitySource = new("InventoryService");
+In Kubernetes deployments (k3s and Azure AKS) the same components run as K8s Deployments with a dedicated Service. Prometheus scrapes services by their internal DNS names instead of `host.docker.internal`.
 
-public async Task ReserveStockAsync(string productId, int quantity, CancellationToken cancellationToken)
-{
-    using var activity = ActivitySource.StartActivity("ReserveStock");
-    activity?.SetTag("product.id", productId);
-    activity?.SetTag("stock.quantity", quantity);
+[cols="1,1,1",options="header"]
+|===
+| Component | Image | K8s Service Port
 
-    var product = await _dbContext.Products.SingleAsync(x => x.Id == productId, cancellationToken);
-    product.Reserve(quantity);
-    await _dbContext.SaveChangesAsync(cancellationToken);
-}
-----
+| Prometheus | `prom/prometheus:v2.48.0` | 9090
+| Grafana | `grafana/grafana:11.4.0` | 3000 (LoadBalancer)
+| Tempo | `grafana/tempo:2.7.2` | 3200 / 4317 / 4318
+|===
 
-The infrastructure side then needs a collector or pipeline that accepts OTLP data and forwards it to the right storage backends.
+Manifests: `infrastructure/k8s/base/prometheus.yaml`, `grafana.yaml`, `tempo.yaml`.
 
-[source,hcl]
-----
-otelcol.receiver.otlp "services" {
-  grpc {
-    endpoint = "0.0.0.0:4317"
-  }
-
-  output {
-    logs   = [otelcol.exporter.loki.default.input]
-    traces = [otelcol.exporter.otlp.tempo.input]
-  }
-}
-----
+NOTE: Loki and Alloy are not deployed in the K8s manifests by default. Log aggregation can be added by deploying Alloy as a DaemonSet and Loki as a StatefulSet.
 
 == Analysis
 
@@ -73,10 +131,12 @@ otelcol.receiver.otlp "services" {
 
 |
 * *Cross-service visibility*: traces and correlated logs make asynchronous workflows debuggable.
-* *Faster diagnosis*: metrics reveal symptoms quickly and traces narrow the failing dependency.
+* *Faster diagnosis*: metrics reveal symptoms quickly; traces narrow the failing dependency.
 * *Operational maturity*: the system becomes measurable rather than anecdotal.
+* *Zero-code correlation*: TraceID derived fields in Loki auto-link log lines to Tempo traces.
 |
 * *Instrumentation effort is real*: telemetry is only useful when services emit meaningful spans, tags, and structured logs.
 * *The stack itself must be operated*: Loki, Tempo, Grafana, and collectors need care just like business services do.
 * *Signal overload is possible*: too much noisy telemetry can be as unhelpful as too little.
+* *Storage grows quickly*: Loki and Tempo write to local volumes; retention policies must be set.
 |===

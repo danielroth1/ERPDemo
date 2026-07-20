@@ -2,16 +2,32 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == ASP.NET Core as the service foundation
 
 ASP.NET Core is the runtime foundation for every backend service in this repository, including the gateway. That is important because it means each service shares the same hosting model even when the service exposes different capabilities such as REST controllers, GraphQL endpoints, SignalR hubs, health probes, or background messaging consumers. For a microservice system, that consistency matters: teams can reuse middleware patterns, authentication conventions, telemetry registration, and deployment habits instead of reinventing service startup for every business area.
+
+website::[href="https://learn.microsoft.com/aspnet/core/",text="ASP.NET Core Documentation"]
+github::[href="https://github.com/dotnet/aspnetcore",text="ASP.NET Core on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::ASP.NET Core[]
+skill::C#[]
+skill::SignalR[]
+skill::EF Core[]
+skill::OpenTelemetry[]
+skill::MassTransit[]
+====
 
 The framework is also a good fit for this project because it handles more than plain HTTP routing. It provides dependency injection, configuration, hosted services, authentication, authorization, request pipeline composition, and observability hooks. Once those concerns are composed correctly in `Program.cs`, feature code can stay focused on domain behavior rather than infrastructure wiring.
 
 == Applying ASP.NET Core in code
 
 A typical service starts by building the host, registering cross-cutting capabilities, then mapping endpoints. The example below shows the same kind of initialization pattern used throughout the ERP demo:
+
+Representative source: {repo-base}/services/inventory/InventoryManagement/Program.cs#L21[services/inventory/InventoryManagement/Program.cs#L21]
 
 [source,csharp]
 ----
@@ -44,6 +60,8 @@ app.Run();
 
 Once the host exists, application behavior is usually expressed through controllers or endpoint handlers. This is where ASP.NET Core becomes practical rather than theoretical: it takes authenticated HTTP input, resolves domain services from dependency injection, and returns structured results to the caller.
 
+Representative source: {repo-base}/services/inventory/InventoryManagement/Controllers/ProductsController.cs#L9[services/inventory/InventoryManagement/Controllers/ProductsController.cs#L9]
+
 [source,csharp]
 ----
 [ApiController]
@@ -68,6 +86,8 @@ public sealed class ProductsController : ControllerBase
 ----
 
 From the frontend, usage stays straightforward. The browser sends an authenticated request to the gateway, and the gateway forwards it to the correct ASP.NET Core service.
+
+Representative source: {repo-base}/frontend/src/services/api.service.ts#L5[frontend/src/services/api.service.ts#L5]
 
 [source,typescript]
 ----

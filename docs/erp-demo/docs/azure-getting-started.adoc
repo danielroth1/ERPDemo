@@ -1,3 +1,5 @@
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
+
 == Getting started without Azure experience
 
 This chapter assumes that Azure is new to you. The deployment path is intentionally script-first: you prepare a small set of variables, authenticate once, and then let the scripts create and operate the environment. Azure Portal usage is optional.
@@ -38,6 +40,8 @@ Docker Buildx is typically available through Docker Desktop or OrbStack.
 === 3. Prepare `.env.deploy`
 
 The scripts do not ask interactive questions. Instead, they read their configuration from `.env.deploy`. Start by copying the example file and filling in the Azure-specific values.
+
+Example configuration source: {repo-base}/.env.deploy.example#L37[.env.deploy.example#L37]
 
 [source,bash]
 ----
@@ -100,22 +104,22 @@ The scripts are enough to deploy ERPDemo to Azure. The Azure UI is not required 
 | No
 
 | Provisioning
-| `bash scripts/aks-provision.sh`
+| {repo-base}/scripts/aks-provision.sh#L1[bash scripts/aks-provision.sh]
 | Creates the Azure resources and installs the shared ingress components.
 | No
 
 | Build and push
-| `bash scripts/aks-build-push.sh`
+| {repo-base}/scripts/aks-build-push.sh#L1[bash scripts/aks-build-push.sh]
 | Builds the Docker images and uploads them to ACR.
 | No
 
 | Deployment
-| `bash scripts/aks-deploy.sh`
+| {repo-base}/scripts/aks-deploy.sh#L1[bash scripts/aks-deploy.sh]
 | Injects runtime values into the Kubernetes overlay and rolls the workloads into AKS.
 | No
 
 | Cost control
-| `bash scripts/aks-stop.sh` and `bash scripts/aks-start.sh`
+| {repo-base}/scripts/aks-stop.sh#L1[bash scripts/aks-stop.sh] and {repo-base}/scripts/aks-start.sh#L1[bash scripts/aks-start.sh]
 | Stops and resumes the environment without recreating it.
 | No
 |===

@@ -2,10 +2,23 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == Kubernetes in the context of this architecture
 
 Kubernetes is the deployment platform that turns the system from a set of locally running processes into a cluster of independently managed services. For teams new to the technology, the most useful mental model is simple: a *Deployment* keeps pods running, a *Service* gives those pods a stable network identity, and an ingress or gateway publishes selected routes to the outside world. Everything else in the platform builds on those foundations.
+
+website::[href="https://kubernetes.io/",text="Kubernetes Documentation"]
+github::[href="https://github.com/kubernetes/kubernetes",text="Kubernetes on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::Kubernetes[]
+skill::Docker[]
+skill::Kafka[]
+skill::RabbitMQ[]
+skill::Skaffold[]
+====
 
 This ERP demo uses Kubernetes because the application is already shaped like a cluster-native system. Services are independently deployable, each service owns its own configuration, observability is centralized, and asynchronous infrastructure such as Kafka and RabbitMQ fits naturally into a shared platform. The repository uses a common manifest base plus overlays so the same architecture can target local clusters, private k3s environments, and AKS with environment-specific changes layered on top.
 
@@ -14,6 +27,8 @@ dotgraph::./diagrams/kubernetes-topology.dot[caption="Kubernetes topology",max-w
 == Applying the pattern
 
 The core implementation pattern is straightforward: package each service as a container, deploy it with a Deployment, expose it with a Service, and route public traffic through a gateway or ingress. A minimal example for a backend service looks like this:
+
+Representative source: {repo-base}/infrastructure/k8s/base/inventory.yaml#L1[infrastructure/k8s/base/inventory.yaml#L1]
 
 [source,yaml]
 ----
@@ -53,6 +68,8 @@ spec:
 ----
 
 In this repository, the gateway remains the main public entry point, so frontend code should still talk to one stable base URL rather than directly to internal services. That keeps service discovery inside the cluster where it belongs.
+
+Representative source: {repo-base}/frontend/src/services/api-base-url.ts#L1[frontend/src/services/api-base-url.ts#L1]
 
 [source,typescript]
 ----

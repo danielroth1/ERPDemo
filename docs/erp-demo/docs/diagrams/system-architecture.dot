@@ -1,7 +1,8 @@
 digraph architecture {
   rankdir=LR;
-  graph [nodesep=0.5, ranksep=0.9, splines=ortho];
+  graph [nodesep=0.65, ranksep=1.05, pad=0.2, splines=polyline, concentrate=true];
   node [shape=box, style="rounded", fontsize=11];
+  edge [penwidth=1];
 
   browser [label="Browser\nReact SPA"];
   gateway [label="API Gateway\nYARP + Auth + Rate limiting"];
@@ -22,39 +23,39 @@ digraph architecture {
 
   browser -> gateway;
 
-  gateway -> users;
-  gateway -> inventory;
-  gateway -> sales;
-  gateway -> financial;
-  gateway -> dashboard;
-  gateway -> orchestration;
+  gateway -> users [sametail=gw];
+  gateway -> inventory [sametail=gw];
+  gateway -> sales [sametail=gw];
+  gateway -> financial [sametail=gw];
+  gateway -> dashboard [sametail=gw];
+  gateway -> orchestration [sametail=gw];
 
-  users -> postgres;
-  inventory -> postgres;
-  sales -> postgres;
-  financial -> postgres;
-  dashboard -> postgres;
-  orchestration -> postgres;
+  users -> postgres [samehead=pg];
+  inventory -> postgres [samehead=pg];
+  sales -> postgres [samehead=pg];
+  financial -> postgres [samehead=pg];
+  dashboard -> postgres [samehead=pg];
+  orchestration -> postgres [samehead=pg];
 
   inventory -> minio;
   dashboard -> redis;
 
-  users -> kafka;
-  inventory -> kafka;
-  sales -> kafka;
-  financial -> kafka;
-  orchestration -> kafka;
-  dashboard -> kafka;
+  users -> kafka [samehead=events];
+  inventory -> kafka [samehead=events];
+  sales -> kafka [samehead=events];
+  financial -> kafka [samehead=events];
+  orchestration -> kafka [samehead=events];
+  dashboard -> kafka [samehead=events];
 
-  orchestration -> rabbit;
-  inventory -> rabbit;
-  financial -> rabbit;
+  orchestration -> rabbit [samehead=commands];
+  inventory -> rabbit [samehead=commands];
+  financial -> rabbit [samehead=commands];
 
-  gateway -> obs [style=dashed];
-  users -> obs [style=dashed];
-  inventory -> obs [style=dashed];
-  sales -> obs [style=dashed];
-  financial -> obs [style=dashed];
-  dashboard -> obs [style=dashed];
-  orchestration -> obs [style=dashed];
+  gateway -> obs [style=dashed, samehead=telemetry];
+  users -> obs [style=dashed, samehead=telemetry];
+  inventory -> obs [style=dashed, samehead=telemetry];
+  sales -> obs [style=dashed, samehead=telemetry];
+  financial -> obs [style=dashed, samehead=telemetry];
+  dashboard -> obs [style=dashed, samehead=telemetry];
+  orchestration -> obs [style=dashed, samehead=telemetry];
 }

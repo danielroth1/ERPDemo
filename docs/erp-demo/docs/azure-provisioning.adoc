@@ -1,6 +1,8 @@
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
+
 == Provision Azure resources step by step
 
-This page explains the infrastructure stage implemented by `scripts/aks-provision.sh`. It is a one-time environment bootstrap: after it succeeds, Azure contains the cluster, registry, database, secret store, ingress components, and the values you need for later deployment.
+This page explains the infrastructure stage implemented by {repo-base}/scripts/aks-provision.sh[scripts/aks-provision.sh]. It is a one-time environment bootstrap: after it succeeds, Azure contains the cluster, registry, database, secret store, ingress components, and the values you need for later deployment.
 
 IMPORTANT: This entire stage is Azure CLI driven. No Azure Portal clicks are required to provision the ERP environment.
 
@@ -12,6 +14,8 @@ Before looking at the individual commands, it helps to see the finished target. 
 image::./images/resources.jpg[alt="Azure Portal resources view showing the collection of resources created for the ERP environment",width=1100]
 
 === The script begins by loading names and regions from `.env.deploy`
+
+Matching source: {repo-base}/scripts/aks-provision.sh#L37[scripts/aks-provision.sh#L37]
 
 [source,bash]
 ----
@@ -33,6 +37,8 @@ These variables decide the names and locations of the Azure resources. That mean
 
 Before Azure can create certain resource types in a subscription, the relevant providers must be registered.
 
+Matching source: {repo-base}/scripts/aks-provision.sh#L66[scripts/aks-provision.sh#L66]
+
 [source,bash]
 ----
 for PROVIDER in \
@@ -53,6 +59,8 @@ This step is idempotent. It is particularly useful in a fresh Azure subscription
 
 The resource group is the logical container for the environment.
 
+Matching source: {repo-base}/scripts/aks-provision.sh#L81[scripts/aks-provision.sh#L81]
+
 [source,bash]
 ----
 az group create --name "$RG" --location "$LOCATION" --output none
@@ -61,6 +69,8 @@ az group create --name "$RG" --location "$LOCATION" --output none
 Every major Azure resource created by the script is attached to this group. If you ever need to review or delete the environment cleanly, the resource group gives you one place to start.
 
 === 2. Create the Virtual Network and AKS subnet
+
+Matching source: {repo-base}/scripts/aks-provision.sh#L88[scripts/aks-provision.sh#L88], {repo-base}/scripts/aks-provision.sh#L94[scripts/aks-provision.sh#L94], {repo-base}/scripts/aks-provision.sh#L99[scripts/aks-provision.sh#L99]
 
 [source,bash]
 ----
@@ -85,6 +95,8 @@ IMPORTANT: Choose address ranges carefully if this environment may later connect
 image::./images/virtual-networks-erp-vnet.jpg[alt="Azure Portal virtual network detail page for the ERP virtual network created during provisioning",width=1100]
 
 === 3. Create Azure Container Registry
+
+Matching source: {repo-base}/scripts/aks-provision.sh#L108[scripts/aks-provision.sh#L108]
 
 [source,bash]
 ----
@@ -117,6 +129,8 @@ image::./images/container-registries-danielerpacr.jpg[alt="Azure Portal detail p
 === 4. Create the AKS cluster
 
 The AKS section is where the most important cost and capacity decisions appear.
+
+Matching source: {repo-base}/scripts/aks-provision.sh#L119[scripts/aks-provision.sh#L119]
 
 [source,bash]
 ----
@@ -166,6 +180,8 @@ IMPORTANT: Node count is the second major AKS decision. One node is fine for a d
 
 After the cluster exists, the script wires it to the registry so it can pull images without hand-managed pull secrets.
 
+Matching source: {repo-base}/scripts/aks-provision.sh#L145[scripts/aks-provision.sh#L145] and {repo-base}/scripts/aks-provision.sh#L154[scripts/aks-provision.sh#L154]
+
 [source,bash]
 ----
 az aks update --resource-group "$RG" --name "$AKS" --attach-acr "$ACR" --output none
@@ -183,6 +199,8 @@ kubernetes-attach-acr
 === 6. Install Gateway API CRDs and Traefik
 
 Provisioning does not stop at raw Azure resources. It also installs the ingress layer the ERP deployment expects.
+
+Matching source: {repo-base}/scripts/aks-provision.sh#L169[scripts/aks-provision.sh#L169] and {repo-base}/scripts/aks-provision.sh#L176[scripts/aks-provision.sh#L176]
 
 [source,bash]
 ----
@@ -206,6 +224,8 @@ IMPORTANT: The public load balancer is convenient and necessary for a public dem
 
 Key Vault is where the environment stores sensitive runtime values.
 
+Matching source: {repo-base}/scripts/aks-provision.sh#L198[scripts/aks-provision.sh#L198]
+
 [source,bash]
 ----
 az keyvault create \
@@ -216,6 +236,8 @@ az keyvault create \
 ----
 
 The script then grants the AKS Key Vault provider identity permission to read secrets and creates a federated identity credential for workload identity.
+
+Matching source: {repo-base}/scripts/aks-provision.sh#L213[scripts/aks-provision.sh#L213] and {repo-base}/scripts/aks-provision.sh#L231[scripts/aks-provision.sh#L231]
 
 [source,bash]
 ----
@@ -243,6 +265,8 @@ image::./images/key-vaults.jpg[alt="Azure Portal Key Vaults page showing the key
 
 The script provisions a managed PostgreSQL server instead of running PostgreSQL inside the cluster.
 
+Matching source: {repo-base}/scripts/aks-provision.sh#L249[scripts/aks-provision.sh#L249]
+
 [source,bash]
 ----
 az postgres flexible-server create \
@@ -256,6 +280,8 @@ az postgres flexible-server create \
 ----
 
 After the server exists, the script creates one database per ERP bounded context.
+
+Matching source: {repo-base}/scripts/aks-provision.sh#L260[scripts/aks-provision.sh#L260]
 
 [source,bash]
 ----
@@ -297,6 +323,8 @@ image::./images/azure-db-postgresql-daniel-erp-pg.jpg[alt="Azure Portal detail p
 
 Once PostgreSQL exists, the script writes the runtime values the cluster will later consume.
 
+Matching source: {repo-base}/scripts/aks-provision.sh#L281[scripts/aks-provision.sh#L281], {repo-base}/scripts/aks-provision.sh#L282[scripts/aks-provision.sh#L282], and {repo-base}/scripts/aks-provision.sh#L288[scripts/aks-provision.sh#L288]
+
 [source,bash]
 ----
 az keyvault secret set --vault-name "$KV" --name "pg-connection-string-users" \
@@ -315,6 +343,8 @@ The actual script sets all six PostgreSQL connection strings and the Grafana adm
 
 At the end of provisioning, the script prints three values you need for later stages.
 
+Matching source: {repo-base}/scripts/aks-provision.sh#L303[scripts/aks-provision.sh#L303], {repo-base}/scripts/aks-provision.sh#L304[scripts/aks-provision.sh#L304], and {repo-base}/scripts/aks-provision.sh#L305[scripts/aks-provision.sh#L305]
+
 [source,bash]
 ----
 AZURE_TENANT_ID=<printed-by-script>
@@ -325,8 +355,8 @@ AZ_PG_HOST=<printed-by-script>
 It also tells you what comes next.
 
 1. Point your DNS A record to the Traefik load balancer IP.
-2. Install the Azure TLS support via `infrastructure/cert-manager/install-azure.sh`.
-3. Build and push images.
-4. Deploy the images into AKS.
+2. Install the Azure TLS support via {repo-base}/infrastructure/cert-manager/install-azure.sh[infrastructure/cert-manager/install-azure.sh].
+3. Build and push images with {repo-base}/scripts/aks-build-push.sh[scripts/aks-build-push.sh].
+4. Deploy the images into AKS with {repo-base}/scripts/aks-deploy.sh[scripts/aks-deploy.sh].
 
 Provisioning is therefore not just about resource creation. It is the stage that prepares the environment contract for everything that follows.

@@ -1,6 +1,10 @@
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
+
 == Deploy the images from ACR into AKS
 
 This stage takes the images that already exist in ACR and turns them into running workloads inside AKS. It does not build anything. Instead, it injects the environment-specific values that Kubernetes needs and applies the manifests.
+
+Script source for the bash examples on this page: {repo-base}/scripts/aks-deploy.sh#L1[scripts/aks-deploy.sh#L1]
 
 IMPORTANT: The two most common deployment mistakes are using the wrong image tag and forgetting to copy `AZURE_TENANT_ID`, `AZURE_KV_IDENTITY_CLIENT_ID`, and `AZ_PG_HOST` from the provisioning output into `.env.deploy`.
 
@@ -39,6 +43,8 @@ The first command proves that `kubectl` can talk to AKS. The second ensures that
 === Build a temporary deployment overlay with the real runtime values
 
 The base Kubernetes manifests in source control contain placeholders. The deployment script replaces them at runtime by generating a temporary `kustomization.yaml`.
+
+Representative base manifest: {repo-base}/infrastructure/k8s/azure/kustomization.yaml#L1[infrastructure/k8s/azure/kustomization.yaml#L1]
 
 [source,yaml]
 ----

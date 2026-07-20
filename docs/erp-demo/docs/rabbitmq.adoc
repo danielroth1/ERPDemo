@@ -2,16 +2,28 @@
 :toclevels: 3
 :sectnums:
 :icons: font
+:repo-base: https://github.com/danielroth1/ERPDemo/blob/76470e3785c857043b0572c8fb0df42d8d5912c3
 
 == RabbitMQ as the command channel for workflows
 
 RabbitMQ is used here for messages that represent an instruction or a unit of work that another service should perform next. That makes it fundamentally different from Kafka. If Kafka answers the question "what already happened?", RabbitMQ answers the question "what should happen now?". In saga-driven workflows, that distinction is extremely useful because orchestration logic often needs to queue the next step, retry when a service is temporarily unavailable, and keep commands isolated from public HTTP request lifetimes.
+
+website::[href="https://www.rabbitmq.com/",text="RabbitMQ Documentation"]
+github::[href="https://github.com/rabbitmq/rabbitmq-server",text="RabbitMQ on GitHub"]
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::RabbitMQ[]
+skill::MassTransit[]
+====
 
 This ERP demo uses RabbitMQ heavily in purchase and return workflows. Commands such as reserve stock, release reservation, create transaction, or void transaction move between services through the broker. That allows the workflow to continue even when the initiating HTTP request has already completed, and it keeps long-running business coordination out of the browser and out of synchronous call chains.
 
 == Applying the pattern
 
 RabbitMQ is typically configured through MassTransit consumers and endpoints. A service registers the message handlers it can execute, then configures retries and endpoint creation during startup.
+
+Representative source: {repo-base}/services/orchestration/Orchestration/Program.cs#L147[services/orchestration/Orchestration/Program.cs#L147]
 
 [source,csharp]
 ----
@@ -39,6 +51,8 @@ builder.Services.AddMassTransit(x =>
 ----
 
 Sending a command should express clear intent and include enough correlation data for the workflow to continue safely.
+
+Representative source: {repo-base}/services/orchestration/Orchestration/Sagas/PurchaseStateMachine.cs#L47[services/orchestration/Orchestration/Sagas/PurchaseStateMachine.cs#L47]
 
 [source,csharp]
 ----
