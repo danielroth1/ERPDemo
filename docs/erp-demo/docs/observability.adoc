@@ -63,9 +63,9 @@ dotgraph::./diagrams/observability-data-flow.dot[caption="Observability data-flo
 
 The detailed sub-pages document each signal path with configuration examples:
 
-* xref:observability-metrics[] — Prometheus scrape config, `/metrics` endpoint, Kafka JMX exporter, span-metrics
-* xref:observability-logs[] — Serilog setup, Alloy Docker discovery, Alloy OTLP relay, Loki config
-* xref:observability-traces[] — OpenTelemetry tracing, custom `ActivitySource`, Tempo config, Grafana correlation
+* xref:erp-docs/observability-metrics[] — Prometheus scrape config, `/metrics` endpoint, Kafka JMX exporter, span-metrics
+* xref:erp-docs/observability-logs[] — Serilog setup, Alloy Docker discovery, Alloy OTLP relay, Loki config
+* xref:erp-docs/observability-traces[] — OpenTelemetry tracing, custom `ActivitySource`, Tempo config, Grafana correlation
 
 == Development Environments
 

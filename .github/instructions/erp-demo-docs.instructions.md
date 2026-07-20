@@ -19,33 +19,44 @@ The files are AsciiDoc (`.adoc`) pages that get published on a React CV portfoli
   - CV website repo: `src/data/projects/ERPDemo/docs/<slug>.adoc`
 - The `diagrams/` folder lives alongside the docs (e.g. `docs/erp-demo/docs/diagrams/`).
 - The filename (without extension) is the **slug**: lowercase, hyphen-separated words.
-- The slug must match the `slug` field of the corresponding entry in `erp-docs.json`.
+- The slug must match the `slug` field of the corresponding entry in `docs.json`.
 
 ---
 
-## erp-docs.json
+## docs.json
 
-`erp-docs.json` is the single source of truth for page order, titles, and hierarchy.
+`docs.json` is the single source of truth for page order, titles, and hierarchy.
 Keep it in sync whenever pages are added, removed, or reordered.
-- Authoring repo: `docs/erp-demo/erp-docs.json`
-- CV website repo: `src/data/projects/ERPDemo/erp-docs.json`
+- Authoring repo: `docs/erp-demo/docs.json`
+- CV website repo: `src/data/projects/ERPDemo/docs.json`
 
 ```json
-[
-  { "slug": "introduction", "title": "Introduction", "level": 1 },
-  { "slug": "architecture-overview", "title": "Architecture Overview", "level": 1 },
-  { "slug": "react-frontend", "title": "React Frontend", "level": 2 }
-]
+{
+  "title": "ERP Documentation",
+  "route": "erp-docs",
+  "landing_page": "src/data/projects/ERPDemo/docs/landing.md",
+  "toc": [
+    { "slug": "introduction", "title": "Introduction", "level": 1 },
+    { "slug": "architecture-overview", "title": "Architecture Overview", "level": 1 },
+    { "slug": "react-frontend", "title": "React Frontend", "level": 2 }
+  ]
+}
 ```
 
 Level values: `1` = chapter, `2` = section, `3` = sub-section.
 The CV website derives section numbers (e.g. `2.1`, `2.1.3`) and prev/next navigation automatically from this file.
 
+Top-level fields:
+- `title` — documentation set title used for navigation/header
+- `route` — URL route prefix for all documentation pages
+- `landing_page` — path to a Markdown file rendered as the landing / overview page
+- `toc` — ordered array of `{ slug, title, level }` entries defining the table of contents
+
 ---
 
 ## Document structure
 
-Do **not** include a document title (`= Title`) — the page title is supplied by the CV website from `erp-docs.json`.
+Do **not** include a document title (`= Title`) — the page title is supplied by the CV website from `docs.json`.
 
 Start content directly with body text or with `==` section headings:
 
@@ -186,7 +197,7 @@ The file is bundled by the CV website's build at compile time. No copy step need
 File layout example:
 ```
 docs/erp-demo/
-  erp-docs.json
+  docs.json
   docs/
     architecture-overview.adoc
     diagrams/
@@ -319,11 +330,11 @@ term two::
 ## Adding a new page
 
 1. Create `docs/erp-demo/docs/<slug>.adoc`.
-2. Add an entry at the desired position in `docs/erp-demo/erp-docs.json`:
+2. Add an entry at the desired position in `docs/erp-demo/docs.json`:
    ```json
    { "slug": "your-slug", "title": "Your Page Title", "level": 2 }
    ```
 3. Copy the `.adoc` file to `src/data/projects/ERPDemo/docs/` in the CV website repository.
-4. Copy `docs/erp-demo/erp-docs.json` to the CV website as well (it replaces the one there).
+4. Copy `docs/erp-demo/docs.json` to the CV website as well (it replaces the one there).
 
 No code changes are needed in the CV website.

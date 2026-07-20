@@ -101,3 +101,74 @@ const products = await inventoryClient.api.v1.products.get({
 * *Over-fetching is common*: fixed response shapes do not always match the needs of a specific screen.
 * *Cross-service composition gets awkward*: read models that span many services often need something more flexible.
 |===
+
+== OpenAPI-Based Client Generation
+
+Every microservice exposes a Swagger endpoint in development mode that a pair of scripts consume to regenerate all HTTP clients — frontend and backend — from a single source of truth. No hand-written HTTP client is ever maintained by a developer, which eliminates the risk of a forgotten API change breaking contract consumers at runtime.
+
+=== Technology
+
+Code generation is driven by {repo-base}/kiota-config.json[Kiota], Microsoft’s OpenAPI-based client generator. Kiota produces lightweight, typed HTTP clients from OpenAPI 3.1 descriptions without generating an entire SDK surface. The same tool generates:
+
+* *TypeScript clients* for the React SPA (`frontend/src/generated/clients/`).
+* *C# clients* for inter-service calls (`services/<service>/Generated/Clients/`).
+
+[highlight,title="Tech Stack",shadow]
+====
+skill::OpenAPI[]
+skill::Kiota[]
+skill::TypeScript[]
+skill::C#[]
+====
+
+=== How OpenAPI Files Are Generated
+
+Each backend service registers Swashbuckle at startup (see <<Applying REST in code>>). When a service runs in development mode, the framework automatically generates an OpenAPI 3.1 specification at `/swagger/v1/swagger.json` from the ASP.NET Core controllers, their route attributes, request/response models, and data annotations.
+
+The script `scripts/update-api-clients.mjs` performs two phases:
+
+1. *Export* — fetches the live Swagger JSON from every running service and saves it to `docs/openapi/<service>.json`.
+2. *Generate* — runs `dotnet kiota` against each saved spec to regenerate C# clients into the backend consumer projects.
+
+The frontend counterpart is `scripts/generate-api-clients.mjs`, which works identically but targets TypeScript output and can additionally validate that all services are reachable before generation starts.
+
+=== Publicly Available Specifications
+
+The exported OpenAPI files live in `docs/openapi/` and are committed to the repository. They serve as the stable, version-controlled contract between services and are consumed directly by both generation scripts:
+
+* `docs/openapi/financial.json`
+* `docs/openapi/dashboard.json`
+* `docs/openapi/inventory.json`
+* `docs/openapi/orchestration.json`
+* `docs/openapi/sales.json`
+* `docs/openapi/user-management.json`
+
+Keeping them in the repository means any developer can regenerate all clients without running every service locally — the specs are the contract, and clients are derived from them.
+
+=== Backend-to-Backend Clients
+
+Several backend services call each other through generated C# clients rather than raw `HttpClient` calls:
+
+[cols="2a,3a",options="header"]
+|===
+| Consumer Service | Generated Clients
+| *Inventory Management* | Financial
+| *Sales Management* | Financial, Inventory
+| *Dashboard Analytics* | User Management, Sales, Financial, Inventory
+|===
+
+These are regenerated with the `shell: frontend: generate-all-api-clients` VS Code task (or by running `scripts/update-api-clients.mjs` directly).
+
+=== Compile-Time Safety Net
+
+Because the frontend imports generated TypeScript clients with full type definitions, any breaking change to a backend API surface immediately causes a *compile error* in the frontend build. There is no possibility of a developer accidentally missing a renamed field, a changed route, or a new required parameter — TypeScript will refuse to compile until the affected frontend code is updated.
+
+This creates a tight feedback loop:
+
+. A developer modifies a backend controller (route, request, or response model).
+. The backend service exposes the updated `/swagger/v1/swagger.json`.
+. The generation script exports the new spec and regenerates all clients.
+. If the change broke the frontend contract, `npm run build` fails with type errors pointing to the exact mismatch.
+. The developer fixes the frontend before the PR can merge.
+
+The same principle applies to backend-to-backend calls: C# clients are also regenerated from the specs, and the .NET compiler will flag mismatches between consumer code and the regenerated client surface.
