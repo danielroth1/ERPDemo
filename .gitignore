@@ -24,6 +24,7 @@ bld/
 
 ## Visual Studio cache/options directory
 .vs/
+*.csproj.lscache
 
 ## Visual Studio Code
 .vscode/*

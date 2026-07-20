@@ -1,28 +1,34 @@
 ---
-applyTo: "docs/erp-demo/**"
+applyTo:
+  - "docs/erp-demo/**"
+  - "src/data/projects/ERPDemo/docs/**"
 ---
 
 # ERP Demo documentation authoring
 
-These instructions apply when writing or editing documentation pages inside `docs/erp-demo/`.
+These instructions apply when writing or editing ERP Demo documentation pages, either in the authoring repository (`docs/erp-demo/`) or in the CV website repository (`src/data/projects/ERPDemo/docs/`).
 
-The files in this folder are AsciiDoc (`.adoc`) pages that get published on a React CV portfolio website.
+The files are AsciiDoc (`.adoc`) pages that get published on a React CV portfolio website.
 
 ---
 
 ## File naming and placement
 
-- Each page is a single `.adoc` file inside `docs/erp-demo/docs/`.
-- The `diagrams/` folder lives at `docs/erp-demo/docs/diagrams/`.
+- Each page is a single `.adoc` file.
+  - Authoring repo: `docs/erp-demo/docs/<slug>.adoc`
+  - CV website repo: `src/data/projects/ERPDemo/docs/<slug>.adoc`
+- The `diagrams/` folder lives alongside the docs (e.g. `docs/erp-demo/docs/diagrams/`).
 - The filename (without extension) is the **slug**: lowercase, hyphen-separated words.
-- The slug must match the `slug` field of the corresponding entry in `docs/erp-demo/erp-docs.json`.
+- The slug must match the `slug` field of the corresponding entry in `erp-docs.json`.
 
 ---
 
 ## erp-docs.json
 
-`docs/erp-demo/erp-docs.json` is the single source of truth for page order, titles, and hierarchy.
+`erp-docs.json` is the single source of truth for page order, titles, and hierarchy.
 Keep it in sync whenever pages are added, removed, or reordered.
+- Authoring repo: `docs/erp-demo/erp-docs.json`
+- CV website repo: `src/data/projects/ERPDemo/erp-docs.json`
 
 ```json
 [
@@ -70,22 +76,25 @@ Optional document attributes at the top of the file:
 
 The CV website renderer supports the following macros in addition to standard AsciiDoc.
 
-### Inline macros (inside paragraph text)
+### Skill badges (inline — inside paragraph text)
+
+Use `skill:Name[]` to render a coloured technology badge inline in any paragraph.
+Use the same canonical skill name that appears in `src/data/skills.json`.
 
 ```asciidoc
-Implemented in skill:C#[] using skill:React[] for the frontend.
-
-Contact: email:[]
-Contact: email:[href="you@example.com",text="Send email"]
+The backend is implemented with skill:ASP.NET Core[] and skill:C#[].
+The frontend is a skill:React[] and skill:TypeScript[] SPA.
 ```
 
-### Buttons (block macros — one per line)
+### Buttons to open webpages (block macros — one per line)
+
+All buttons must be on their own line. They open an external URL in a new tab.
 
 ```asciidoc
 github::[href="https://github.com/org/repo",text="View on GitHub"]
-download::[href="https://example.com/v1.zip",text="Download v1.0"]
 website::[href="https://example.com",text="Live Demo"]
 linkedin::[href="https://linkedin.com/in/you",text="LinkedIn"]
+download::[href="https://example.com/v1.zip",text="Download v1.0"]
 
 linux::[href="https://example.com/app.AppImage",text="Download for Linux"]
 windows::[href="https://example.com/app.zip",text="Download for Windows"]
@@ -95,13 +104,21 @@ firefox::[href="https://addons.mozilla.org/…",text="Get for Firefox"]
 chrome::[href="https://chrome.google.com/webstore/…",text="Get for Chrome"]
 ```
 
-### Custom button
+#### Custom button with any react-icon
 
 ```asciidoc
 btn::[href="https://…",icon="FaDownload",text="Download Release"]
+btn::[href="https://…",icon="FaExternalLinkAlt",text="Open Dashboard"]
 ```
 
 `icon` accepts any `react-icons/fa` name (e.g. `FaGithub`, `FaExternalLinkAlt`).
+
+#### Contact email button (inline)
+
+```asciidoc
+Contact: email:[]
+Contact: email:[href="you@example.com",text="Send email"]
+```
 
 ### Video embeds
 
@@ -130,7 +147,18 @@ highlight::[title="Note",text="This feature requires .NET 8.",shadow]
 
 All attributes are optional. `shadow` is a boolean flag (no value needed).
 
-To embed skill badges or other tags inside a highlight, use a passthrough block:
+To embed skill badges inside a highlight, use the block form with `====` delimiters:
+
+```asciidoc
+[highlight,title="Tech Stack",shadow]
+====
+skill::Azure AKS[]
+skill::Kubernetes[]
+skill::Docker[]
+====
+```
+
+For arbitrary HTML content, use a passthrough block:
 
 ```asciidoc
 ++++
